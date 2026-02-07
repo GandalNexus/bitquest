@@ -26,8 +26,8 @@ export default function SignupPage() {
           <div className="w-12 h-12 bg-gradient-to-tr from-amber-400 to-yellow-200 rounded-lg flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/30">
             <Bitcoin className="w-7 h-7 text-slate-900" />
           </div>
-          <h2 className="text-2xl font-bold text-white">Créer un compte</h2>
-          <p className="text-slate-400 text-sm mt-2">Rejoignez l'aventure BitQuest.</p>
+          <h2 className="text-2xl font-bold text-white">Create an Account</h2>
+          <p className="text-slate-400 text-sm mt-2">Join the BitQuest adventure.</p>
         </div>
 
         <form action={formAction} className="space-y-4">
@@ -39,7 +39,7 @@ export default function SignupPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Pseudo</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Username</label>
             <div className="relative">
               <User className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
               <input 
@@ -61,13 +61,13 @@ export default function SignupPage() {
                 type="email" 
                 required
                 className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
-                placeholder="vous@exemple.com"
+                placeholder="you@example.com"
               />
             </div>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Mot de passe</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
             <div className="relative">
               <Lock className="absolute left-3 top-3 w-5 h-5 text-slate-500" />
               <input 
@@ -79,16 +79,16 @@ export default function SignupPage() {
                 placeholder="••••••••"
               />
             </div>
-            <p className="text-xs text-slate-500 mt-1">Minimum 8 caractères.</p>
+            <p className="text-xs text-slate-500 mt-1">Minimum 8 characters.</p>
           </div>
 
           <SubmitButton />
         </form>
 
         <p className="text-center text-slate-400 text-sm mt-8">
-          Déjà un aventurier ? {' '}
+          Already an adventurer? {' '}
           <Link href="/login" className="text-amber-500 hover:text-amber-400 font-bold">
-            Se connecter
+            Log In
           </Link>
         </p>
       </div>
@@ -104,7 +104,7 @@ function SubmitButton() {
       className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-slate-700 disabled:cursor-not-allowed text-slate-900 font-bold py-3 rounded-lg shadow-lg shadow-amber-500/20 transition-all transform active:scale-95 flex items-center justify-center gap-2 mt-6"
     >
       {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-      {pending ? 'Création en cours...' : 'Commencer le jeu'}
+      {pending ? 'Creating account...' : 'Start the Game'}
     </button>
   );
 }

@@ -25,8 +25,8 @@ export default function LoginPage() {
           <div className="w-12 h-12 bg-amber-500 rounded-lg flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/20">
             <Bitcoin className="w-7 h-7 text-slate-900" />
           </div>
-          <h2 className="text-2xl font-bold text-white">Bienvenue sur BitQuest</h2>
-          <p className="text-slate-400 text-sm mt-2">Connectez-vous pour continuer votre progression.</p>
+          <h2 className="text-2xl font-bold text-white">Welcome to BitQuest</h2>
+          <p className="text-slate-400 text-sm mt-2">Log in to continue your progress.</p>
         </div>
 
         <form action={formAction} className="space-y-5">
@@ -43,12 +43,12 @@ export default function LoginPage() {
               type="email" 
               required
               className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
-              placeholder="vous@exemple.com"
+              placeholder="you@example.com"
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Mot de passe</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
             <input 
               name="password"
               type="password" 
@@ -62,9 +62,9 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-slate-400 text-sm mt-8">
-          Pas encore de compte ? {' '}
+          Don't have an account yet? {' '}
           <Link href="/signup" className="text-amber-500 hover:text-amber-400 font-bold">
-            S'inscrire
+            Sign Up
           </Link>
         </p>
       </div>
@@ -80,7 +80,7 @@ function LoginButton() {
       className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-slate-700 disabled:cursor-not-allowed text-slate-900 font-bold py-3 rounded-lg shadow-lg shadow-amber-500/20 transition-all transform active:scale-95 flex items-center justify-center gap-2"
     >
       {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-      {pending ? 'Connexion...' : 'Se connecter'}
+      {pending ? 'Logging in...' : 'Log In'}
     </button>
   );
 }
