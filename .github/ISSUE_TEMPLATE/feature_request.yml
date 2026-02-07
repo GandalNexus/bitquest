@@ -1,0 +1,85 @@
+name: Feature Request
+description: Suggest a new feature for BitQuest
+title: "[FEATURE] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting an improvement! 💡
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What problem does this feature solve?
+      placeholder: I am always frustrated when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How do you imagine this feature working?
+      placeholder: I suggest that...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you thought of other solutions?
+      placeholder: I also thought about...
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Low (nice to have)
+        - Medium (would improve the experience)
+        - High (important feature)
+        - Critical (blocker)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Which part of the project does this relate to?
+      options:
+        - Authentication
+        - Dashboard
+        - Quests
+        - Wallet
+        - Badges
+        - UI/UX
+        - Performance
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Add any other context, screenshots, mockups, etc.
+      placeholder: Other details...
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      description: Before submitting
+      options:
+        - label: I have checked that there is no similar request
+          required: true
+        - label: This feature aligns with the project's goals
+          required: true
+        - label: I am ready to contribute to its implementation
+          required: false
