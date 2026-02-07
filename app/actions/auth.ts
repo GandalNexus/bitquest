@@ -30,7 +30,7 @@ export async function loginUser(
   const email = formData.get('email')?.toString();
   const password = formData.get('password')?.toString();
 
-  if (!email || !password) return { error: 'Email et mot de passe requis' };
+  if (!email || !password) return { error: 'Email and password required' };
 
   const [userRecord] = await db.select({
       id: users.id,
@@ -45,10 +45,10 @@ export async function loginUser(
     .from(users)
     .where(sql`${users.email} = ${email}`);
 
-  if (!userRecord) return { error: 'Utilisateur non trouvé' };
+  if (!userRecord) return { error: 'User not found' };
 
   const valid = await bcrypt.compare(password, userRecord.password);
-  if (!valid) return { error: 'Mot de passe incorrect' };
+  if (!valid) return { error: 'Incorrect password' };
 
   (await cookies()).set('user_session', userRecord.id.toString(), {
     path: '/',
@@ -86,10 +86,10 @@ export async function signupUser(
   const email = formData.get('email')?.toString();
   const password = formData.get('password')?.toString();
 
-  if (!name || !email || !password) return { error: 'Tous les champs sont requis' };
+  if (!name || !email || !password) return { error: 'All fields are required' };
 
   const [exists] = await db.select().from(users).where(sql`${users.email} = ${email}`);
-  if (exists) return { error: 'Cet email est déjà utilisé' };
+  if (exists) return { error: 'This email is already in use' };
 
   const hashed = await bcrypt.hash(password, 10);
 
@@ -100,7 +100,7 @@ export async function signupUser(
       password: hashed,
       level: 1,
       xp: 0,
-      sats: 0,
+      sats: 50,
       createdAt: new Date(),
     })
     .returning({
@@ -133,4 +133,36 @@ export async function signupUser(
     },
   };
   
+}
+
+// ---------------- GET CURRENT USER ----------------
+export async function getCurrentUser(): Promise<User | null> {
+  const cookieStore = await cookies();
+  const userId = cookieStore.get('user_session')?.value;
+
+  if (!userId) return null;
+
+  const [userRecord] = await db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      level: users.level,
+      xp: users.xp,
+      sats: users.sats,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(sql`${users.id} = ${parseInt(userId)}`);
+
+  if (!userRecord) return null;
+
+  return {
+    id: userRecord.id,
+    name: userRecord.name,
+    email: userRecord.email,
+    level: userRecord.level ?? 1,
+    xp: userRecord.xp ?? 0,
+    sats: userRecord.sats ?? 0,
+    createdAt: userRecord.createdAt,
+  };
 }
