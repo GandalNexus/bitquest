@@ -16,26 +16,27 @@ interface User {
   id: number;
   name: string;
   email: string;
-  level: number;
-  xp: number;
-  sats: number;
+  level: number | null;
+  xp: number | null;
+  sats: number | null;
+  createdAt: Date | null;
 }
 
 const QuestsData = [
   {
     id: 1,
-    title: "Premiers Pas",
-    description: "Comprendre ce qu'est une adresse Bitcoin.",
-    type: "Initiation",
+    title: "First Steps",
+    description: "Understand what a Bitcoin address is.",
+    type: "Beginner",
     xpReward: 50,
     satsReward: 10,
     status: 'completed' 
   },
   {
     id: 2,
-    title: "Votre Première Transaction",
-    description: "Envoyer des sats sur la testnet.",
-    type: "Intermédiaire",
+    title: "Your First Transaction",
+    description: "Send sats on the testnet.",
+    type: "Intermediate",
     xpReward: 100,
     satsReward: 25,
     status: 'available'
@@ -43,8 +44,8 @@ const QuestsData = [
   {
     id: 3,
     title: "Lightning Network 101",
-    description: "Ouverture d'un canal de paiement.",
-    type: "Avancé",
+    description: "Opening a payment channel.",
+    type: "Advanced",
     xpReward: 200,
     satsReward: 100,
     status: 'locked'
@@ -59,9 +60,13 @@ export default function DashboardShell({ user }: DashboardShellProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  const xpForNextLevel = user.level * 100;
-  const currentXpInLevel = user.xp % xpForNextLevel;
-  const progressPercentage = (currentXpInLevel / xpForNextLevel) * 100;
+  const level = user.level ?? 1;
+  const xp = user.xp ?? 0;
+  const sats = user.sats ?? 0;
+  
+  const xpForNextLevel = level * 100;
+  const currentXpInLevel = xp % xpForNextLevel;
+  const progressPercentage = Math.min((currentXpInLevel / xpForNextLevel) * 100, 100);
 
   const handleLogout = async () => {
     await logoutUser();
@@ -84,9 +89,9 @@ export default function DashboardShell({ user }: DashboardShellProps) {
 
           <nav className="mt-8 flex flex-col gap-2 px-4">
             <TabButton icon={LayoutDashboard} label="Dashboard" isActive={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-            <TabButton icon={Map} label="Parcours Quêtes" isActive={activeTab === 'quests'} onClick={() => setActiveTab('quests')} />
+            <TabButton icon={Map} label="Quest Path" isActive={activeTab === 'quests'} onClick={() => setActiveTab('quests')} />
             <TabButton icon={Award} label="Badges" isActive={activeTab === 'badges'} onClick={() => setActiveTab('badges')} />
-            <TabButton icon={Wallet} label="Wallet Sats" isActive={activeTab === 'wallet'} onClick={() => setActiveTab('wallet')} />
+            <TabButton icon={Wallet} label="Sats Wallet" isActive={activeTab === 'wallet'} onClick={() => setActiveTab('wallet')} />
           </nav>
         </div>
 
@@ -99,7 +104,7 @@ export default function DashboardShell({ user }: DashboardShellProps) {
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-bold text-white truncate">{user.name}</p>
-              <p className="text-xs text-amber-500">Niveau {user.level}</p>
+              <p className="text-xs text-amber-500">Level {level}</p>
             </div>
           </div>
           <button 
@@ -107,7 +112,7 @@ export default function DashboardShell({ user }: DashboardShellProps) {
             className="flex items-center w-full gap-2 px-2 py-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors text-sm"
           >
             <LogOut className="w-4 h-4" />
-            <span>Déconnexion</span>
+            <span>Logout</span>
           </button>
         </div>
       </aside>
@@ -119,10 +124,10 @@ export default function DashboardShell({ user }: DashboardShellProps) {
         {/* Header */}
         <header className="relative z-10 h-20 bg-[#1e293b]/70 backdrop-blur-md border-b border-slate-700 flex items-center justify-between px-8 flex-shrink-0">
           <h2 className="text-2xl font-bold text-white" style={{ textShadow: '0 0 10px rgba(245, 158, 11, 0.5)' }}>
-            {activeTab === 'dashboard' && 'Tableau de Bord'}
-            {activeTab === 'quests' && 'Parcours des Quêtes'}
-            {activeTab === 'badges' && 'Vos Badges'}
-            {activeTab === 'wallet' && 'Wallet Éducatif'}
+            {activeTab === 'dashboard' && 'Dashboard'}
+            {activeTab === 'quests' && 'Quest Path'}
+            {activeTab === 'badges' && 'Your Badges'}
+            {activeTab === 'wallet' && 'Educational Wallet'}
           </h2>
           
           <div className="flex items-center gap-6">
@@ -139,7 +144,7 @@ export default function DashboardShell({ user }: DashboardShellProps) {
 
             <div className="flex items-center gap-2 bg-[#1e293b]/80 px-4 py-1.5 rounded-full border border-amber-500/30">
               <Zap className="w-4 h-4 text-amber-500 fill-amber-500/20" />
-              <span className="font-mono font-bold text-white">{user.sats.toLocaleString()}</span>
+              <span className="font-mono font-bold text-white">{sats.toLocaleString()}</span>
               <span className="text-xs text-slate-400">sats</span>
             </div>
           </div>
@@ -176,30 +181,101 @@ function TabButton({ icon: Icon, label, isActive, onClick }: any) {
 }
 
 function DashboardView({ user }: { user: User }) {
+  const level = user.level ?? 1;
+  const xp = user.xp ?? 0;
+  const sats = user.sats ?? 0;
+  
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="Niveau Actuel" value={user.level} icon={<Trophy className="w-8 h-8 text-amber-500" />} sub="Prochain niveau bientôt" />
-        <StatCard title="Solde Wallet" value={`${user.sats} sats`} icon={<Zap className="w-8 h-8 text-amber-500 fill-amber-500/20" />} sub="Testnet Lightning" />
-        <StatCard title="Quêtes Terminées" value="1 / 3" icon={<Map className="w-8 h-8 text-blue-500" />} sub="Continuez comme ça !" />
+        <StatCard 
+          title="Current Level" 
+          value={level} 
+          icon={<Trophy className="w-8 h-8 text-amber-500" />} 
+          sub={`${xp} total XP`}
+        />
+        <StatCard 
+          title="Wallet Balance" 
+          value={`${sats.toLocaleString()} sats`} 
+          icon={<Zap className="w-8 h-8 text-amber-500 fill-amber-500/20" />} 
+          sub="Testnet Lightning" 
+        />
+        <StatCard 
+          title="Quests Completed" 
+          value="1 / 3" 
+          icon={<Map className="w-8 h-8 text-blue-500" />} 
+          sub="Keep it up!" 
+        />
       </div>
 
-      <div className="bg-[#1e293b]/70 backdrop-blur-md p-8 rounded-xl border border-slate-700">
-        <h3 className="text-xl font-bold text-white mb-6">Reprendre l'aventure</h3>
-        <div className="space-y-4">
-           <div className="flex items-center justify-between p-4 bg-[#0f172a]/50 rounded border border-slate-700 hover:border-amber-500/50 transition-colors cursor-pointer">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20">
-                <Play className="w-5 h-5 fill-current" />
-              </div>
-              <div>
-                <h4 className="font-bold text-white">Votre Première Transaction</h4>
-                <p className="text-xs text-slate-400">Intermédiaire • +100 XP • +25 sats</p>
-              </div>
-            </div>
-            <ChevronRight className="w-5 h-5 text-slate-500" />
+      <div className="bg-gradient-to-br from-[#1e293b]/90 to-[#0f172a]/90 backdrop-blur-md p-8 rounded-2xl border border-slate-700 shadow-2xl">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-bold text-white">Resume the adventure</h3>
+          <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full">
+            <span className="text-xs font-bold text-amber-500">NEW</span>
           </div>
         </div>
+        <div className="space-y-4">
+           <div className="group flex items-center justify-between p-5 bg-gradient-to-r from-[#0f172a]/80 to-[#1e293b]/50 rounded-xl border border-slate-700 hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-500/10 transition-all cursor-pointer">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
+                <Play className="w-6 h-6 fill-current" />
+              </div>
+              <div>
+                <h4 className="font-bold text-white text-lg mb-1">Your First Transaction</h4>
+                <p className="text-sm text-slate-400">Intermediate • +100 XP • +25 sats</p>
+              </div>
+            </div>
+            <ChevronRight className="w-6 h-6 text-slate-500 group-hover:text-amber-500 group-hover:translate-x-1 transition-all" />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-[#1e293b]/70 backdrop-blur-md p-6 rounded-xl border border-slate-700">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-green-500" />
+            Recent Progress
+          </h3>
+          <div className="space-y-3">
+            <ProgressItem label="Quest #1 completed" value="100%" color="green" />
+            <ProgressItem label="Level 2" value={`${Math.min((xp / (level * 100)) * 100, 100).toFixed(0)}%`} color="amber" />
+          </div>
+        </div>
+
+        <div className="bg-[#1e293b]/70 backdrop-blur-md p-6 rounded-xl border border-slate-700">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <Award className="w-5 h-5 text-purple-500" />
+            Next Goals
+          </h3>
+          <ul className="space-y-2 text-sm text-slate-300">
+            <li className="flex items-start gap-2">
+              <ChevronRight className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+              <span>Complete the "First Transaction" quest</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <ChevronRight className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+              <span>Reach level 2 ({level * 100 - xp} XP remaining)</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProgressItem({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div>
+      <div className="flex justify-between text-sm mb-1">
+        <span className="text-slate-400">{label}</span>
+        <span className={`font-bold ${color === 'green' ? 'text-green-500' : 'text-amber-500'}`}>{value}</span>
+      </div>
+      <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+        <div 
+          className={`h-full ${color === 'green' ? 'bg-green-500' : 'bg-amber-500'} transition-all duration-500`}
+          style={{ width: value }}
+        />
       </div>
     </div>
   );
@@ -208,42 +284,46 @@ function DashboardView({ user }: { user: User }) {
 function QuestsView() {
   return (
     <div className="max-w-7xl mx-auto">
+      <div className="mb-8 text-center">
+        <h2 className="text-3xl font-bold text-white mb-2">Learning Path</h2>
+        <p className="text-slate-400">Progress at your own pace and earn rewards</p>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {QuestsData.map((quest) => (
-          <div key={quest.id} className={`relative overflow-hidden rounded-xl border p-6 transition-all hover:transform hover:-translate-y-1 ${
-            quest.status === 'completed' ? 'border-green-500/50 bg-slate-800/50 opacity-75' :
+          <div key={quest.id} className={`relative overflow-hidden rounded-2xl border p-6 transition-all hover:transform hover:-translate-y-2 hover:shadow-2xl ${
+            quest.status === 'completed' ? 'border-green-500/50 bg-gradient-to-br from-green-900/20 to-slate-800/50' :
             quest.status === 'locked' ? 'border-slate-700 bg-slate-900/50 opacity-60' :
-            'border-amber-500/50 bg-slate-800/50'
+            'border-amber-500/50 bg-gradient-to-br from-amber-900/20 to-slate-800/50 shadow-lg shadow-amber-500/10'
           }`}>
             {quest.status === 'locked' && <div className="absolute inset-0 z-10 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
-                <Lock className="w-8 h-8 text-slate-500" />
+                <Lock className="w-10 h-10 text-slate-500" />
             </div>}
             
             <div className="flex justify-between items-start mb-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-800 px-2 py-1 rounded">{quest.type}</span>
-              {quest.status === 'completed' ? <CheckCircle className="w-6 h-6 text-green-500" /> : 
-               quest.status === 'locked' ? <Lock className="w-6 h-6 text-slate-500" /> : 
-               <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />}
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-full">{quest.type}</span>
+              {quest.status === 'completed' ? <CheckCircle className="w-7 h-7 text-green-500" /> : 
+               quest.status === 'locked' ? <Lock className="w-7 h-7 text-slate-500" /> : 
+               <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50" />}
             </div>
             
-            <h3 className="text-xl font-bold text-white mb-2">{quest.title}</h3>
-            <p className="text-slate-400 text-sm mb-6 line-clamp-2">{quest.description}</p>
+            <h3 className="text-xl font-bold text-white mb-3">{quest.title}</h3>
+            <p className="text-slate-400 text-sm mb-6 line-clamp-2 leading-relaxed">{quest.description}</p>
 
             <div className="space-y-4">
-              <div className="flex items-center gap-4 text-xs font-mono">
-                <span className="flex items-center gap-1 text-amber-500">
-                  <Trophy className="w-3 h-3" /> {quest.xpReward} XP
+              <div className="flex items-center gap-4 text-sm font-mono">
+                <span className="flex items-center gap-1.5 text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full">
+                  <Trophy className="w-4 h-4" /> {quest.xpReward} XP
                 </span>
-                <span className="flex items-center gap-1 text-amber-500">
-                  <Zap className="w-3 h-3" /> {quest.satsReward} sats
+                <span className="flex items-center gap-1.5 text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full">
+                  <Zap className="w-4 h-4" /> {quest.satsReward} sats
                 </span>
               </div>
-              <button disabled={quest.status !== 'available'} className={`w-full py-2 rounded border text-sm font-medium transition-all ${
-                quest.status === 'completed' ? 'border-green-500 text-green-500 hover:bg-green-500/10' :
-                quest.status === 'locked' ? 'border-slate-700 text-slate-500 cursor-not-allowed' :
-                'border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-slate-900'
+              <button disabled={quest.status !== 'available'} className={`w-full py-3 rounded-xl text-sm font-bold transition-all ${
+                quest.status === 'completed' ? 'border-2 border-green-500 text-green-500 hover:bg-green-500/10' :
+                quest.status === 'locked' ? 'border-2 border-slate-700 text-slate-500 cursor-not-allowed' :
+                'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 hover:from-amber-400 hover:to-amber-500 shadow-lg shadow-amber-500/30 hover:scale-105'
               }`}>
-                {quest.status === 'completed' ? 'Rejouer' : quest.status === 'locked' ? 'Verrouillé' : 'Commencer'}
+                {quest.status === 'completed' ? 'Replay' : quest.status === 'locked' ? 'Locked' : 'Start'}
               </button>
             </div>
           </div>
@@ -254,29 +334,32 @@ function QuestsView() {
 }
 
 function WalletView({ user }: { user: User }) {
+  const sats = user.sats ?? 0;
+  
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="bg-[#1e293b]/70 backdrop-blur-md p-8 rounded-2xl border border-slate-700 text-center relative overflow-hidden">
-         <div className="absolute inset-0 bg-amber-500/5"></div>
-         <h2 className="text-slate-400 text-sm uppercase tracking-widest mb-2 relative z-10">Solde disponible</h2>
-         <div className="text-6xl font-mono font-bold text-white mb-6 relative z-10">{user.sats.toLocaleString()}</div>
+      <div className="bg-gradient-to-br from-amber-500/10 via-[#1e293b]/70 to-[#0f172a]/70 backdrop-blur-md p-10 rounded-3xl border border-amber-500/30 text-center relative overflow-hidden shadow-2xl">
+         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(245,158,11,0.1),transparent_50%)]"></div>
+         <h2 className="text-slate-400 text-sm uppercase tracking-widest mb-3 relative z-10 font-bold">Available Balance</h2>
+         <div className="text-7xl font-mono font-bold text-white mb-8 relative z-10 drop-shadow-lg">{sats.toLocaleString()}</div>
+         <div className="text-amber-500 text-lg mb-6 relative z-10">sats</div>
          <div className="flex justify-center gap-4 relative z-10">
-            <button className="bg-[#0f172a] hover:bg-slate-800 text-white px-6 py-2 rounded-lg border border-slate-600 flex items-center gap-2 transition-colors">
-              <Download className="w-4 h-4" /> Recevoir
+            <button className="bg-[#0f172a] hover:bg-slate-800 text-white px-8 py-3 rounded-xl border border-slate-600 flex items-center gap-2 transition-all hover:scale-105 shadow-lg">
+              <Download className="w-5 h-5" /> Receive
             </button>
-            <button className="bg-amber-500 hover:bg-amber-400 text-slate-900 px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors">
-              <Upload className="w-4 h-4" /> Envoyer
+            <button className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all hover:scale-105 shadow-lg shadow-amber-500/30">
+              <Upload className="w-5 h-5" /> Send
             </button>
          </div>
       </div>
 
-      <div className="bg-[#1e293b]/70 backdrop-blur-md rounded-xl border border-slate-700 overflow-hidden">
-        <div className="p-4 border-b border-slate-700 bg-slate-800/50">
-          <h3 className="font-bold text-white">Historique des transactions</h3>
+      <div className="bg-[#1e293b]/70 backdrop-blur-md rounded-2xl border border-slate-700 overflow-hidden shadow-xl">
+        <div className="p-5 border-b border-slate-700 bg-slate-800/50">
+          <h3 className="font-bold text-white text-lg">Transaction History</h3>
         </div>
         <div className="divide-y divide-slate-700/50">
-          <TransactionItem title="Récompense Inscription" date="Il y a 10 min" amount="+50 sats" type="in" />
-          <TransactionItem title="Récompense Quête #1" date="Il y a 5 min" amount="+10 sats" type="in" />
+          <TransactionItem title="Signup Reward" date="10 min ago" amount="+50 sats" type="in" />
+          <TransactionItem title="Quest #1 Reward" date="5 min ago" amount="+10 sats" type="in" />
         </div>
       </div>
     </div>
@@ -285,37 +368,54 @@ function WalletView({ user }: { user: User }) {
 
 function BadgesView() {
   const badges = [
-    { name: "Initié", icon: ShieldCheck, unlocked: true },
-    { name: "Lightning Warrior", icon: Zap, unlocked: false },
-    { name: "HODLer", icon: Clock, unlocked: false },
+    { name: "Initiate", icon: ShieldCheck, unlocked: true, description: "First login" },
+    { name: "Lightning Warrior", icon: Zap, unlocked: false, description: "Master Lightning Network" },
+    { name: "HODLer", icon: Clock, unlocked: false, description: "Understand HODL" },
+    { name: "Satoshi Fan", icon: Bitcoin, unlocked: false, description: "Read the whitepaper" },
   ];
   
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
+    <div className="max-w-6xl mx-auto">
+      <div className="mb-8 text-center">
+        <h2 className="text-3xl font-bold text-white mb-2">Badge Collection</h2>
+        <p className="text-slate-400">Unlock badges by completing quests</p>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
        {badges.map((badge, i) => {
          const IconComponent = badge.icon;
          return (
-           <div key={i} className={`p-6 rounded-xl flex flex-col items-center text-center border ${badge.unlocked ? 'border-slate-600 bg-slate-800/50' : 'grayscale opacity-50 bg-slate-900/50 border-slate-800'}`}>
-             <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mb-4">
-                <IconComponent className={`w-8 h-8 ${badge.unlocked ? 'text-amber-500' : 'text-slate-500'}`} />
+           <div key={i} className={`p-8 rounded-2xl flex flex-col items-center text-center border transition-all hover:scale-105 ${
+             badge.unlocked 
+               ? 'border-amber-500/50 bg-gradient-to-br from-amber-900/20 to-slate-800/50 shadow-lg shadow-amber-500/20' 
+               : 'grayscale opacity-50 bg-slate-900/50 border-slate-800 hover:opacity-70'
+           }`}>
+             <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${
+               badge.unlocked 
+                 ? 'bg-gradient-to-br from-amber-500 to-amber-600 shadow-lg shadow-amber-500/30' 
+                 : 'bg-slate-700/50'
+             }`}>
+                <IconComponent className={`w-10 h-10 ${badge.unlocked ? 'text-white' : 'text-slate-500'}`} />
              </div>
-             <h4 className="font-bold text-white text-sm mb-1">{badge.name}</h4>
-             {badge.unlocked && <span className="mt-4 text-xs text-green-500 font-bold border border-green-500 px-2 py-0.5 rounded-full">OBTENU</span>}
+             <h4 className="font-bold text-white text-base mb-2">{badge.name}</h4>
+             <p className="text-xs text-slate-400 mb-3">{badge.description}</p>
+             {badge.unlocked && <span className="mt-2 text-xs text-green-500 font-bold border-2 border-green-500 px-3 py-1 rounded-full">OBTAINED</span>}
            </div>
          );
        })}
+      </div>
     </div>
   );
 }
 
 function StatCard({ title, value, icon, sub }: any) {
   return (
-    <div className="bg-[#1e293b]/70 backdrop-blur-md p-6 rounded-xl border border-slate-700 relative overflow-hidden group">
-      <div className="absolute -right-4 -top-4 w-24 h-24 bg-amber-500/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-      <h3 className="text-slate-400 text-sm font-medium mb-2">{title}</h3>
-      <p className="text-4xl font-bold text-white mb-2 flex items-center gap-2">{value}</p>
-      <p className="text-amber-500 text-sm flex items-center gap-1">
-        {icon} {sub}
+    <div className="bg-gradient-to-br from-[#1e293b]/90 to-[#0f172a]/70 backdrop-blur-md p-6 rounded-2xl border border-slate-700 relative overflow-hidden group hover:border-amber-500/50 transition-all shadow-xl">
+      <div className="absolute -right-6 -top-6 w-32 h-32 bg-amber-500/5 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+      <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-amber-500/5 rounded-full group-hover:scale-125 transition-transform duration-500"></div>
+      <h3 className="text-slate-400 text-sm font-bold mb-3 uppercase tracking-wider">{title}</h3>
+      <p className="text-4xl font-bold text-white mb-3 flex items-center gap-3 relative z-10">{value}</p>
+      <p className="text-amber-500 text-sm flex items-center gap-2 relative z-10">
+        {icon} <span className="font-medium">{sub}</span>
       </p>
     </div>
   );
@@ -323,17 +423,19 @@ function StatCard({ title, value, icon, sub }: any) {
 
 function TransactionItem({ title, date, amount, type }: any) {
   return (
-    <div className="p-4 flex justify-between items-center hover:bg-slate-800/30 transition-colors">
-      <div className="flex items-center gap-3">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${type === 'in' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-          {type === 'in' ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpLeft className="w-4 h-4" />}
+    <div className="p-5 flex justify-between items-center hover:bg-slate-800/50 transition-all cursor-pointer group">
+      <div className="flex items-center gap-4">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all group-hover:scale-110 ${
+          type === 'in' ? 'bg-green-500/10 text-green-500 border border-green-500/30' : 'bg-red-500/10 text-red-500 border border-red-500/30'
+        }`}>
+          {type === 'in' ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpLeft className="w-5 h-5" />}
         </div>
         <div>
-          <p className="text-sm font-bold text-white">{title}</p>
+          <p className="text-sm font-bold text-white mb-1">{title}</p>
           <p className="text-xs text-slate-500">{date}</p>
         </div>
       </div>
-      <span className={`font-mono font-bold ${type === 'in' ? 'text-green-400' : 'text-red-400'}`}>{amount}</span>
+      <span className={`font-mono font-bold text-lg ${type === 'in' ? 'text-green-400' : 'text-red-400'}`}>{amount}</span>
     </div>
   );
 }
