@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { logoutUser } from '@/app/actions/auth';
+import Link from 'next/link';
 import { 
   LayoutDashboard, Map, Award, Wallet, LogOut, 
   Bitcoin, Zap, TrendingUp, Play, Lock, CheckCircle, 
@@ -22,41 +23,24 @@ interface User {
   createdAt: Date | null;
 }
 
-const QuestsData = [
-  {
-    id: 1,
-    title: "First Steps",
-    description: "Understand what a Bitcoin address is.",
-    type: "Beginner",
-    xpReward: 50,
-    satsReward: 10,
-    status: 'completed' 
-  },
-  {
-    id: 2,
-    title: "Your First Transaction",
-    description: "Send sats on the testnet.",
-    type: "Intermediate",
-    xpReward: 100,
-    satsReward: 25,
-    status: 'available'
-  },
-  {
-    id: 3,
-    title: "Lightning Network 101",
-    description: "Opening a payment channel.",
-    type: "Advanced",
-    xpReward: 200,
-    satsReward: 100,
-    status: 'locked'
-  }
-];
+interface Quest {
+  id: number;
+  title: string;
+  description: string;
+  type: string;
+  xpReward: number;
+  satsReward: number;
+  status: string;
+  quizPassed: boolean;
+  practicalCompleted: boolean;
+}
 
 interface DashboardShellProps {
   user: User;
+  quests: Quest[];
 }
 
-export default function DashboardShell({ user }: DashboardShellProps) {
+export default function DashboardShell({ user, quests }: DashboardShellProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
   
@@ -152,8 +136,8 @@ export default function DashboardShell({ user }: DashboardShellProps) {
 
         {/* Content Views */}
         <div className="relative z-10 flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
-          {activeTab === 'dashboard' && <DashboardView user={user} />}
-          {activeTab === 'quests' && <QuestsView />}
+          {activeTab === 'dashboard' && <DashboardView user={user} quests={quests} />}
+          {activeTab === 'quests' && <QuestsView quests={quests} />}
           {activeTab === 'badges' && <BadgesView />}
           {activeTab === 'wallet' && <WalletView user={user} />}
         </div>
@@ -180,10 +164,13 @@ function TabButton({ icon: Icon, label, isActive, onClick }: any) {
   );
 }
 
-function DashboardView({ user }: { user: User }) {
+function DashboardView({ user, quests }: { user: User; quests: Quest[] }) {
   const level = user.level ?? 1;
   const xp = user.xp ?? 0;
   const sats = user.sats ?? 0;
+  
+  const completedQuests = quests.filter(q => q.status === 'completed').length;
+  const availableQuest = quests.find(q => q.status === 'available' || q.status === 'in_progress');
   
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -202,34 +189,38 @@ function DashboardView({ user }: { user: User }) {
         />
         <StatCard 
           title="Quests Completed" 
-          value="1 / 3" 
+          value={`${completedQuests} / ${quests.length}`} 
           icon={<Map className="w-8 h-8 text-blue-500" />} 
           sub="Keep it up!" 
         />
       </div>
 
-      <div className="bg-gradient-to-br from-[#1e293b]/90 to-[#0f172a]/90 backdrop-blur-md p-8 rounded-2xl border border-slate-700 shadow-2xl">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-bold text-white">Resume the adventure</h3>
-          <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full">
-            <span className="text-xs font-bold text-amber-500">NEW</span>
-          </div>
-        </div>
-        <div className="space-y-4">
-           <div className="group flex items-center justify-between p-5 bg-gradient-to-r from-[#0f172a]/80 to-[#1e293b]/50 rounded-xl border border-slate-700 hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-500/10 transition-all cursor-pointer">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
-                <Play className="w-6 h-6 fill-current" />
-              </div>
-              <div>
-                <h4 className="font-bold text-white text-lg mb-1">Your First Transaction</h4>
-                <p className="text-sm text-slate-400">Intermediate • +100 XP • +25 sats</p>
-              </div>
+      {availableQuest && (
+        <div className="bg-gradient-to-br from-[#1e293b]/90 to-[#0f172a]/90 backdrop-blur-md p-8 rounded-2xl border border-slate-700 shadow-2xl">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-2xl font-bold text-white">Resume the adventure</h3>
+            <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full">
+              <span className="text-xs font-bold text-amber-500">NEW</span>
             </div>
-            <ChevronRight className="w-6 h-6 text-slate-500 group-hover:text-amber-500 group-hover:translate-x-1 transition-all" />
+          </div>
+          <div className="space-y-4">
+            <Link href={`/quest/${availableQuest.id}`}>
+              <div className="group flex items-center justify-between p-5 bg-gradient-to-r from-[#0f172a]/80 to-[#1e293b]/50 rounded-xl border border-slate-700 hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-500/10 transition-all cursor-pointer">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
+                    <Play className="w-6 h-6 fill-current" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white text-lg mb-1">{availableQuest.title}</h4>
+                    <p className="text-sm text-slate-400">{availableQuest.type} • +{availableQuest.xpReward} XP • +{availableQuest.satsReward} sats</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-6 h-6 text-slate-500 group-hover:text-amber-500 group-hover:translate-x-1 transition-all" />
+              </div>
+            </Link>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-[#1e293b]/70 backdrop-blur-md p-6 rounded-xl border border-slate-700">
@@ -238,7 +229,7 @@ function DashboardView({ user }: { user: User }) {
             Recent Progress
           </h3>
           <div className="space-y-3">
-            <ProgressItem label="Quest #1 completed" value="100%" color="green" />
+            <ProgressItem label={`Quest${completedQuests > 1 ? 's' : ''} completed`} value="100%" color="green" />
             <ProgressItem label="Level 2" value={`${Math.min((xp / (level * 100)) * 100, 100).toFixed(0)}%`} color="amber" />
           </div>
         </div>
@@ -249,10 +240,12 @@ function DashboardView({ user }: { user: User }) {
             Next Goals
           </h3>
           <ul className="space-y-2 text-sm text-slate-300">
-            <li className="flex items-start gap-2">
-              <ChevronRight className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-              <span>Complete the "First Transaction" quest</span>
-            </li>
+            {availableQuest && (
+              <li className="flex items-start gap-2">
+                <ChevronRight className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                <span>Complete "{availableQuest.title}"</span>
+              </li>
+            )}
             <li className="flex items-start gap-2">
               <ChevronRight className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
               <span>Reach level 2 ({level * 100 - xp} XP remaining)</span>
@@ -281,7 +274,7 @@ function ProgressItem({ label, value, color }: { label: string; value: string; c
   );
 }
 
-function QuestsView() {
+function QuestsView({ quests }: { quests: Quest[] }) {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-8 text-center">
@@ -289,44 +282,46 @@ function QuestsView() {
         <p className="text-slate-400">Progress at your own pace and earn rewards</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {QuestsData.map((quest) => (
-          <div key={quest.id} className={`relative overflow-hidden rounded-2xl border p-6 transition-all hover:transform hover:-translate-y-2 hover:shadow-2xl ${
-            quest.status === 'completed' ? 'border-green-500/50 bg-gradient-to-br from-green-900/20 to-slate-800/50' :
-            quest.status === 'locked' ? 'border-slate-700 bg-slate-900/50 opacity-60' :
-            'border-amber-500/50 bg-gradient-to-br from-amber-900/20 to-slate-800/50 shadow-lg shadow-amber-500/10'
-          }`}>
-            {quest.status === 'locked' && <div className="absolute inset-0 z-10 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
-                <Lock className="w-10 h-10 text-slate-500" />
-            </div>}
-            
-            <div className="flex justify-between items-start mb-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-full">{quest.type}</span>
-              {quest.status === 'completed' ? <CheckCircle className="w-7 h-7 text-green-500" /> : 
-               quest.status === 'locked' ? <Lock className="w-7 h-7 text-slate-500" /> : 
-               <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50" />}
-            </div>
-            
-            <h3 className="text-xl font-bold text-white mb-3">{quest.title}</h3>
-            <p className="text-slate-400 text-sm mb-6 line-clamp-2 leading-relaxed">{quest.description}</p>
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-4 text-sm font-mono">
-                <span className="flex items-center gap-1.5 text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full">
-                  <Trophy className="w-4 h-4" /> {quest.xpReward} XP
-                </span>
-                <span className="flex items-center gap-1.5 text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full">
-                  <Zap className="w-4 h-4" /> {quest.satsReward} sats
-                </span>
+        {quests.map((quest) => (
+          <Link key={quest.id} href={`/quest/${quest.id}`}>
+            <div className={`relative overflow-hidden rounded-2xl border p-6 transition-all hover:transform hover:-translate-y-2 hover:shadow-2xl cursor-pointer ${
+              quest.status === 'completed' ? 'border-green-500/50 bg-gradient-to-br from-green-900/20 to-slate-800/50' :
+              quest.status === 'locked' ? 'border-slate-700 bg-slate-900/50 opacity-60' :
+              'border-amber-500/50 bg-gradient-to-br from-amber-900/20 to-slate-800/50 shadow-lg shadow-amber-500/10'
+            }`}>
+              {quest.status === 'locked' && <div className="absolute inset-0 z-10 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
+                  <Lock className="w-10 h-10 text-slate-500" />
+              </div>}
+              
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-full">{quest.type}</span>
+                {quest.status === 'completed' ? <CheckCircle className="w-7 h-7 text-green-500" /> : 
+                 quest.status === 'locked' ? <Lock className="w-7 h-7 text-slate-500" /> : 
+                 <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50" />}
               </div>
-              <button disabled={quest.status !== 'available'} className={`w-full py-3 rounded-xl text-sm font-bold transition-all ${
-                quest.status === 'completed' ? 'border-2 border-green-500 text-green-500 hover:bg-green-500/10' :
-                quest.status === 'locked' ? 'border-2 border-slate-700 text-slate-500 cursor-not-allowed' :
-                'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 hover:from-amber-400 hover:to-amber-500 shadow-lg shadow-amber-500/30 hover:scale-105'
-              }`}>
-                {quest.status === 'completed' ? 'Replay' : quest.status === 'locked' ? 'Locked' : 'Start'}
-              </button>
+              
+              <h3 className="text-xl font-bold text-white mb-3">{quest.title}</h3>
+              <p className="text-slate-400 text-sm mb-6 line-clamp-2 leading-relaxed">{quest.description}</p>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 text-sm font-mono">
+                  <span className="flex items-center gap-1.5 text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full">
+                    <Trophy className="w-4 h-4" /> {quest.xpReward} XP
+                  </span>
+                  <span className="flex items-center gap-1.5 text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full">
+                    <Zap className="w-4 h-4" /> {quest.satsReward} sats
+                  </span>
+                </div>
+                <button disabled={quest.status === 'locked'} className={`w-full py-3 rounded-xl text-sm font-bold transition-all ${
+                  quest.status === 'completed' ? 'border-2 border-green-500 text-green-500 hover:bg-green-500/10' :
+                  quest.status === 'locked' ? 'border-2 border-slate-700 text-slate-500 cursor-not-allowed' :
+                  'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-900 hover:from-amber-400 hover:to-amber-500 shadow-lg shadow-amber-500/30 hover:scale-105'
+                }`}>
+                  {quest.status === 'completed' ? 'Replay' : quest.status === 'locked' ? 'Locked' : 'Start'}
+                </button>
+              </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

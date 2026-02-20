@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/app/actions/auth';
 import { redirect } from 'next/navigation';
 import DashboardShell from '@/components/DashboardShell';
+import { getUserQuests } from '@/app/actions/quests';
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
@@ -9,5 +10,7 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  return <DashboardShell user={user} />;
+  const quests = await getUserQuests(user.id);
+
+  return <DashboardShell user={user} quests={quests} />;
 }
