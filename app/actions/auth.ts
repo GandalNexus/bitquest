@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { db } from '../../db';
 import { users } from '../../db/schema';
 import { sql } from 'drizzle-orm';
+import { createSessionToken, verifySessionToken } from '../../lib/session';
 
 export interface User {
   id: number;
@@ -33,15 +34,15 @@ export async function loginUser(
   if (!email || !password) return { error: 'Email and password required' };
 
   const [userRecord] = await db.select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      password: users.password,
-      level: users.level,
-      xp: users.xp,
-      sats: users.sats,
-      createdAt: users.createdAt,
-    })
+    id: users.id,
+    name: users.name,
+    email: users.email,
+    password: users.password,
+    level: users.level,
+    xp: users.xp,
+    sats: users.sats,
+    createdAt: users.createdAt,
+  })
     .from(users)
     .where(sql`${users.email} = ${email}`);
 
@@ -50,7 +51,7 @@ export async function loginUser(
   const valid = await bcrypt.compare(password, userRecord.password);
   if (!valid) return { error: 'Incorrect password' };
 
-  (await cookies()).set('user_session', userRecord.id.toString(), {
+  (await cookies()).set('user_session', await createSessionToken(userRecord.id), {
     path: '/',
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -113,7 +114,7 @@ export async function signupUser(
       createdAt: users.createdAt,
     });
 
-  (await cookies()).set('user_session', userRecord.id.toString(), {
+  (await cookies()).set('user_session', await createSessionToken(userRecord.id), {
     path: '/',
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -132,27 +133,32 @@ export async function signupUser(
       createdAt: userRecord.createdAt,
     },
   };
-  
+
 }
 
 // ---------------- GET CURRENT USER ----------------
 export async function getCurrentUser(): Promise<User | null> {
   const cookieStore = await cookies();
-  const userId = cookieStore.get('user_session')?.value;
+  const token = cookieStore.get('user_session')?.value;
 
+  if (!token) return null;
+
+  // FIX: Verify HMAC signature before trusting the userId.
+  // A forged or tampered cookie will fail verification and return null.
+  const userId = await verifySessionToken(token);
   if (!userId) return null;
 
   const [userRecord] = await db.select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      level: users.level,
-      xp: users.xp,
-      sats: users.sats,
-      createdAt: users.createdAt,
-    })
+    id: users.id,
+    name: users.name,
+    email: users.email,
+    level: users.level,
+    xp: users.xp,
+    sats: users.sats,
+    createdAt: users.createdAt,
+  })
     .from(users)
-    .where(sql`${users.id} = ${parseInt(userId)}`);
+    .where(sql`${users.id} = ${userId}`);
 
   if (!userRecord) return null;
 
