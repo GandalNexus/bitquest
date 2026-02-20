@@ -5,24 +5,30 @@ import { quests, quizzes, userQuestProgress, users } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 import type { QuizAttempt } from '@/types/quest';
+import { verifySessionToken } from '@/lib/session';
 
 export async function getUserQuests(userId: number) {
-  const userProgress = await db
-    .select()
-    .from(userQuestProgress)
-    .where(eq(userQuestProgress.userId, userId));
+  const results = await db
+    .select({
+      quest: quests,
+      progress: userQuestProgress,
+    })
+    .from(quests)
+    .leftJoin(
+      userQuestProgress,
+      and(
+        eq(userQuestProgress.questId, quests.id),
+        eq(userQuestProgress.userId, userId)
+      )
+    )
+    .where(eq(quests.isActive, true));
 
-  const allQuests = await db.select().from(quests).where(eq(quests.isActive, true));
-
-  return allQuests.map(quest => {
-    const progress = userProgress.find(p => p.questId === quest.id);
-    return {
-      ...quest,
-      status: progress?.status || 'locked',
-      quizPassed: progress?.quizPassed || false,
-      practicalCompleted: progress?.practicalCompleted || false,
-    };
-  });
+  return results.map(({ quest, progress }) => ({
+    ...quest,
+    status: progress?.status || 'locked',
+    quizPassed: progress?.quizPassed || false,
+    practicalCompleted: progress?.practicalCompleted || false,
+  }));
 }
 
 export async function getQuestById(questId: number) {
@@ -37,8 +43,9 @@ export async function getQuizByQuestId(questId: number) {
 
 export async function submitQuiz(questId: number, attempt: QuizAttempt) {
   const cookieStore = await cookies();
-  const userId = cookieStore.get('user_session')?.value;
-  
+  const token = cookieStore.get('user_session')?.value;
+  const userId = token ? await verifySessionToken(token) : null;
+
   if (!userId) return { error: 'Not authenticated' };
 
   const quiz = await getQuizByQuestId(questId);
@@ -52,7 +59,7 @@ export async function submitQuiz(questId: number, attempt: QuizAttempt) {
     .from(userQuestProgress)
     .where(
       and(
-        eq(userQuestProgress.userId, parseInt(userId)),
+        eq(userQuestProgress.userId, userId),
         eq(userQuestProgress.questId, questId)
       )
     );
@@ -68,7 +75,7 @@ export async function submitQuiz(questId: number, attempt: QuizAttempt) {
       .where(eq(userQuestProgress.id, existing.id));
   } else {
     await db.insert(userQuestProgress).values({
-      userId: parseInt(userId),
+      userId: userId,
       questId,
       status: passed ? 'in_progress' : 'available',
       quizScore: attempt.score,
@@ -81,12 +88,32 @@ export async function submitQuiz(questId: number, attempt: QuizAttempt) {
 
 export async function completeQuest(questId: number) {
   const cookieStore = await cookies();
-  const userId = cookieStore.get('user_session')?.value;
-  
+  const token = cookieStore.get('user_session')?.value;
+  const userId = token ? await verifySessionToken(token) : null;
+
   if (!userId) return { error: 'Not authenticated' };
 
   const quest = await getQuestById(questId);
   if (!quest) return { error: 'Quest not found' };
+
+  // FIX: Idempotency guard — do not award rewards if already completed.
+  const [existing] = await db
+    .select()
+    .from(userQuestProgress)
+    .where(
+      and(
+        eq(userQuestProgress.userId, userId),
+        eq(userQuestProgress.questId, questId)
+      )
+    );
+
+  if (existing?.status === 'completed') {
+    return {
+      success: true,
+      rewards: { xp: 0, sats: 0 },
+      alreadyCompleted: true,
+    };
+  }
 
   // Mark quest as completed
   await db
@@ -98,7 +125,7 @@ export async function completeQuest(questId: number) {
     })
     .where(
       and(
-        eq(userQuestProgress.userId, parseInt(userId)),
+        eq(userQuestProgress.userId, userId),
         eq(userQuestProgress.questId, questId)
       )
     );
@@ -107,7 +134,7 @@ export async function completeQuest(questId: number) {
   const [currentUser] = await db
     .select()
     .from(users)
-    .where(eq(users.id, parseInt(userId)));
+    .where(eq(users.id, userId));
 
   if (currentUser) {
     await db
@@ -116,35 +143,56 @@ export async function completeQuest(questId: number) {
         xp: (currentUser.xp || 0) + quest.xpReward,
         sats: (currentUser.sats || 0) + quest.satsReward,
       })
-      .where(eq(users.id, parseInt(userId)));
+      .where(eq(users.id, userId));
   }
 
-  return { 
-    success: true, 
-    rewards: { 
-      xp: quest.xpReward, 
-      sats: quest.satsReward 
-    } 
+  return {
+    success: true,
+    alreadyCompleted: false,
+    rewards: {
+      xp: quest.xpReward,
+      sats: quest.satsReward
+    }
   };
 }
 
 export async function unlockNextQuest(currentQuestId: number) {
   const cookieStore = await cookies();
-  const userId = cookieStore.get('user_session')?.value;
-  
+  const token = cookieStore.get('user_session')?.value;
+  const userId = token ? await verifySessionToken(token) : null;
+
   if (!userId) return { error: 'Not authenticated' };
+
+  // FIX: Fetch the current quest first to get its `order`.
+  // Previously the code used `currentQuestId + 1` which confused quest `id`
+  // with quest `order` — they are not the same field.
+  const currentQuest = await getQuestById(currentQuestId);
+  if (!currentQuest) return { success: true }; // nothing to unlock
 
   const nextQuest = await db
     .select()
     .from(quests)
-    .where(eq(quests.order, currentQuestId + 1));
+    .where(eq(quests.order, currentQuest.order + 1));
 
   if (nextQuest.length > 0) {
-    await db.insert(userQuestProgress).values({
-      userId: parseInt(userId),
-      questId: nextQuest[0].id,
-      status: 'available',
-    });
+    // Check if progress already exists to avoid duplicate inserts
+    const [alreadyUnlocked] = await db
+      .select()
+      .from(userQuestProgress)
+      .where(
+        and(
+          eq(userQuestProgress.userId, userId),
+          eq(userQuestProgress.questId, nextQuest[0].id)
+        )
+      );
+
+    if (!alreadyUnlocked) {
+      await db.insert(userQuestProgress).values({
+        userId: userId,
+        questId: nextQuest[0].id,
+        status: 'available',
+      });
+    }
   }
 
   return { success: true };
