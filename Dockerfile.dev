@@ -1,0 +1,40 @@
+# Dockerfile.dev — BitQuest development environment
+#
+# Image de développement reproductible pour BitQuest (Next.js 16 + Prisma 6 + SQLite).
+# Les dépendances sont installées au DÉMARRAGE (volume Docker dédié pour node_modules),
+# pas au build-time : cf. docs/DOCKER_DEVELOPMENT.md pour les commandes.
+#
+# Ne pas utiliser en production.
+
+FROM node:20-bookworm-slim
+
+# Dépendances système requises par Prisma (OpenSSL) + confort.
+# bookworm-slim est basé sur glibc : compatibilité native maximale avec les
+# binaires npm précompilés (vs Alpine/musl).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      openssl \
+      ca-certificates \
+      curl \
+      bash \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Dossiers préparés avec le bon propriétaire. Ils seront masqués par les
+# volumes nommés / bind mounts du docker-compose.dev.yml au runtime,
+# mais la création préalable évite les problèmes de permissions.
+RUN mkdir -p /app/node_modules /app/.next /app/db \
+ && chown -R node:node /app
+
+# Utilisateur non-root fourni par l'image officielle Node (UID 1000).
+USER node
+
+EXPOSE 3000
+
+# Par défaut : serveur de dev Next.js lié à toutes les interfaces,
+# afin d'être accessible depuis le host macOS via localhost:3000.
+# Le binding explicite -H 0.0.0.0 est requis dans un conteneur.
+# On contourne volontairement le script npm "dev" qui pipe sur tee dev.log :
+# dans Docker, les logs doivent aller sur stdout pour `docker compose logs`.
+CMD ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]

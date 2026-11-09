@@ -1,0 +1,53 @@
+# docker-compose.dev.yml — Environnement de développement reproductible pour BitQuest.
+#
+# Ce fichier NE REMPLACE PAS le docker-compose.yml (PostgreSQL) existant.
+# Usage : docker compose -f docker-compose.dev.yml <commande>
+# Voir docs/DOCKER_DEVELOPMENT.md pour toutes les commandes.
+#
+# Persistance :
+#   - Code source : bind mount ./ → /app (modifs host visibles instantanément)
+#   - node_modules : volume Docker nommé (isolation Linux ≠ macOS, binaires natifs)
+#   - .next (cache) : volume Docker nommé (accélère les rebuilds)
+#   - SQLite : bind mount ./db → /app/db (le fichier custom.db reste sur le host)
+
+services:
+  bitquest-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: bitquest-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      # Chemin absolu : non ambigu dans le conteneur, insensible au CWD de Prisma.
+      - DATABASE_URL=file:/app/db/custom.db
+      # HMR fiable sur macOS (osxfs/virtiofs ne propage pas toujours inotify).
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      # Désactive la télémétrie Next (évite les appels réseau au démarrage).
+      - NEXT_TELEMETRY_DISABLED=1
+    volumes:
+      # Code source complet, en mode "cached" pour les perfs sur macOS.
+      - ./:/app:cached
+      # node_modules isolé : les binaires natifs du conteneur Linux ne
+      # doivent jamais être exposés à / écrasés par le host macOS.
+      - node_modules:/app/node_modules
+      # Cache Next.js : accélère les démarrages, isolé du host.
+      - next_cache:/app/.next
+      # Base SQLite : bind mount explicite pour garantir que le fichier
+      # custom.db existant est le MÊME que celui vu par le conteneur,
+      # et qu'il reste visible/sauvegardable depuis le Mac.
+      - ./db:/app/db
+    stdin_open: true
+    tty: true
+    working_dir: /app
+    # La commande est également définie dans le Dockerfile.dev ; on la
+    # redéclare ici pour qu'elle soit évidente à la lecture du compose.
+    command: ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]
+
+volumes:
+  node_modules:
+    name: bitquest_node_modules
+  next_cache:
+    name: bitquest_next_cache
