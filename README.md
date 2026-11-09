@@ -1,202 +1,216 @@
 # BitQuest
 
 ![Bitcoin](https://img.shields.io/badge/Bitcoin-FF9900?style=flat-square&logo=bitcoin&logoColor=white)
-![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=next.js&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js%2016-000000?style=flat-square&logo=next.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat-square&logo=postgresql&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg?style=flat-square)
 
-**A gamified educational platform to learn Bitcoin and the Lightning Network.**
+**Plateforme éducative gamifiée pour apprendre Bitcoin et le Lightning Network.**
 
-## Overview
+BitQuest est l'un des deux volets de [GandalNexus](https://github.com/GandalNexus) (projet sénégalais récompensé au Dakar Bitcoin Hack 2025) : le module **learn → practice → earn** pour accompagner les apprenants, débutants comme avancés, dans la découverte progressive de Bitcoin. Le volet pratique est assuré par le projet frère [BitLab](https://github.com/GandalNexus/bitlab).
 
-BitQuest is an interactive web application designed to transform Bitcoin
-education into an engaging experience. Users progress through educational
-quests, earn rewards, unlocks achievements, and master the fundamentals of
-Bitcoin and the Lightning Network through a structured, gamified learning path.
+## Vue d'ensemble
 
-## Key Features
+BitQuest propose un parcours structuré de quêtes thématiques alliant théorie, mini-quiz et missions pratiques. L'engagement est récompensé par de l'XP, des badges et des satoshis **symboliques** (voir avertissement ci-dessous).
 
-### Authentication and Security
+### Les quêtes
 
-- Secure user registration and login using bcrypt hashing.
-- Session management via httpOnly cookies.
-- Route protection implemented with Next.js middleware.
+Chaque quête est composée de :
 
-### Gamification Engine
+1. **Une introduction** avec contexte et objectifs pédagogiques.
+2. **Des sections théoriques** structurées (texte + points clés).
+3. **Un quiz** à réussir à 70 % minimum pour débloquer la suite.
+4. **Une mission pratique** (8 types disponibles : exploration de bloc, forge de clés, construction de transaction, minage d'un nonce, ouverture d'un canal Lightning, parsing BOLT11, multisig, tweak Taproot).
+5. **Une récompense** : XP et sats pédagogiques.
 
-- **Leveling System**: Users gain XP and level up by completing educational
-  tasks.
-- **Virtual Economy**: An educational wallet system simulating satoshis
-  (testnet).
-- **Achievements**: Badge system to track and reward progress.
-- **Progressive Difficulty**: Curated quests ranging from beginner to expert
-  concepts.
+> ⚠️ **Les satoshis distribués par BitQuest sont des points pédagogiques**, pas des satoshis réels. Aucun transfert on-chain, aucun paiement Lightning réel n'est effectué dans cette version. L'intégration Lightning réelle via BitLab est prévue pour les phases ultérieures (voir `docs/BITQUEST_ROADMAP.md`).
 
-### User Dashboard
+### Fonctionnalités actuelles
 
-- Comprehensive progress tracking.
-- Real-time statistics and user metrics.
-- Transaction history visualization.
-- Personalized learning paths.
+- **Authentification** (compte email/password + mode invité).
+- **Dashboard** avec anneau de niveau, statistiques et timeline d'événements.
+- **11 quêtes seedées** en français, réparties sur 4 pistes (initiation, intermédiaire, avancée, spéciale).
+- **Moteur de progression** : 10 niveaux (0 à 3200 XP), streaks quotidiens, bonus de série sur les sats (0–50 %), plafond journalier de 10 000 sats.
+- **15 badges** avec 7 types de conditions (complétion de quête, séries, niveaux, totaux, quiz parfaits, etc.).
+- **Classement** des 20 meilleurs apprenants par XP.
+- **Portefeuille** pédagogique avec historique des transactions.
+- **Thème sombre** par défaut, polices soignées (Orbitron, Exo 2, Geist Mono).
 
-### User Interface
+### Fonctionnalités prévues (roadmap)
 
-- Responsive design compatible with desktop and mobile devices.
-- Dark mode support.
-- Optimized for performance and accessibility.
+- Académie structurée (cours → chapitres → leçons MDX avec illustrations).
+- Interface d'administration (CRUD cours, quêtes, badges, utilisateurs).
+- Internationalisation FR / EN / WO.
+- Intégration BitLab réelle avec vérification de preuves on-chain / Lightning via `mempool.space`.
+- Récompenses Lightning Testnet sous feature flag.
+- Migration vers PostgreSQL pour la production.
 
-## Technology Stack
+Détail complet dans `docs/BITQUEST_ROADMAP.md`.
+
+## Stack technique
 
 ### Frontend
 
-- **Next.js 16**: React framework utilizing the App Router architecture.
-- **React 19**: Library for building user interfaces.
-- **TypeScript**: Statically typed JavaScript for improved maintainability.
-- **Tailwind CSS 4**: Utility-first CSS framework for styling.
-- **Lucide React**: Icon library.
+- **Next.js 16** (App Router, Turbopack).
+- **React 19** avec Server Components.
+- **TypeScript** strict (vérifié par `npm run typecheck`).
+- **Tailwind CSS 4** + sélection de primitives **shadcn/ui** basée sur Radix UI.
+- **Lucide React** pour les icônes.
+- **Framer Motion** pour les animations.
+- **next-themes** pour le mode sombre.
 
-### Backend and Database
+### État client
 
-- **Next.js Server Actions**: Server-side logic and API handling.
-- **Drizzle ORM**: TypeScript-first Object Relational Mapper.
-- **PostgreSQL**: Relational database management system.
-- **bcryptjs**: Library for secure password hashing.
+- **Zustand** pour la session et la navigation SPA.
+- **TanStack Query** pour le cache des appels API.
 
-## Getting Started
+### Backend
 
-### Prerequisites
+- **Route Handlers Next.js** (`src/app/api/*`) pour l'API JSON interne.
+- **Prisma 6** comme ORM.
+- **SQLite** comme base de données (fichier `db/custom.db` en dev). Migration PostgreSQL planifiée.
+- **crypto natif Node.js** (`scrypt`) pour le hachage des mots de passe.
 
-Ensure the following are installed in your development environment:
+### Tests & qualité
 
-- Node.js 18 or higher
-- Docker and Docker Compose
-- npm or yarn package manager
+- **Vitest** + **happy-dom** pour les tests unitaires (voir `src/lib/bitquest/progression.test.ts`).
+- **oxlint** + **ESLint** + **Prettier**.
+- **GitHub Actions** (`.github/workflows/ci.yml`).
 
-### Installation
+## Démarrage rapide
 
-1.  **Clone the repository**
+### Option A — Avec Docker (recommandé)
 
-    ```bash
-    git clone https://github.com/your-username/bitquest.git
-    cd bitquest
-    ```
+Un environnement de développement reproductible est fourni. Voir `docs/DOCKER_DEVELOPMENT.md` pour la documentation complète.
 
-2.  **Install dependencies**
+```bash
+# Construire l'image
+docker compose -f docker-compose.dev.yml build
 
-    ```bash
-    npm install
-    ```
+# Installer les dépendances dans le volume nommé
+docker compose -f docker-compose.dev.yml run --rm bitquest-dev npm ci
 
-3.  **Configure environment variables**
+# Générer le client Prisma
+docker compose -f docker-compose.dev.yml run --rm bitquest-dev npx prisma generate
 
-    ```bash
-    cp .env.example .env
-    ```
+# Démarrer le serveur de dev
+docker compose -f docker-compose.dev.yml up
+```
 
-    The `.env` file comes pre-configured for the local Docker environment:
+Application disponible sur `http://localhost:3000`.
 
-    ```env
-    DATABASE_URL="postgresql://bitquest:bitquest_dev_password@localhost:5432/bitquest"
-    NODE_ENV="development"
-    ```
+### Option B — Local (Node 20+)
 
-4.  **Initialize the Database** Start the PostgreSQL container and apply the
-    schema:
+#### Prérequis
 
-    ```bash
-    npm run db:start
-    npm run db:push
-    ```
+- **Node.js 20** ou supérieur.
+- **npm 10+** (ou npm 11 recommandé — cf. note sur `--package-lock-only`).
 
-5.  **Start the Development Server**
-    ```bash
-    npm run dev
-    ```
-    Access the application at [http://localhost:3000](http://localhost:3000).
+#### Installation
 
-### Available Scripts
+```bash
+git clone https://github.com/GandalNexus/bitquest.git
+cd bitquest
 
-| Command             | Description                                   |
-| :------------------ | :-------------------------------------------- |
-| `npm run dev`       | Starts the development server.                |
-| `npm run build`     | Builds the application for production.        |
-| `npm run start`     | Starts the production server.                 |
-| `npm run lint`      | Runs the linter to ensure code quality.       |
-| `npm run db:start`  | Starts the PostgreSQL database via Docker.    |
-| `npm run db:stop`   | Stops the PostgreSQL database container.      |
-| `npm run db:reset`  | Resets the database (CAUTION: deletes data).  |
-| `npm run db:push`   | Pushes schema changes to the database.        |
-| `npm run db:studio` | Opens Drizzle Studio for database management. |
+# Configurer l'environnement
+echo 'DATABASE_URL="file:./db/custom.db"' > .env
+echo 'NODE_ENV="development"' >> .env
 
-For detailed Docker instructions, refer to `DOCKER.md`.
+# Installer et préparer
+npm ci
+npx prisma generate
 
-## Project Structure
+# Démarrer
+npm run dev
+```
+
+Ouvre `http://localhost:3000`.
+
+## Scripts npm
+
+| Commande | Description |
+|---|---|
+| `npm run dev` | Serveur de développement Next.js (port 3000) |
+| `npm run build` | Build de production Next.js (⚠ voir issue connue en bas) |
+| `npm start` | Serveur de production (nécessite Bun pour `.next/standalone/server.js`) |
+| `npm run lint` | oxlint + ESLint |
+| `npm run typecheck` | Vérification TypeScript (`tsc --noEmit`) |
+| `npm test` | Tests Vitest (une passe) |
+| `npm run test:watch` | Tests Vitest en mode watch |
+| `npm run format` | Prettier (écriture) |
+| `npm run format:check` | Prettier (vérification seule) |
+| `npm run db:generate` | Régénère le client Prisma |
+| `npm run db:push` | Synchronise le schéma avec la base (⚠ dev uniquement, `--accept-data-loss`) |
+| `npm run db:migrate` | Crée/applique une migration Prisma (dev) |
+| `npm run db:reset` | Réinitialise la base (⚠ destructif) |
+
+## Structure du projet
 
 ```
 bitquest/
-├── app/
-│   ├── actions/          # Server Actions (backend logic)
-│   ├── dashboard/        # Dashboard route and components
-│   ├── login/            # Authentication routes
-│   ├── signup/           # Registration routes
-│   ├── layout.tsx        # Root layout definition
-│   └── page.tsx          # Landing page
-├── components/           # Reusable UI components
-│   ├── DashboardShell.tsx
-│   └── PublicLayout.tsx
-├── db/                   # Database configuration
-│   ├── index.ts          # Drizzle client setup
-│   └── schema.ts         # Database schema definitions
-├── public/               # Static assets (images, fonts)
-├── middleware.ts         # Authentication middleware
-└── package.json          # Project dependencies and scripts
+├── src/
+│   ├── app/                     # Next.js App Router
+│   │   ├── api/                 # Route handlers (auth, me, quests, wallet, leaderboard)
+│   │   ├── layout.tsx
+│   │   ├── page.tsx             # SPA shell
+│   │   └── global-error.tsx     # Boundary d'erreur racine
+│   ├── components/
+│   │   ├── bitquest/            # Composants métier (dashboard, quest-player, etc.)
+│   │   └── ui/                  # Primitives shadcn/ui utilisées (12)
+│   ├── hooks/                   # Hooks React partagés
+│   ├── lib/
+│   │   ├── bitquest/            # Domain layer (progression, missions, quests, …)
+│   │   ├── db.ts                # Instance Prisma singleton
+│   │   ├── seed-data.ts         # 11 quêtes + 15 badges + bots de leaderboard
+│   │   └── utils.ts
+│   └── test/
+│       └── setup.ts             # Setup Vitest
+├── prisma/
+│   ├── schema.prisma            # 8 modèles (User, Quest, QuizQuestion, …)
+│   └── seed.ts
+├── db/
+│   └── custom.db                # Base SQLite (versionnée avec le seed initial)
+├── docs/                        # Audit, architecture, roadmap, intégration BitLab, Docker
+├── public/                      # Assets statiques
+├── Dockerfile.dev
+├── docker-compose.dev.yml
+├── docker-compose.yml           # (PostgreSQL, actuellement non utilisé — phase future)
+└── .github/workflows/ci.yml
 ```
 
-## Database Schema
+## Documentation
 
-The core user table structure is defined as follows:
+Tous les documents de conception et d'audit sont dans `docs/` :
 
-```sql
-CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  password TEXT NOT NULL,
-  level INTEGER DEFAULT 1,
-  xp INTEGER DEFAULT 0,
-  sats INTEGER DEFAULT 50,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
+- `BITQUEST_AUDIT.md` — Audit du code existant.
+- `BITQUEST_ARCHITECTURE.md` — Architecture cible.
+- `BITQUEST_FEATURE_MATRIX.md` — Écart existant / cible.
+- `BITQUEST_INTEGRATION_BITLAB.md` — Intégration BitLab prévue.
+- `BITQUEST_ROADMAP.md` — Plan de développement par phases.
+- `DOCKER_DEVELOPMENT.md` — Environnement Docker de dev.
+- `PHASE_0_REPORT.md` — Rapport d'hygiène technique (Phase 0).
 
-## Roadmap
+## Issues connues
 
-- [x] Authentication system
-- [x] Interactive dashboard
-- [x] Quest system foundation
-- [x] Educational wallet
-- [x] Achievement system
-- [ ] Advanced interactive quests
-- [ ] Lightning Network integration (testnet)
-- [ ] Leaderboards and competitive features
-- [ ] Multiplayer capabilities
-- [ ] Public API
+- **Build Next.js** : la commande `npm run build` échoue actuellement au stade de prerender de la route interne `/_global-error` (`TypeError: Cannot read properties of null (reading 'useContext')`). Cette erreur est **pré-existante** (antérieure au commit `a2d7ad9`) et sera corrigée en Phase 1. La CI exécute le build mais ne bloque pas le pipeline tant que le fix n'a pas été identifié. Le serveur de dev (`npm run dev`) fonctionne sans problème.
+- **17 vulnérabilités npm** (12 moderate, 5 high, 0 critical) détectées via `npm audit`. Toutes les corrections impliquent des breaking changes (sharp, @mdxeditor/editor, eslint-config-next, react-syntax-highlighter). À traiter en Phase 1.
 
-## Contributing
+## Contribuer
 
-Contributions are welcome. Please follow the standard workflow:
+Les contributions sont bienvenues ! Voir `CONTRIBUTING.md` et `CODE_OF_CONDUCT.md`.
 
-1.  Fork the repository.
-2.  Create a feature branch (`git checkout -b feature/NewFeature`).
-3.  Commit your changes (`git commit -m 'Add NewFeature'`).
-4.  Push to the branch (`git push origin feature/NewFeature`).
-5.  Open a Pull Request.
+Workflow :
 
-Please ensure all code adheres to the project's TypeScript conventions and
-includes appropriate tests.
+1. Fork + branche de feature.
+2. Vérifier localement : `npm run lint && npm run typecheck && npm test`.
+3. Ouvrir une Pull Request contre `main`.
 
-## License
+## Sécurité
 
-This project is licensed under the AGPL-3.0 License. See the [LICENSE](LICENSE)
-file for details.
+Une vulnérabilité à signaler ? Merci de **ne pas** ouvrir d'issue publique. Suivre la procédure décrite dans `SECURITY.md`.
+
+## Licence
+
+[AGPL-3.0](LICENSE) © GandalNexus
