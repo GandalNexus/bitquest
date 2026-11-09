@@ -1,16 +1,16 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { formatDistanceToNow } from "date-fns";
-import { fr } from "date-fns/locale";
 import {
   ArrowRight,
   CheckCircle2,
   Coins,
   Flame,
+  GraduationCap,
   Map,
   Sparkles,
   Star,
+  Target,
   TrendingUp,
   Trophy,
   type LucideIcon,
@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useMe, useQuests } from "@/lib/bitquest/hooks";
-import { formatSats, type MeEvent, type QuestState } from "@/lib/bitquest/client";
+import { formatSats } from "@/lib/bitquest/client";
 import type { View } from "@/lib/bitquest/store";
 import {
   BadgeIcon,
@@ -33,8 +33,15 @@ import {
   statusLabels,
   trackStyles,
 } from "./ui-bits";
+import {
+  TRACK_ORDER,
+  eventText,
+  isNewUser,
+  pickNextQuest,
+  relativeTime,
+} from "./dashboard.utils";
 
-/* ============ Helpers ============ */
+/* ============ Helpers visuels (non testables car React) ============ */
 
 function LevelRing({ pct, level }: { pct: number; level: number }) {
   const radius = 34;
@@ -68,17 +75,6 @@ function LevelRing({ pct, level }: { pct: number; level: number }) {
   );
 }
 
-const STATUS_PRIORITY = ["IN_PROGRESS", "THEORY_DONE", "QUIZ_PASSED", "AVAILABLE"];
-
-function pickNextQuest(quests: QuestState[]): QuestState | undefined {
-  const candidates = quests
-    .filter((q) => q.status !== "COMPLETED" && !q.locked)
-    .sort(
-      (a, b) => a.order - b.order || STATUS_PRIORITY.indexOf(a.status) - STATUS_PRIORITY.indexOf(b.status),
-    );
-  return candidates[0];
-}
-
 const EVENT_META: Record<string, { icon: LucideIcon; className: string }> = {
   QUEST_COMPLETED: { icon: CheckCircle2, className: "text-emerald-500" },
   BADGE_UNLOCKED: { icon: Trophy, className: "text-amber-500" },
@@ -86,46 +82,128 @@ const EVENT_META: Record<string, { icon: LucideIcon; className: string }> = {
   SATS_EARNED: { icon: Coins, className: "text-amber-500" },
 };
 
-function eventText(e: MeEvent): string {
-  const p = e.payload ?? {};
-  switch (e.type) {
-    case "QUEST_COMPLETED": {
-      const title = typeof p.questTitle === "string" ? p.questTitle : "une quête";
-      return `Quête terminée : ${title}`;
-    }
-    case "BADGE_UNLOCKED": {
-      const name = typeof p.badgeName === "string" ? p.badgeName : "un badge";
-      return `Badge débloqué : ${name}`;
-    }
-    case "LEVEL_UP": {
-      const to = Number(p.to);
-      return Number.isFinite(to) ? `Niveau ${to} atteint` : "Niveau supérieur atteint";
-    }
-    case "SATS_EARNED": {
-      const amount = Number(p.amount);
-      return Number.isFinite(amount) ? `+${formatSats(amount)} sats gagnés` : "Satoshis gagnés";
-    }
-    default:
-      return "Événement d'aventure";
-  }
-}
-
-function relativeTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  try {
-    return formatDistanceToNow(date, { addSuffix: true, locale: fr });
-  } catch {
-    return "—";
-  }
-}
-
 const fadeUp = {
   initial: { opacity: 0, y: 14 },
   animate: { opacity: 1, y: 0 },
 };
 
-const TRACK_ORDER = ["INITIATION", "INTERMEDIATE", "ADVANCED", "SPECIAL"] as const;
+/* ============ Sous-composants additifs (Sprint 1A) ============ */
+
+/**
+ * D2 — Tuile Académie « Bientôt disponible ».
+ * Volontairement inerte tant que le module Académie n'est pas livré en Sprint 1B.
+ */
+function AcademyTeaser() {
+  const titleId = "dashboard-academy-title";
+  return (
+    <motion.section
+      {...fadeUp}
+      transition={{ duration: 0.35, delay: 0.18 }}
+      aria-labelledby={titleId}
+    >
+      <Card className="h-full rounded-xl">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div className="min-w-0">
+            <CardTitle
+              id={titleId}
+              className="flex items-center gap-2 text-base sm:text-lg"
+            >
+              <GraduationCap className="h-5 w-5 text-primary" aria-hidden />
+              Académie BitQuest
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Cours structurés et leçons illustrées pour approfondir Bitcoin au-delà des quêtes.
+            </CardDescription>
+          </div>
+          <Badge
+            variant="outline"
+            className="shrink-0 border-primary/30 bg-primary/10 text-primary"
+          >
+            Bientôt disponible
+          </Badge>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Les premiers cours arrivent au Sprint 1B. En attendant, continue tes quêtes pour poser
+            les bases.
+          </p>
+          <Button
+            variant="outline"
+            disabled
+            aria-disabled="true"
+            title="Module en cours de construction — disponible au prochain sprint"
+            className="w-full sm:w-auto"
+          >
+            Explorer l&apos;Académie
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </Button>
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+/**
+ * D3 — Bannière d'onboarding pour les comptes tout neufs (0 XP, 0 événement, 0 quête terminée).
+ * Rappelle la boucle d'apprentissage avant de laisser l'utilisateur plonger dans la quête Genesis.
+ */
+function OnboardingBanner({ onStart }: { onStart: () => void }) {
+  const titleId = "dashboard-onboarding-title";
+  const steps: { icon: LucideIcon; title: string; sub: string }[] = [
+    { icon: Sparkles, title: "Lis & valide", sub: "Lis une section et réussis le quiz à 70 %." },
+    { icon: Target, title: "Pratique", sub: "Réalise la mission pour ancrer la notion." },
+    { icon: Trophy, title: "Récompense", sub: "Gagne XP, badges et sats pédagogiques." },
+  ];
+  return (
+    <motion.section
+      {...fadeUp}
+      transition={{ duration: 0.35, delay: 0.08 }}
+      aria-labelledby={titleId}
+    >
+      <Card className="rounded-xl border-primary/30 bg-primary/5">
+        <CardHeader>
+          <CardTitle id={titleId} className="flex items-center gap-2 text-base sm:text-lg">
+            <Sparkles className="h-5 w-5 text-primary" aria-hidden />
+            Bienvenue sur BitQuest
+          </CardTitle>
+          <CardDescription>
+            Trois étapes pour chaque quête. Ton aventure commence par la Genèse de Bitcoin.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <ol className="grid gap-3 sm:grid-cols-3" aria-label="Boucle d'apprentissage">
+            {steps.map(({ icon: Icon, title, sub }, i) => (
+              <li
+                key={title}
+                className="flex items-start gap-3 rounded-lg border bg-background/60 p-3"
+              >
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
+                  aria-hidden
+                >
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Étape {i + 1}
+                  </div>
+                  <div className="text-sm font-medium">{title}</div>
+                  <div className="text-xs text-muted-foreground">{sub}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <div className="flex justify-end">
+            <Button onClick={onStart} className="w-full sm:w-auto">
+              Commencer la quête Genesis
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
 
 /* ============ Dashboard ============ */
 
@@ -162,20 +240,46 @@ export function Dashboard({
   const recentBadges = meQuery.data.badges.slice(0, 4);
   const recentEvents = meQuery.data.events.slice(0, 8);
 
+  /** D3 — compte tout neuf : affiche la bannière d'onboarding en plus du Hero. */
+  const showOnboarding = isNewUser({
+    completedCount: completedQuests.length,
+    eventCount: meQuery.data.events.length,
+    xp: me.xp,
+  });
+
+  /** Code de la première quête disponible pour l'onboarding (toujours Genesis dans le seed actuel). */
+  const firstAvailableCode =
+    quests.find((q) => q.status === "AVAILABLE" && !q.locked)?.code ?? "genesis";
+
+  /* --- Identifiants pour aria-labelledby (D6) --- */
+  const heroId = "dashboard-hero-title";
+  const statsId = "dashboard-stats-title";
+  const nextQuestId = "dashboard-next-title";
+  const tracksId = "dashboard-tracks-title";
+  const badgesId = "dashboard-badges-title";
+  const activityId = "dashboard-activity-title";
+
   return (
     <div className="space-y-6">
       {/* ===== Hero ===== */}
-      <motion.section {...fadeUp} transition={{ duration: 0.35 }}>
+      <motion.section
+        {...fadeUp}
+        transition={{ duration: 0.35 }}
+        aria-labelledby={heroId}
+      >
         <Card className="rounded-xl">
           <CardContent className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             <div className="min-w-0 text-center sm:text-left">
-              <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+              <h1
+                id={heroId}
+                className="font-display text-2xl font-bold tracking-tight sm:text-3xl"
+              >
                 Bonjour, {me.pseudo}
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 Niv. {level.level} · {level.title}
               </p>
-              {!allCompleted && remaining > 0 && (
+              {!allCompleted && remaining > 0 && !showOnboarding && (
                 <p className="mt-2 max-w-md text-sm">
                   {remaining === 1
                     ? "Une quête t'attend encore : chaque victoire rapproche du rang de Maître Satoshi !"
@@ -187,7 +291,8 @@ export function Dashboard({
               <LevelRing pct={level.pct} level={level.level} />
               <div className="space-y-1 text-sm">
                 <div className="font-semibold">
-                  {formatSats(me.xp)} XP <span className="font-normal text-muted-foreground">au total</span>
+                  {formatSats(me.xp)} XP{" "}
+                  <span className="font-normal text-muted-foreground">au total</span>
                 </div>
                 <div className="text-muted-foreground">
                   {level.next !== null
@@ -200,13 +305,19 @@ export function Dashboard({
         </Card>
       </motion.section>
 
+      {/* ===== Onboarding (D3 — nouveaux comptes uniquement) ===== */}
+      {showOnboarding && <OnboardingBanner onStart={() => onOpenQuest(firstAvailableCode)} />}
+
       {/* ===== StatCards ===== */}
       <motion.section
         {...fadeUp}
         transition={{ duration: 0.35, delay: 0.05 }}
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
-        aria-label="Statistiques d'aventurier"
+        aria-labelledby={statsId}
       >
+        <h2 id={statsId} className="sr-only">
+          Statistiques d&apos;aventurier
+        </h2>
         <StatCard icon={Star} label="XP total" value={formatSats(me.xp)} />
         <StatCard
           icon={Map}
@@ -222,10 +333,14 @@ export function Dashboard({
         {/* --- Colonne gauche --- */}
         <div className="space-y-4 lg:col-span-2">
           {/* Continuer l'apprentissage */}
-          <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.1 }}>
+          <motion.section
+            {...fadeUp}
+            transition={{ duration: 0.35, delay: 0.1 }}
+            aria-labelledby={nextQuestId}
+          >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle>Continuer l&apos;apprentissage</CardTitle>
+                <CardTitle id={nextQuestId}>Continuer l&apos;apprentissage</CardTitle>
                 <CardDescription>Ta prochaine étape sur le chemin de Bitcoin.</CardDescription>
               </CardHeader>
               <CardContent>
@@ -252,7 +367,8 @@ export function Dashboard({
                         className="h-10 w-full sm:w-auto"
                         onClick={() => onOpenQuest(nextQuest.code)}
                       >
-                        {nextQuest.status === "AVAILABLE" ? "Commencer" : "Reprendre"} : {nextQuest.title}
+                        {nextQuest.status === "AVAILABLE" ? "Commencer" : "Reprendre"} :{" "}
+                        {nextQuest.title}
                         <ArrowRight className="h-4 w-4" aria-hidden />
                       </Button>
                     </div>
@@ -262,8 +378,8 @@ export function Dashboard({
                     <Sparkles className="h-8 w-8 text-primary" aria-hidden />
                     <p className="font-semibold">Toutes les quêtes terminées, Maître Satoshi !</p>
                     <p className="text-sm text-muted-foreground">
-                      Tu maîtrises désormais les fondamentaux de Bitcoin et du Lightning Network. Compare ton
-                      XP aux autres aventuriers.
+                      Tu maîtrises désormais les fondamentaux de Bitcoin et du Lightning Network.
+                      Compare ton XP aux autres aventuriers.
                     </p>
                     <Button size="lg" className="h-10" onClick={() => onNavigate("leaderboard")}>
                       Voir le classement
@@ -291,10 +407,14 @@ export function Dashboard({
           </motion.section>
 
           {/* Progression par parcours */}
-          <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.15 }}>
+          <motion.section
+            {...fadeUp}
+            transition={{ duration: 0.35, delay: 0.15 }}
+            aria-labelledby={tracksId}
+          >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle>Progression par parcours</CardTitle>
+                <CardTitle id={tracksId}>Progression par parcours</CardTitle>
                 <CardDescription>
                   Quatre pistes, de l&apos;initiation aux événements spéciaux.
                 </CardDescription>
@@ -331,15 +451,22 @@ export function Dashboard({
               </CardContent>
             </Card>
           </motion.section>
+
+          {/* D2 — Tuile Académie "Bientôt disponible" */}
+          <AcademyTeaser />
         </div>
 
         {/* --- Colonne droite --- */}
         <div className="space-y-4">
           {/* Badges récents */}
-          <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.2 }}>
+          <motion.section
+            {...fadeUp}
+            transition={{ duration: 0.35, delay: 0.2 }}
+            aria-labelledby={badgesId}
+          >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle>Badges récents</CardTitle>
+                <CardTitle id={badgesId}>Badges récents</CardTitle>
                 <CardDescription>Tes dernières récompenses de collectionneur.</CardDescription>
               </CardHeader>
               <CardContent>
@@ -390,23 +517,31 @@ export function Dashboard({
           </motion.section>
 
           {/* Activité récente */}
-          <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.25 }}>
+          <motion.section
+            {...fadeUp}
+            transition={{ duration: 0.35, delay: 0.25 }}
+            aria-labelledby={activityId}
+          >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle>Activité récente</CardTitle>
+                <CardTitle id={activityId}>Activité récente</CardTitle>
                 <CardDescription>Le journal de ton aventure.</CardDescription>
               </CardHeader>
               <CardContent>
                 {recentEvents.length > 0 ? (
                   <ul
                     className="max-h-64 space-y-3 overflow-y-auto pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar]:w-1.5"
+                    aria-live="polite"
                     aria-label="Journal d'activité"
                   >
                     {recentEvents.map((event, i) => {
                       const meta = EVENT_META[event.type];
                       const Icon = meta?.icon ?? Sparkles;
                       return (
-                        <li key={`${event.type}-${event.createdAt}-${i}`} className="flex items-start gap-3">
+                        <li
+                          key={`${event.type}-${event.createdAt}-${i}`}
+                          className="flex items-start gap-3"
+                        >
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
                             <Icon
                               className={`h-4 w-4 ${meta?.className ?? "text-muted-foreground"}`}
@@ -415,7 +550,9 @@ export function Dashboard({
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm leading-snug">{eventText(event)}</p>
-                            <p className="text-xs text-muted-foreground">{relativeTime(event.createdAt)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {relativeTime(event.createdAt)}
+                            </p>
                           </div>
                         </li>
                       );
@@ -441,8 +578,8 @@ export function Dashboard({
           className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground"
         >
           <Flame className="h-3.5 w-3.5 text-orange-500" aria-hidden />
-          Série d&apos;activité : {me.streak} jour{me.streak > 1 ? "s" : ""} — reviens demain pour un bonus
-          accru.
+          Série d&apos;activité : {me.streak} jour{me.streak > 1 ? "s" : ""} — reviens demain pour
+          un bonus accru.
         </motion.p>
       )}
     </div>
