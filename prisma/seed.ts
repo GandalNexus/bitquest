@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { questsSeed, badgesSeed, botUsersSeed } from "../src/lib/seed-data";
+import { academyCoursesSeed } from "../src/lib/academy-seed";
 import crypto from "crypto";
 
 const db = new PrismaClient();
@@ -94,6 +95,88 @@ async function main() {
     }
   }
   console.log(`Bots: ${botUsersSeed.length}`);
+
+  /* ---- Académie — Cours / Chapitres / Leçons ---- */
+  // Upserts idempotents : jamais de delete sur les leçons ou les chapitres,
+  // afin de préserver les LessonProgress des utilisateurs.
+  let courseOrder = 0;
+  let totalChapters = 0;
+  let totalLessons = 0;
+  for (const course of academyCoursesSeed) {
+    courseOrder += 1;
+    const courseRow = await db.course.upsert({
+      where: { slug: course.slug },
+      update: {
+        title: course.title,
+        subtitle: course.subtitle,
+        description: course.description,
+        coverIcon: course.coverIcon,
+        order: courseOrder,
+        publishedAt: new Date(),
+      },
+      create: {
+        slug: course.slug,
+        title: course.title,
+        subtitle: course.subtitle,
+        description: course.description,
+        coverIcon: course.coverIcon,
+        order: courseOrder,
+        publishedAt: new Date(),
+      },
+    });
+
+    let chapterOrder = 0;
+    for (const chapter of course.chapters) {
+      chapterOrder += 1;
+      totalChapters += 1;
+      const chapterRow = await db.chapter.upsert({
+        where: { courseId_slug: { courseId: courseRow.id, slug: chapter.slug } },
+        update: {
+          title: chapter.title,
+          summary: chapter.summary,
+          order: chapterOrder,
+        },
+        create: {
+          courseId: courseRow.id,
+          slug: chapter.slug,
+          title: chapter.title,
+          summary: chapter.summary,
+          order: chapterOrder,
+        },
+      });
+
+      let lessonOrder = 0;
+      for (const lesson of chapter.lessons) {
+        lessonOrder += 1;
+        totalLessons += 1;
+        await db.lesson.upsert({
+          where: { chapterId_slug: { chapterId: chapterRow.id, slug: lesson.slug } },
+          update: {
+            title: lesson.title,
+            summary: lesson.summary,
+            content: lesson.content,
+            estimatedMinutes: lesson.estimatedMinutes,
+            order: lessonOrder,
+            publishedAt: new Date(),
+          },
+          create: {
+            chapterId: chapterRow.id,
+            slug: lesson.slug,
+            title: lesson.title,
+            summary: lesson.summary,
+            content: lesson.content,
+            estimatedMinutes: lesson.estimatedMinutes,
+            order: lessonOrder,
+            publishedAt: new Date(),
+          },
+        });
+      }
+    }
+  }
+  console.log(
+    `Académie : ${academyCoursesSeed.length} cours · ${totalChapters} chapitres · ${totalLessons} leçons`,
+  );
+
   console.log("Seed terminé.");
 }
 

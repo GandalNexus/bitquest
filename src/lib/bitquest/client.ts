@@ -177,6 +177,53 @@ export interface WalletResponse {
   }[];
 }
 
+export interface AcademyCourseSummaryDTO {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  coverIcon: string;
+  order: number;
+  totalLessons: number;
+  totalChapters: number;
+  completedLessons: number;
+  pct: number;
+}
+
+export interface AcademyLessonNodeDTO {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  content: string;
+  estimatedMinutes: number;
+  order: number;
+  completed: boolean;
+}
+
+export interface AcademyChapterNodeDTO {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  order: number;
+  lessons: AcademyLessonNodeDTO[];
+}
+
+export interface AcademyCourseTreeDTO {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  coverIcon: string;
+  totalLessons: number;
+  completedLessons: number;
+  pct: number;
+  chapters: AcademyChapterNodeDTO[];
+}
+
 export interface LeaderboardEntry {
   rank: number;
   id: string;
@@ -279,6 +326,14 @@ export const api = {
     }),
   wallet: () => request<WalletResponse>("/api/wallet"),
   leaderboard: () => request<{ entries: LeaderboardEntry[] }>("/api/leaderboard"),
+  academyCourses: () => request<{ courses: AcademyCourseSummaryDTO[] }>("/api/academy/courses"),
+  academyCourse: (slug: string) =>
+    request<{ course: AcademyCourseTreeDTO }>(`/api/academy/courses/${slug}`),
+  completeLesson: (lessonId: string) =>
+    request<{ alreadyCompleted: boolean; completedAt: string }>(
+      `/api/academy/lessons/${lessonId}/complete`,
+      { method: "POST", body: {} },
+    ),
 };
 
 /* ============ Formats ============ */

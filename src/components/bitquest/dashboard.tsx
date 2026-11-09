@@ -90,8 +90,7 @@ const fadeUp = {
 /* ============ Sous-composants additifs (Sprint 1A) ============ */
 
 /**
- * D2 — Tuile Académie « Bientôt disponible ».
- * Volontairement inerte tant que le module Académie n'est pas livré en Sprint 1B.
+ * D2 — Tuile Académie : lien vers le module Académie (Sprint 1B).
  */
 function AcademyTeaser() {
   const titleId = "dashboard-academy-title";
@@ -117,25 +116,21 @@ function AcademyTeaser() {
           </div>
           <Badge
             variant="outline"
-            className="shrink-0 border-primary/30 bg-primary/10 text-primary"
+            className="shrink-0 border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
           >
-            Bientôt disponible
+            Disponible
           </Badge>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            Les premiers cours arrivent au Sprint 1B. En attendant, continue tes quêtes pour poser
-            les bases.
+            Parcours thématiques, chapitres et leçons pédagogiques — ouvre l&apos;Académie pour
+            commencer ou reprendre un cours.
           </p>
-          <Button
-            variant="outline"
-            disabled
-            aria-disabled="true"
-            title="Module en cours de construction — disponible au prochain sprint"
-            className="w-full sm:w-auto"
-          >
-            Explorer l&apos;Académie
-            <ArrowRight className="h-4 w-4" aria-hidden />
+          <Button asChild className="w-full sm:w-auto">
+            <a href="/academy">
+              Explorer l&apos;Académie
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </a>
           </Button>
         </CardContent>
       </Card>

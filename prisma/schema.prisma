@@ -22,10 +22,11 @@ model User {
   lastActiveDate  String?
   createdAt       DateTime @default(now())
 
-  progress     UserQuestProgress[]
-  badges       UserBadge[]
-  transactions WalletTransaction[]
-  events       UserEvent[]
+  progress       UserQuestProgress[]
+  badges         UserBadge[]
+  transactions   WalletTransaction[]
+  events         UserEvent[]
+  lessonProgress LessonProgress[]
 }
 
 model Quest {
@@ -46,6 +47,7 @@ model Quest {
 
   quizQuestions QuizQuestion[]
   progress      UserQuestProgress[]
+  chapters      ChapterQuest[]
 }
 
 model QuizQuestion {
@@ -117,7 +119,87 @@ model UserEvent {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String // QUEST_COMPLETED | BADGE_UNLOCKED | LEVEL_UP | SATS_EARNED | QUIZ_PASSED
+  type      String // QUEST_COMPLETED | BADGE_UNLOCKED | LEVEL_UP | SATS_EARNED | QUIZ_PASSED | LESSON_COMPLETED
   payload   String // JSON
   createdAt DateTime @default(now())
+}
+
+/* =============================================================
+ * ACADEMY  — Sprint 1B
+ * Parcours pédagogique structuré (Course → Chapter → Lesson),
+ * complémentaire du système de quêtes gamifiées.
+ * ============================================================= */
+
+model Course {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  subtitle    String
+  description String
+  coverIcon   String    @default("BookOpen")
+  order       Int
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  chapters Chapter[]
+}
+
+model Chapter {
+  id       String @id @default(cuid())
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  slug     String
+  title    String
+  summary  String
+  order    Int
+
+  lessons      Lesson[]
+  linkedQuests ChapterQuest[]
+
+  @@unique([courseId, slug])
+  @@index([courseId, order])
+}
+
+model Lesson {
+  id               String    @id @default(cuid())
+  chapterId        String
+  chapter          Chapter   @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+  slug             String
+  title            String
+  summary          String
+  content          String
+  estimatedMinutes Int       @default(5)
+  order            Int
+  publishedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  progress LessonProgress[]
+
+  @@unique([chapterId, slug])
+  @@index([chapterId, order])
+}
+
+model LessonProgress {
+  userId      String
+  lessonId    String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+
+  @@id([userId, lessonId])
+  @@index([userId])
+}
+
+model ChapterQuest {
+  chapterId String
+  questId   String
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  quest     Quest   @relation(fields: [questId], references: [id], onDelete: Restrict)
+  order     Int
+  note      String?
+
+  @@id([chapterId, questId])
+  @@index([chapterId])
 }
