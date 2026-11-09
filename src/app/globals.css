@@ -1,0 +1,207 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-exo2), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-orbitron), var(--font-exo2), ui-sans-serif, sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ============ Charte BitQuest — Édition 2026 ============
+ * Palette : #F7931A Orange Bitcoin · #E8720C Orange Profond ·
+ * #FFFFFF Blanc · #14141F Encre Nuit · #0D0D16 Nuit Web3
+ * Répartition 45 / 30 / 15 / 10 — le blanc domine et respire,
+ * l'orange signe, l'encre structure, la nuit enveloppe.
+ */
+
+:root {
+  --radius: 0.75rem;
+  --background: #ffffff;
+  --foreground: #14141f;
+  --card: #ffffff;
+  --card-foreground: #14141f;
+  --popover: #ffffff;
+  --popover-foreground: #14141f;
+  --primary: #f7931a;
+  --primary-foreground: #14141f;
+  --secondary: #fdf1e0;
+  --secondary-foreground: #7c4a03;
+  --muted: #f5f3f0;
+  --muted-foreground: #5c5b66;
+  --accent: #fdeedc;
+  --accent-foreground: #14141f;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #e9e5df;
+  --input: #e9e5df;
+  --ring: #f7931a;
+  --chart-1: #f7931a;
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: #14141f;
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: #e8720c;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #14141f;
+  --sidebar-primary: #f7931a;
+  --sidebar-primary-foreground: #14141f;
+  --sidebar-accent: #fdeedc;
+  --sidebar-accent-foreground: #14141f;
+  --sidebar-border: #e9e5df;
+  --sidebar-ring: #f7931a;
+}
+
+.dark {
+  /* Nuit Web3 enveloppe, l'encre structure les cartes */
+  --background: #0d0d16;
+  --foreground: #f2f2f6;
+  --card: #14141f;
+  --card-foreground: #f2f2f6;
+  --popover: #14141f;
+  --popover-foreground: #f2f2f6;
+  --primary: #f7931a;
+  --primary-foreground: #14141f;
+  --secondary: #1a1a26;
+  --secondary-foreground: #f2f2f6;
+  --muted: #1a1a25;
+  --muted-foreground: #a2a2b5;
+  --accent: #1d1d2a;
+  --accent-foreground: #f2f2f6;
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #f7931a;
+  --chart-1: #f7931a;
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: #e8720c;
+  --sidebar: #0d0d16;
+  --sidebar-foreground: #f2f2f6;
+  --sidebar-primary: #f7931a;
+  --sidebar-primary-foreground: #14141f;
+  --sidebar-accent: #1d1d2a;
+  --sidebar-accent-foreground: #f2f2f6;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #f7931a;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* Sélection aux couleurs de la marque */
+  ::selection {
+    background: #f7931a;
+    color: #14141f;
+  }
+  /* Barres de défilement discrètes et à thème */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(20, 20, 31, 0.28) transparent;
+  }
+  .dark * {
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(20, 20, 31, 0.28);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(20, 20, 31, 0.45);
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.32);
+  }
+  .dark ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* ============ Champ d'étoiles (mode Nuit Web3) ============
+ * Inspiration space / Stellar Quest : un ciel étoilé très discret
+ * enveloppe l'interface sombre, avec une nébuleuse orange fugace.
+ */
+.starfield {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% -12%, rgba(247, 147, 26, 0.07), transparent 62%),
+    radial-gradient(1px 1px at 22% 18%, rgba(255, 255, 255, 0.55) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 68% 42%, rgba(255, 255, 255, 0.4) 50%, transparent 51%),
+    radial-gradient(1px 1px at 84% 72%, rgba(255, 255, 255, 0.32) 50%, transparent 51%),
+    radial-gradient(1px 1px at 12% 58%, rgba(255, 255, 255, 0.28) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 44% 88%, rgba(255, 255, 255, 0.22) 50%, transparent 51%),
+    radial-gradient(1px 1px at 58% 8%, rgba(255, 255, 255, 0.35) 50%, transparent 51%),
+    radial-gradient(1px 1px at 92% 24%, rgba(255, 255, 255, 0.3) 50%, transparent 51%);
+  background-size:
+    100% 100%,
+    560px 560px,
+    420px 420px,
+    340px 340px,
+    460px 460px,
+    380px 380px,
+    300px 300px,
+    520px 520px;
+}
+.dark .starfield {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .starfield {
+    transition: none;
+  }
+}

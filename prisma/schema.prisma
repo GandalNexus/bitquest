@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  pseudo          String   @unique
+  email           String?  @unique
+  passwordHash    String?
+  isGuest         Boolean  @default(false)
+  isBot           Boolean  @default(false)
+  token           String   @unique
+  xp              Int      @default(0)
+  sats            Int      @default(0)
+  satsEarnedTotal Int      @default(0)
+  streak          Int      @default(1)
+  lastActiveDate  String?
+  createdAt       DateTime @default(now())
+
+  progress     UserQuestProgress[]
+  badges       UserBadge[]
+  transactions WalletTransaction[]
+  events       UserEvent[]
+}
+
+model Quest {
+  id             String @id @default(cuid())
+  code           String @unique
+  track          String // INITIATION | INTERMEDIATE | ADVANCED | SPECIAL
+  order          Int
+  title          String
+  subtitle       String
+  description    String
+  intro          String
+  theorySections String // JSON: [{ title, body, keypoints: [] }]
+  xpReward       Int
+  satsReward     Int
+  requiredLevel  Int    @default(1)
+  missionType    String
+  missionConfig  String // JSON config for the BitLab mission generator
+
+  quizQuestions QuizQuestion[]
+  progress      UserQuestProgress[]
+}
+
+model QuizQuestion {
+  id          String @id @default(cuid())
+  questId     String
+  quest       Quest   @relation(fields: [questId], references: [id], onDelete: Cascade)
+  order       Int
+  type        String // MCQ | TRUE_FALSE
+  question    String
+  options     String // JSON array of options (empty for TRUE_FALSE)
+  correct     String // JSON: { index } for MCQ, { bool } for TRUE_FALSE
+  explanation String
+
+  quest2 String?
+}
+
+model UserQuestProgress {
+  id              String    @id @default(cuid())
+  userId          String
+  questId         String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quest           Quest     @relation(fields: [questId], references: [id], onDelete: Cascade)
+  status          String    @default("AVAILABLE") // IN_PROGRESS | THEORY_DONE | QUIZ_PASSED | COMPLETED
+  sectionsRead    Int       @default(0)
+  quizBestScore   Int       @default(0) // percent
+  quizAttempts    Int       @default(0)
+  perfectQuiz     Boolean   @default(false)
+  missionSession  String? // JSON server-side session: { challenge, expected }
+  missionAttempts Int       @default(0)
+  missionProof    String? // JSON proof data from BitLab
+  xpEarned        Int       @default(0)
+  satsEarned      Int       @default(0)
+  completedAt     DateTime?
+
+  @@unique([userId, questId])
+}
+
+model Badge {
+  id             String @id @default(cuid())
+  code           String @unique
+  name           String
+  description    String
+  icon           String // lucide icon name
+  rarity         String // COMMON | RARE | EPIC
+  conditionType  String // QUEST_COMPLETE | QUEST_COUNT | TRACK_COMPLETE | STREAK | LEVEL | SATS_TOTAL | PERFECT_QUIZ
+  conditionValue String // JSON payload for condition
+  users          UserBadge[]
+}
+
+model UserBadge {
+  userId   String
+  badgeId  String
+  user     User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge    Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt DateTime @default(now())
+
+  @@id([userId, badgeId])
+}
+
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Int // positive = gain
+  type        String // QUEST_REWARD | STREAK_BONUS | DAILY_CAP
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model UserEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // QUEST_COMPLETED | BADGE_UNLOCKED | LEVEL_UP | SATS_EARNED | QUIZ_PASSED
+  payload   String // JSON
+  createdAt DateTime @default(now())
+}
