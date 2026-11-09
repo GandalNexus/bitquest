@@ -104,7 +104,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label={theme === "dark" ? "Passer en thème clair" : "Passer en thème sombre"}
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             >
-              {mounted && theme === "dark" ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
+              {mounted && theme === "dark" ? (
+                <Sun className="h-4.5 w-4.5" />
+              ) : (
+                <Moon className="h-4.5 w-4.5" />
+              )}
             </Button>
             <Button variant="ghost" size="icon" aria-label="Se déconnecter" onClick={handleLogout}>
               <LogOut className="h-4.5 w-4.5" />
@@ -142,7 +146,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   "flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
                   view === item.view
                     ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
                 )}
               >
                 <item.icon className="h-4 w-4" />
@@ -154,7 +158,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* ===== Contenu ===== */}
-      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-24 md:pb-10">{children}</main>
+      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-24 md:pb-10">
+        {children}
+      </main>
 
       {/* ===== Nav mobile (bas) ===== */}
       <nav
@@ -168,7 +174,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-current={view === item.view ? "page" : undefined}
             className={cn(
               "flex min-h-[56px] flex-col items-center justify-center gap-0.5 text-[10px] font-medium",
-              view === item.view ? "text-primary" : "text-muted-foreground"
+              view === item.view ? "text-primary" : "text-muted-foreground",
             )}
           >
             <item.icon className="h-5 w-5" />

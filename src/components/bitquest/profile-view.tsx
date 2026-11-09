@@ -1,23 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {
-  CheckCircle2,
-  Coins,
-  Flame,
-  Lock,
-  Map as MapIcon,
-  Star,
-  UserRound,
-} from "lucide-react";
+import { CheckCircle2, Coins, Flame, Lock, Map as MapIcon, Star, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMe } from "@/lib/bitquest/hooks";
 import { formatDate } from "@/lib/bitquest/client";
 import {
@@ -85,10 +71,7 @@ export function ProfileView() {
                 <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                   <h1 className="text-2xl font-bold tracking-tight">{user.pseudo}</h1>
                   {user.isGuest && (
-                    <Badge
-                      variant="outline"
-                      className="border-zinc-500/40 bg-zinc-500/10 text-zinc-400"
-                    >
+                    <Badge variant="outline" className="border-zinc-500/40 bg-zinc-500/10 text-zinc-400">
                       <UserRound className="h-3 w-3" aria-hidden />
                       Invité
                     </Badge>
@@ -125,11 +108,7 @@ export function ProfileView() {
           label="Série d'activité"
           value={`${user.streak} jour${user.streak > 1 ? "s" : ""}`}
         />
-        <StatCard
-          icon={MapIcon}
-          label="Quêtes terminées"
-          value={me.questsCompleted.length}
-        />
+        <StatCard icon={MapIcon} label="Quêtes terminées" value={me.questsCompleted.length} />
       </motion.section>
 
       {/* ===== Badges ===== */}
@@ -140,8 +119,7 @@ export function ProfileView() {
               <div>
                 <CardTitle>Badges</CardTitle>
                 <CardDescription>
-                  {me.badges.length} / {me.allBadges.length || 15} badges débloqués —
-                  collectionne-les tous.
+                  {me.badges.length} / {me.allBadges.length || 15} badges débloqués — collectionne-les tous.
                 </CardDescription>
               </div>
               <Badge variant="outline" className="border-primary/40 bg-primary/5 text-primary">
@@ -177,17 +155,14 @@ export function ProfileView() {
                           {rarity.label}
                         </Badge>
                       </div>
-                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                        {badge.description}
-                      </p>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{badge.description}</p>
                       {owned ? (
                         <p className="mt-1.5 text-[11px] font-medium text-emerald-500">
                           Obtenu le {formatDate(owned.earnedAt ?? null)}
                         </p>
                       ) : (
                         <p className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <Lock className="h-3 w-3" aria-hidden />
-                          À débloquer
+                          <Lock className="h-3 w-3" aria-hidden />À débloquer
                         </p>
                       )}
                     </div>
@@ -222,13 +197,8 @@ export function ProfileView() {
                       className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5"
                     >
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                        {quest.title}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className={cn("hidden shrink-0 sm:inline-flex", style?.badge)}
-                      >
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{quest.title}</span>
+                      <Badge variant="outline" className={cn("hidden shrink-0 sm:inline-flex", style?.badge)}>
                         {style?.label ?? quest.track}
                       </Badge>
                       <span className="w-24 shrink-0 text-right text-xs text-muted-foreground">

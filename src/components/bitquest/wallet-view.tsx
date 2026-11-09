@@ -1,23 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {
-  AlertCircle,
-  ArrowUpRight,
-  CheckCircle2,
-  Coins,
-  Flame,
-  Info,
-  type LucideIcon,
-} from "lucide-react";
+import { AlertCircle, ArrowUpRight, CheckCircle2, Coins, Flame, Info, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useWallet } from "@/lib/bitquest/hooks";
 import { formatDate, formatSats } from "@/lib/bitquest/client";
@@ -61,7 +47,8 @@ export function WalletView() {
   }
 
   const wallet = walletQuery.data;
-  const dailyPct = wallet.dailyCap > 0 ? Math.min(100, Math.round((wallet.dailyUsed / wallet.dailyCap) * 100)) : 0;
+  const dailyPct =
+    wallet.dailyCap > 0 ? Math.min(100, Math.round((wallet.dailyUsed / wallet.dailyCap) * 100)) : 0;
 
   return (
     <div className="space-y-6">
@@ -118,14 +105,13 @@ export function WalletView() {
               aria-label={`Plafond journalier utilisé à ${dailyPct} %`}
             />
             <p className="text-sm font-medium">
-              {formatSats(wallet.dailyUsed)} / {formatSats(wallet.dailyCap)} sats gagnés
-              aujourd&apos;hui
+              {formatSats(wallet.dailyUsed)} / {formatSats(wallet.dailyCap)} sats gagnés aujourd&apos;hui
             </p>
             <p className="flex items-start gap-2 rounded-lg border border-dashed bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              Note pédagogique : les satoshis de BitQuest sont des récompenses
-              d&apos;apprentissage — volontairement faibles et plafonnées chaque jour.
-              L&apos;objectif est de comprendre l&apos;économie de Bitcoin, pas de spéculer.
+              Note pédagogique : les satoshis de BitQuest sont des récompenses d&apos;apprentissage —
+              volontairement faibles et plafonnées chaque jour. L&apos;objectif est de comprendre
+              l&apos;économie de Bitcoin, pas de spéculer.
             </p>
           </CardContent>
         </Card>
@@ -136,9 +122,7 @@ export function WalletView() {
         <Card className="rounded-xl">
           <CardHeader>
             <CardTitle>Historique des gains</CardTitle>
-            <CardDescription>
-              Chaque récompense, du plus récent au plus ancien.
-            </CardDescription>
+            <CardDescription>Chaque récompense, du plus récent au plus ancien.</CardDescription>
           </CardHeader>
           <CardContent>
             {wallet.transactions.length > 0 ? (
@@ -151,10 +135,7 @@ export function WalletView() {
                   const Icon = meta?.icon ?? Coins;
                   const isCapped = tx.type === "DAILY_CAP";
                   return (
-                    <li
-                      key={tx.id}
-                      className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5"
-                    >
+                    <li key={tx.id} className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
                         <Icon
                           className={`h-4 w-4 ${meta?.className ?? "text-muted-foreground"}`}
@@ -177,11 +158,7 @@ export function WalletView() {
                 })}
               </ul>
             ) : (
-              <EmptyState
-                icon={Coins}
-                title="Aucun gain pour l'instant"
-                sub="Les quêtes t'attendent !"
-              />
+              <EmptyState icon={Coins} title="Aucun gain pour l'instant" sub="Les quêtes t'attendent !" />
             )}
           </CardContent>
         </Card>

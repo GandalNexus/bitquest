@@ -1,7 +1,9 @@
 # Security Policy
 
 ## Supported Versions
-The following table outlines the versions of BitQuest currently receiving security updates. We recommend always running the latest stable release.
+
+The following table outlines the versions of BitQuest currently receiving
+security updates. We recommend always running the latest stable release.
 
 | Version | Supported |
 | ------- | --------- |
@@ -10,7 +12,8 @@ The following table outlines the versions of BitQuest currently receiving securi
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in BitQuest, please report it responsibly.
+If you discover a security vulnerability in BitQuest, please report it
+responsibly.
 
 ### How to Report
 
@@ -18,7 +21,8 @@ If you discover a security vulnerability in BitQuest, please report it responsib
 
 Instead:
 
-1. **Send an email** to contact.ibrahima.fall@gmail.com (or create a Security Advisory on GitHub)
+1. **Send an email** to contact.ibrahima.fall@gmail.com (or create a Security
+   Advisory on GitHub)
 2. **Include**:
    - Detailed description of the vulnerability
    - Steps to reproduce
@@ -42,7 +46,8 @@ We ask that you:
 
 ### Recognition
 
-We publicly acknowledge security researchers who report vulnerabilities responsibly (unless you prefer to remain anonymous).
+We publicly acknowledge security researchers who report vulnerabilities
+responsibly (unless you prefer to remain anonymous).
 
 ## Security Best Practices
 
@@ -75,13 +80,15 @@ We publicly acknowledge security researchers who report vulnerabilities responsi
 ### Out of Scope
 
 - Brute force attacks (rate limiting in place)
-- Vulnerabilities in third-party dependencies (report them directly to maintainers)
+- Vulnerabilities in third-party dependencies (report them directly to
+  maintainers)
 - Issues requiring physical access to the device
 - Social engineering
 
 ## Security Updates
 
-Security updates are published as soon as possible after discovery and fix of a vulnerability. We recommend:
+Security updates are published as soon as possible after discovery and fix of a
+vulnerability. We recommend:
 
 - Monitoring GitHub releases
 - Subscribing to security notifications
@@ -90,8 +97,9 @@ Security updates are published as soon as possible after discovery and fix of a 
 ## Contact
 
 For any security-related questions:
+
 - Email: contact.ibrahima.fall@gmail.com
 
 ---
 
-Thank you for helping keep BitQuest safe for everyone! 
+Thank you for helping keep BitQuest safe for everyone!

@@ -18,7 +18,10 @@ async function touchStreak(userId: string) {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
   const { streak } = updateStreak(user);
   if (streak !== user.streak || user.lastActiveDate !== new Date().toISOString().slice(0, 10)) {
-    await db.user.update({ where: { id: userId }, data: { streak, lastActiveDate: new Date().toISOString().slice(0, 10) } });
+    await db.user.update({
+      where: { id: userId },
+      data: { streak, lastActiveDate: new Date().toISOString().slice(0, 10) },
+    });
   }
   return db.user.findUniqueOrThrow({ where: { id: userId } });
 }
@@ -33,7 +36,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
   const body = await req.json();
   const action = body.action as string;
 
-  const quest = await db.quest.findUnique({ where: { code }, include: { quizQuestions: { orderBy: { order: "asc" } } } });
+  const quest = await db.quest.findUnique({
+    where: { code },
+    include: { quizQuestions: { orderBy: { order: "asc" } } },
+  });
   if (!quest) return Response.json({ error: "Quête introuvable." }, { status: 404 });
 
   let progress = await db.userQuestProgress.findUnique({
@@ -85,7 +91,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
         }
         p = await db.userQuestProgress.findUniqueOrThrow({ where: { id: p.id } });
       }
-      return Response.json({ progress: p, xp, user: await db.user.findUniqueOrThrow({ where: { id: user.id } }).then(publicUser) });
+      return Response.json({
+        progress: p,
+        xp,
+        user: await db.user.findUniqueOrThrow({ where: { id: user.id } }).then(publicUser),
+      });
     }
 
     /* ---------- SOUMISSION DU QUIZ ---------- */
@@ -99,7 +109,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       const results = quest.quizQuestions.map((q, i) => {
         const correct = JSON.parse(q.correct || "{}");
         const ans = answers[i];
-        const isCorrect = q.type === "TRUE_FALSE" ? Boolean(ans) === Boolean(correct.bool) : Number(ans) === Number(correct.index);
+        const isCorrect =
+          q.type === "TRUE_FALSE"
+            ? Boolean(ans) === Boolean(correct.bool)
+            : Number(ans) === Number(correct.index);
         return {
           index: i,
           isCorrect,
@@ -153,10 +166,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       await touchStreak(user.id);
       const p = await ensureProgress();
       if (p.quizBestScore < QUIZ_PASS_THRESHOLD) {
-        return Response.json({ error: "Réussis d'abord le quiz (score minimum 70 %) pour débloquer la mission." }, { status: 403 });
+        return Response.json(
+          { error: "Réussis d'abord le quiz (score minimum 70 %) pour débloquer la mission." },
+          { status: 403 },
+        );
       }
       if (p.missionAttempts >= MISSION_MAX_ATTEMPTS && p.status !== "COMPLETED") {
-        return Response.json({ error: "Nombre maximum de tentatives atteint pour cette mission. Reviens demain." }, { status: 429 });
+        return Response.json(
+          { error: "Nombre maximum de tentatives atteint pour cette mission. Reviens demain." },
+          { status: 429 },
+        );
       }
       const config = JSON.parse(quest.missionConfig || "{}");
       const { challenge, expected } = generateMission(quest.missionType, config);
@@ -181,7 +200,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       await touchStreak(user.id);
       const p = await ensureProgress();
       if (!p.missionSession) {
-        return Response.json({ error: "Aucune mission en cours. Lance d'abord la mission dans BitLab." }, { status: 400 });
+        return Response.json(
+          { error: "Aucune mission en cours. Lance d'abord la mission dans BitLab." },
+          { status: 400 },
+        );
       }
       if (p.status === "COMPLETED") {
         return Response.json({ error: "Quête déjà complétée." }, { status: 400 });
@@ -189,9 +211,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       if (p.missionAttempts >= MISSION_MAX_ATTEMPTS) {
         return Response.json({ error: "Nombre maximum de tentatives atteint." }, { status: 429 });
       }
-      const session = JSON.parse(p.missionSession) as { challenge: Record<string, unknown>; expected: Record<string, unknown> };
+      const session = JSON.parse(p.missionSession) as {
+        challenge: Record<string, unknown>;
+        expected: Record<string, unknown>;
+      };
       const result = validateMission(quest.missionType, session, body.answer ?? {});
-      await db.userQuestProgress.update({ where: { id: p.id }, data: { missionAttempts: p.missionAttempts + 1 } });
+      await db.userQuestProgress.update({
+        where: { id: p.id },
+        data: { missionAttempts: p.missionAttempts + 1 },
+      });
 
       if (!result.success || !result.proof) {
         const refreshed = await db.userQuestProgress.findUniqueOrThrow({ where: { id: p.id } });

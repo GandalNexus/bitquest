@@ -68,7 +68,7 @@ async function main() {
         question: quiz.question,
         options: JSON.stringify(quiz.options ?? []),
         correct: JSON.stringify(
-          quiz.type === "MCQ" ? { index: quiz.correctIndex ?? 0 } : { bool: quiz.correctBool ?? false }
+          quiz.type === "MCQ" ? { index: quiz.correctIndex ?? 0 } : { bool: quiz.correctBool ?? false },
         ),
         explanation: quiz.explanation,
       })),

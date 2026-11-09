@@ -1,0 +1,24 @@
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Dependencies
+node_modules/
+
+# Generated files
+next-env.d.ts
+bun.lock
+package-lock.json
+
+# Database
+db/
+prisma/migrations/
+
+# Logs
+*.log
+
+# Misc
+.git/
+public/

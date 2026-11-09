@@ -4,13 +4,14 @@ BitQuest is made possible thanks to the contributions of many people.
 
 ## Core Team
 
-- **Mohamed Camara** - *Creator & Lead Developer* - [@Mohamed-Cams](https://github.com/Mohamed-Cams)
+- **Mohamed Camara** - _Creator & Lead Developer_ -
+  [@Mohamed-Cams](https://github.com/Mohamed-Cams)
 
 ## Contributors
 
 Thank you to everyone who has contributed to the project! 🙏
 
-<!-- 
+<!--
 To add your name here, submit a PR with your contributions.
 Format: - **Name** - *Role/Contribution* - [@username](https://github.com/username)
 -->
@@ -23,4 +24,5 @@ Format: - **Name** - *Role/Contribution* - [@username](https://github.com/userna
 
 ---
 
-To see the complete list of contributors, visit the [GitHub contributors page](https://github.com/your-username/bitquest/graphs/contributors).
+To see the complete list of contributors, visit the
+[GitHub contributors page](https://github.com/your-username/bitquest/graphs/contributors).

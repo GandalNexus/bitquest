@@ -2,16 +2,7 @@
 
 import { Fragment } from "react";
 import { motion } from "framer-motion";
-import {
-  BookOpen,
-  CheckCircle2,
-  ChevronRight,
-  Lock,
-  Map,
-  Play,
-  Target,
-  Zap,
-} from "lucide-react";
+import { BookOpen, CheckCircle2, ChevronRight, Lock, Map, Play, Target, Zap } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { formatSats } from "@/lib/bitquest/client";
@@ -63,7 +54,9 @@ function StatusIcon({ quest }: { quest: QuestState }) {
     <span
       className={cn(
         "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border",
-        started ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-muted/50 text-muted-foreground"
+        started
+          ? "border-primary/40 bg-primary/10 text-primary"
+          : "border-border bg-muted/50 text-muted-foreground",
       )}
     >
       <Play className={cn("h-4 w-4", started && "fill-current")} />
@@ -94,7 +87,7 @@ function QuestCard({
         locked && "cursor-not-allowed opacity-60",
         !locked && "cursor-pointer hover:shadow-md hover:ring-2",
         !locked && ts.ring,
-        completed && "border-l-4 border-l-emerald-500"
+        completed && "border-l-4 border-l-emerald-500",
       )}
     >
       <StatusIcon quest={quest} />
@@ -246,7 +239,9 @@ export function QuestMap({ onOpenQuest }: { onOpenQuest: (code: string) => void 
         className="space-y-4"
       >
         <div>
-          <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">Carte des Quêtes</h1>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
+            Carte des Quêtes
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Débloque les parcours en progressant. Chaque piste se franchit étape par étape.
           </p>

@@ -46,9 +46,7 @@ export async function getQuestsWithState(userId: string): Promise<QuestWithState
     const p = progressByQuest.get(quest.id);
     // Détermine la quête précédente dans la même piste
     const prevInTrack = quests.find((q) => q.track === quest.track && q.order === quest.order - 1);
-    const prevCompleted = prevInTrack
-      ? progressByQuest.get(prevInTrack.id)?.status === "COMPLETED"
-      : true;
+    const prevCompleted = prevInTrack ? progressByQuest.get(prevInTrack.id)?.status === "COMPLETED" : true;
 
     const levelOk = level >= quest.requiredLevel;
     const locked = !levelOk || !prevCompleted;

@@ -90,11 +90,9 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Une erreur est survenue. Réessaie.";
 }
 
-function notifyBadges(
-  toast: ReturnType<typeof useToast>["toast"],
-  badges: BadgeNotification[] | undefined
-) {
-  badges?.forEach((b) => {
+function notifyBadges(toast: ReturnType<typeof useToast>["toast"], badges: BadgeNotification[] | undefined) {
+  if (!badges) return;
+  for (const b of badges) {
     toast({
       title: `Badge débloqué : ${b.name}`,
       description: (
@@ -104,7 +102,7 @@ function notifyBadges(
         </span>
       ),
     });
-  });
+  }
 }
 
 function userAnswerLabel(q: QuizQuestion, a: number | boolean | null): string {
@@ -215,7 +213,9 @@ function TheoryStep({
 
           {section.keypoints.length > 0 && (
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">Points clés</div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
+                Points clés
+              </div>
               <ul className="space-y-2">
                 {section.keypoints.map((k) => (
                   <li key={k} className="flex items-start gap-2 text-sm">
@@ -230,12 +230,7 @@ function TheoryStep({
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button
-          variant="ghost"
-          className="h-10"
-          onClick={onBack}
-          disabled={sectionIndex === 0 || reading}
-        >
+        <Button variant="ghost" className="h-10" onClick={onBack} disabled={sectionIndex === 0 || reading}>
           <ArrowLeft className="h-4 w-4" />
           Section précédente
         </Button>
@@ -295,7 +290,7 @@ function QuizQuestionCard({
                 variant="outline"
                 className={cn(
                   "h-14 text-base",
-                  answer === v && "border-primary/60 bg-primary/10 text-primary hover:bg-primary/15"
+                  answer === v && "border-primary/60 bg-primary/10 text-primary hover:bg-primary/15",
                 )}
                 onClick={() => onSelect(v)}
               >
@@ -314,7 +309,7 @@ function QuizQuestionCard({
                 htmlFor={`bq-quiz-${index}-opt-${oi}`}
                 className={cn(
                   "min-h-10 cursor-pointer items-center justify-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-                  answer === oi ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40"
+                  answer === oi ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40",
                 )}
               >
                 <RadioGroupItem id={`bq-quiz-${index}-opt-${oi}`} value={String(oi)} />
@@ -353,7 +348,7 @@ function QuizResults({
             <div
               className={cn(
                 "font-display text-5xl font-bold sm:text-6xl",
-                result.passed ? "text-emerald-500" : "text-rose-500"
+                result.passed ? "text-emerald-500" : "text-rose-500",
               )}
             >
               {result.score}
@@ -364,7 +359,9 @@ function QuizResults({
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Badge
               className={
-                result.passed ? "border-transparent bg-emerald-500 text-white" : "border-transparent bg-rose-500 text-white"
+                result.passed
+                  ? "border-transparent bg-emerald-500 text-white"
+                  : "border-transparent bg-rose-500 text-white"
               }
             >
               {result.passed ? "Quiz réussi" : "Quiz échoué"}
@@ -411,7 +408,9 @@ function QuizResults({
                   key={r.index}
                   className={cn(
                     "space-y-2 rounded-xl border p-3",
-                    r.isCorrect ? "border-emerald-500/30 bg-emerald-500/5" : "border-rose-500/30 bg-rose-500/5"
+                    r.isCorrect
+                      ? "border-emerald-500/30 bg-emerald-500/5"
+                      : "border-rose-500/30 bg-rose-500/5",
                   )}
                 >
                   <div className="flex items-start gap-2">
@@ -424,7 +423,11 @@ function QuizResults({
                       <p className="text-sm font-medium leading-snug">{q.question}</p>
                       <p className="text-xs text-muted-foreground">
                         Ta réponse :{" "}
-                        <span className={r.isCorrect ? "font-semibold text-emerald-500" : "font-semibold text-rose-500"}>
+                        <span
+                          className={
+                            r.isCorrect ? "font-semibold text-emerald-500" : "font-semibold text-rose-500"
+                          }
+                        >
                           {userAnswerLabel(q, answers[r.index] ?? null)}
                         </span>
                         {!r.isCorrect && (
@@ -633,8 +636,8 @@ function MissionStep({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Le défi est généré côté serveur : les réponses attendues ne quittent jamais BitLab. Les tentatives sont
-          limitées, prends ton temps.
+          Le défi est généré côté serveur : les réponses attendues ne quittent jamais BitLab. Les tentatives
+          sont limitées, prends ton temps.
         </p>
       </CardContent>
     </Card>
@@ -665,7 +668,7 @@ function RewardsStep({
         duration: 1.8 + (i % 3) * 0.35,
         color: ["bg-primary", "bg-amber-500", "bg-emerald-500", "bg-violet-500"][i % 4],
       })),
-    []
+    [],
   );
 
   return (
@@ -694,7 +697,9 @@ function RewardsStep({
           >
             <PartyPopper className="mx-auto h-12 w-12 text-primary" />
           </motion.div>
-          <h2 className="mt-3 font-display text-2xl font-black tracking-tight sm:text-3xl">Quête complétée !</h2>
+          <h2 className="mt-3 font-display text-2xl font-black tracking-tight sm:text-3xl">
+            Quête complétée !
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">{questTitle} — bravo, aventurier.</p>
         </div>
       </motion.div>
@@ -1039,7 +1044,7 @@ export function QuestPlayer({
                     ? "bg-primary/15 text-primary"
                     : isUnlocked
                       ? "text-muted-foreground hover:bg-accent"
-                      : "cursor-not-allowed text-muted-foreground/50"
+                      : "cursor-not-allowed text-muted-foreground/50",
                 )}
               >
                 <span
@@ -1051,7 +1056,7 @@ export function QuestPlayer({
                         ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-500"
                         : isUnlocked
                           ? "border-border"
-                          : "border-border/60 text-muted-foreground/60"
+                          : "border-border/60 text-muted-foreground/60",
                   )}
                 >
                   {isDone && !isCurrent ? (

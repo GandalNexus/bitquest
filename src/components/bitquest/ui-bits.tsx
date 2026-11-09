@@ -3,24 +3,17 @@
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import {
-  Boxes,
-  BookOpen,
-  Coins,
-  Flame,
-  Gem,
-  Star,
-  Trophy,
-  Loader2,
-  type LucideIcon,
-} from "lucide-react";
+import { Boxes, BookOpen, Coins, Flame, Gem, Star, Trophy, Loader2, type LucideIcon } from "lucide-react";
 import type { LevelInfo } from "@/lib/bitquest/client";
 import { formatSats } from "@/lib/bitquest/client";
 import type { ReactNode } from "react";
 
 /* ============ Styles partagés ============ */
 
-export const trackStyles: Record<string, { label: string; badge: string; dot: string; ring: string; text: string }> = {
+export const trackStyles: Record<
+  string,
+  { label: string; badge: string; dot: string; ring: string; text: string }
+> = {
   INITIATION: {
     label: "Initiation",
     badge: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
@@ -53,8 +46,16 @@ export const trackStyles: Record<string, { label: string; badge: string; dot: st
 
 export const rarityStyles: Record<string, { label: string; badge: string; glow: string }> = {
   COMMON: { label: "Commun", badge: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30", glow: "" },
-  RARE: { label: "Rare", badge: "bg-amber-500/15 text-amber-500 border-amber-500/30", glow: "shadow-[0_0_18px_-4px] shadow-amber-500/40" },
-  EPIC: { label: "Épique", badge: "bg-violet-500/15 text-violet-500 border-violet-500/30", glow: "shadow-[0_0_22px_-4px] shadow-violet-500/50" },
+  RARE: {
+    label: "Rare",
+    badge: "bg-amber-500/15 text-amber-500 border-amber-500/30",
+    glow: "shadow-[0_0_18px_-4px] shadow-amber-500/40",
+  },
+  EPIC: {
+    label: "Épique",
+    badge: "bg-violet-500/15 text-violet-500 border-violet-500/30",
+    glow: "shadow-[0_0_22px_-4px] shadow-violet-500/50",
+  },
 };
 
 export const statusLabels: Record<string, string> = {
@@ -96,7 +97,13 @@ export function BadgeIcon({ icon, className }: { icon: string; className?: strin
 export function XpBar({ levelInfo, compact }: { levelInfo: LevelInfo; compact?: boolean }) {
   if (compact) {
     /* Version compacte : la barre seule — le niveau est affiché par le badge adjacent */
-    return <Progress value={levelInfo.pct} className="h-2" aria-label={`Niveau ${levelInfo.level} : ${levelInfo.pct} %`} />;
+    return (
+      <Progress
+        value={levelInfo.pct}
+        className="h-2"
+        aria-label={`Niveau ${levelInfo.level} : ${levelInfo.pct} %`}
+      />
+    );
   }
   return (
     <div className="w-full space-y-1.5">
@@ -165,7 +172,17 @@ export function RewardChips({ xp, sats }: { xp?: number; sats?: number }) {
 
 export function ProofChips({ proof }: { proof: Record<string, unknown> | null }) {
   if (!proof) return null;
-  const keys = ["txid", "blockHash", "hash", "channelId", "paymentHash", "psbt", "address", "outputKey", "fundingTxid"];
+  const keys = [
+    "txid",
+    "blockHash",
+    "hash",
+    "channelId",
+    "paymentHash",
+    "psbt",
+    "address",
+    "outputKey",
+    "fundingTxid",
+  ];
   const shown = keys.filter((k) => typeof proof[k] === "string").slice(0, 2);
   if (shown.length === 0) return null;
   return (
@@ -201,7 +218,10 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
         {message}
       </div>
       {onRetry && (
-        <button onClick={onRetry} className="text-sm font-medium text-primary underline-offset-4 hover:underline">
+        <button
+          onClick={onRetry}
+          className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+        >
           Réessayer
         </button>
       )}

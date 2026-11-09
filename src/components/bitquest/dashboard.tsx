@@ -17,13 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useMe, useQuests } from "@/lib/bitquest/hooks";
 import { formatSats, type MeEvent, type QuestState } from "@/lib/bitquest/client";
@@ -48,7 +42,11 @@ function LevelRing({ pct, level }: { pct: number; level: number }) {
   const clamped = Math.min(100, Math.max(0, pct));
   const offset = circumference - (clamped / 100) * circumference;
   return (
-    <div className="relative h-24 w-24 shrink-0" role="img" aria-label={`Niveau ${level}, progression ${Math.round(clamped)} %`}>
+    <div
+      className="relative h-24 w-24 shrink-0"
+      role="img"
+      aria-label={`Niveau ${level}, progression ${Math.round(clamped)} %`}
+    >
       <svg viewBox="0 0 80 80" className="h-24 w-24 -rotate-90">
         <circle cx="40" cy="40" r={radius} fill="none" strokeWidth="7" className="stroke-muted" />
         <circle
@@ -76,9 +74,7 @@ function pickNextQuest(quests: QuestState[]): QuestState | undefined {
   const candidates = quests
     .filter((q) => q.status !== "COMPLETED" && !q.locked)
     .sort(
-      (a, b) =>
-        a.order - b.order ||
-        STATUS_PRIORITY.indexOf(a.status) - STATUS_PRIORITY.indexOf(b.status),
+      (a, b) => a.order - b.order || STATUS_PRIORITY.indexOf(a.status) - STATUS_PRIORITY.indexOf(b.status),
     );
   return candidates[0];
 }
@@ -236,10 +232,7 @@ export function Dashboard({
                 {nextQuest ? (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className={trackStyles[nextQuest.track]?.badge}
-                      >
+                      <Badge variant="outline" className={trackStyles[nextQuest.track]?.badge}>
                         {trackStyles[nextQuest.track]?.label ?? nextQuest.track}
                       </Badge>
                       <Badge variant="outline" className="text-muted-foreground">
@@ -259,8 +252,7 @@ export function Dashboard({
                         className="h-10 w-full sm:w-auto"
                         onClick={() => onOpenQuest(nextQuest.code)}
                       >
-                        {nextQuest.status === "AVAILABLE" ? "Commencer" : "Reprendre"} :{" "}
-                        {nextQuest.title}
+                        {nextQuest.status === "AVAILABLE" ? "Commencer" : "Reprendre"} : {nextQuest.title}
                         <ArrowRight className="h-4 w-4" aria-hidden />
                       </Button>
                     </div>
@@ -268,12 +260,10 @@ export function Dashboard({
                 ) : allCompleted ? (
                   <div className="flex flex-col items-center gap-3 py-6 text-center">
                     <Sparkles className="h-8 w-8 text-primary" aria-hidden />
-                    <p className="font-semibold">
-                      Toutes les quêtes terminées, Maître Satoshi !
-                    </p>
+                    <p className="font-semibold">Toutes les quêtes terminées, Maître Satoshi !</p>
                     <p className="text-sm text-muted-foreground">
-                      Tu maîtrises désormais les fondamentaux de Bitcoin et du Lightning
-                      Network. Compare ton XP aux autres aventuriers.
+                      Tu maîtrises désormais les fondamentaux de Bitcoin et du Lightning Network. Compare ton
+                      XP aux autres aventuriers.
                     </p>
                     <Button size="lg" className="h-10" onClick={() => onNavigate("leaderboard")}>
                       Voir le classement
@@ -286,7 +276,12 @@ export function Dashboard({
                     <p className="text-sm text-muted-foreground">
                       Continue de gagner de l&apos;XP pour débloquer la suite du parcours.
                     </p>
-                    <Button variant="outline" size="lg" className="h-10" onClick={() => onNavigate("leaderboard")}>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="h-10"
+                      onClick={() => onNavigate("leaderboard")}
+                    >
                       Voir le classement
                     </Button>
                   </div>
@@ -300,7 +295,9 @@ export function Dashboard({
             <Card className="h-full rounded-xl">
               <CardHeader>
                 <CardTitle>Progression par parcours</CardTitle>
-                <CardDescription>Quatre pistes, de l&apos;initiation aux événements spéciaux.</CardDescription>
+                <CardDescription>
+                  Quatre pistes, de l&apos;initiation aux événements spéciaux.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {TRACK_ORDER.map((track) => {
@@ -317,7 +314,11 @@ export function Dashboard({
                       >
                         {style?.label ?? track}
                       </Badge>
-                      <Progress value={pct} className="h-2 flex-1" aria-label={`Progression ${style?.label ?? track} : ${pct} %`} />
+                      <Progress
+                        value={pct}
+                        className="h-2 flex-1"
+                        aria-label={`Progression ${style?.label ?? track} : ${pct} %`}
+                      />
                       <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
                         {done}/{total}
                       </span>
@@ -325,9 +326,7 @@ export function Dashboard({
                   );
                 })}
                 {quests.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Les quêtes se chargent…
-                  </p>
+                  <p className="text-sm text-muted-foreground">Les quêtes se chargent…</p>
                 )}
               </CardContent>
             </Card>
@@ -409,7 +408,10 @@ export function Dashboard({
                       return (
                         <li key={`${event.type}-${event.createdAt}-${i}`} className="flex items-start gap-3">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                            <Icon className={`h-4 w-4 ${meta?.className ?? "text-muted-foreground"}`} aria-hidden />
+                            <Icon
+                              className={`h-4 w-4 ${meta?.className ?? "text-muted-foreground"}`}
+                              aria-hidden
+                            />
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm leading-snug">{eventText(event)}</p>
@@ -439,8 +441,8 @@ export function Dashboard({
           className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground"
         >
           <Flame className="h-3.5 w-3.5 text-orange-500" aria-hidden />
-          Série d&apos;activité : {me.streak} jour{me.streak > 1 ? "s" : ""} — reviens demain
-          pour un bonus accru.
+          Série d&apos;activité : {me.streak} jour{me.streak > 1 ? "s" : ""} — reviens demain pour un bonus
+          accru.
         </motion.p>
       )}
     </div>

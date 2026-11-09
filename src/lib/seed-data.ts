@@ -53,13 +53,7 @@ export interface BadgeSeed {
   icon: string; // nom d'icône lucide-react en camelCase
   rarity: "COMMON" | "RARE" | "EPIC";
   conditionType:
-    | "QUEST_COMPLETE"
-    | "QUEST_COUNT"
-    | "TRACK_COMPLETE"
-    | "STREAK"
-    | "LEVEL"
-    | "SATS_TOTAL"
-    | "PERFECT_QUIZ";
+    "QUEST_COMPLETE" | "QUEST_COUNT" | "TRACK_COMPLETE" | "STREAK" | "LEVEL" | "SATS_TOTAL" | "PERFECT_QUIZ";
   conditionValue: Record<string, unknown>;
 }
 
@@ -265,15 +259,19 @@ export const questsSeed: QuestSeed[] = [
       {
         type: "MCQ",
         question: "Quel problème fondamental Bitcoin résout-il sans autorité centrale ?",
-        options: ["La censure des e-mails", "Le vol de mots de passe", "La double dépense", "La lenteur du minage"],
+        options: [
+          "La censure des e-mails",
+          "Le vol de mots de passe",
+          "La double dépense",
+          "La lenteur du minage",
+        ],
         correctIndex: 2,
         explanation:
           "La double dépense est le problème central du cash électronique ; Bitcoin le résout par consensus décentralisé, sans banque ni registre propriétaire.",
       },
       {
         type: "TRUE_FALSE",
-        question:
-          "La récompense de 50 BTC du bloc genèse peut être dépensée par quiconque la réclame.",
+        question: "La récompense de 50 BTC du bloc genèse peut être dépensée par quiconque la réclame.",
         options: [],
         correctBool: false,
         explanation:
@@ -754,8 +752,7 @@ export const questsSeed: QuestSeed[] = [
       },
       {
         type: "TRUE_FALSE",
-        question:
-          "Depuis le halving d'avril 2024, la récompense de bloc s'élève à 3,125 BTC.",
+        question: "Depuis le halving d'avril 2024, la récompense de bloc s'élève à 3,125 BTC.",
         options: [],
         correctBool: true,
         explanation:
@@ -843,8 +840,7 @@ export const questsSeed: QuestSeed[] = [
       },
       {
         type: "MCQ",
-        question:
-          "Que se passe-t-il si le preimage n'est pas révélé avant l'échéance du HTLC ?",
+        question: "Que se passe-t-il si le preimage n'est pas révélé avant l'échéance du HTLC ?",
         options: [
           "Le paiement devient définitif",
           "Les fonds retournent à l'expéditeur",
@@ -857,8 +853,7 @@ export const questsSeed: QuestSeed[] = [
       },
       {
         type: "TRUE_FALSE",
-        question:
-          "Pour payer un marchand sur Lightning, tu dois ouvrir un canal direct avec lui.",
+        question: "Pour payer un marchand sur Lightning, tu dois ouvrir un canal direct avec lui.",
         options: [],
         correctBool: false,
         explanation:
@@ -954,8 +949,7 @@ export const questsSeed: QuestSeed[] = [
       },
       {
         type: "TRUE_FALSE",
-        question:
-          "Une facture BOLT11 peut être payée plusieurs fois tant qu'elle n'a pas expiré.",
+        question: "Une facture BOLT11 peut être payée plusieurs fois tant qu'elle n'a pas expiré.",
         options: [],
         correctBool: false,
         explanation:
@@ -1056,8 +1050,7 @@ export const questsSeed: QuestSeed[] = [
       },
       {
         type: "TRUE_FALSE",
-        question:
-          "Un coffre 2-de-3 devient inutilisable si une seule des trois clés est perdue.",
+        question: "Un coffre 2-de-3 devient inutilisable si une seule des trois clés est perdue.",
         options: [],
         correctBool: false,
         explanation:
@@ -1153,8 +1146,7 @@ export const questsSeed: QuestSeed[] = [
       },
       {
         type: "TRUE_FALSE",
-        question:
-          "Une dépense par key path est indiscernable d'un paiement simple sur la chaîne.",
+        question: "Une dépense par key path est indiscernable d'un paiement simple sur la chaîne.",
         options: [],
         correctBool: true,
         explanation:
@@ -1245,8 +1237,7 @@ export const questsSeed: QuestSeed[] = [
       },
       {
         type: "TRUE_FALSE",
-        question:
-          "Le stock-to-flow garantit mécaniquement la hausse du cours après chaque halving.",
+        question: "Le stock-to-flow garantit mécaniquement la hausse du cours après chaque halving.",
         options: [],
         correctBool: false,
         explanation:

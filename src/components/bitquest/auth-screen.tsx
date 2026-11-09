@@ -4,13 +4,7 @@ import { useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { BookOpen, Coins, Loader2, LogIn, Target, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -149,11 +143,14 @@ export function AuthScreen() {
               Apprends. Pratique. Gagne.
             </p>
             <p className="max-w-md text-balance text-sm text-muted-foreground sm:text-base">
-              La quête éducative pour maîtriser Bitcoin et le Lightning Network —
-              open-source, de l&apos;Afrique vers le monde.
+              La quête éducative pour maîtriser Bitcoin et le Lightning Network — open-source, de
+              l&apos;Afrique vers le monde.
             </p>
           </div>
-          <ul className="flex flex-wrap items-center justify-center gap-2" aria-label="Fonctionnalités de BitQuest">
+          <ul
+            className="flex flex-wrap items-center justify-center gap-2"
+            aria-label="Fonctionnalités de BitQuest"
+          >
             {FEATURES.map((f) => (
               <li
                 key={f.keyword}
@@ -178,12 +175,16 @@ export function AuthScreen() {
           <Card className="rounded-xl shadow-lg">
             <CardHeader>
               <CardTitle className="font-display tracking-wide">Rejoins l&apos;orbite</CardTitle>
-              <CardDescription>
-                Crée ton compte, connecte-toi ou explore en mode invité.
-              </CardDescription>
+              <CardDescription>Crée ton compte, connecte-toi ou explore en mode invité.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs value={tab} onValueChange={(v) => { setTab(v); setError(null); }}>
+              <Tabs
+                value={tab}
+                onValueChange={(v) => {
+                  setTab(v);
+                  setError(null);
+                }}
+              >
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="register">Créer un compte</TabsTrigger>
                   <TabsTrigger value="login">Connexion</TabsTrigger>
@@ -250,7 +251,11 @@ export function AuthScreen() {
                       </p>
                     )}
                     <Button type="submit" size="lg" className="h-11 w-full" disabled={loading}>
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <UserPlus className="h-4 w-4" aria-hidden />}
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      ) : (
+                        <UserPlus className="h-4 w-4" aria-hidden />
+                      )}
                       Commencer l&apos;aventure
                     </Button>
                   </form>
@@ -295,7 +300,11 @@ export function AuthScreen() {
                       </p>
                     )}
                     <Button type="submit" size="lg" className="h-11 w-full" disabled={loading}>
-                      {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <LogIn className="h-4 w-4" aria-hidden />}
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      ) : (
+                        <LogIn className="h-4 w-4" aria-hidden />
+                      )}
                       Se connecter
                     </Button>
                   </form>
@@ -305,10 +314,9 @@ export function AuthScreen() {
                 <TabsContent value="guest">
                   <div className="mt-2 space-y-4">
                     <p className="text-sm leading-relaxed text-muted-foreground">
-                      Explore BitQuest sans compte : ta progression est conservée sur cet
-                      appareil. Le mode invité est limité (pas de synchronisation entre
-                      appareils), mais il donne accès à l&apos;ensemble des quêtes, badges
-                      et récompenses pédagogiques.
+                      Explore BitQuest sans compte : ta progression est conservée sur cet appareil. Le mode
+                      invité est limité (pas de synchronisation entre appareils), mais il donne accès à
+                      l&apos;ensemble des quêtes, badges et récompenses pédagogiques.
                     </p>
                     {error && (
                       <p role="alert" className="text-sm text-destructive">

@@ -4,7 +4,7 @@ import crypto from "crypto";
 
 const randHex = (bytes: number) => crypto.randomBytes(bytes).toString("hex");
 const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
-const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 
 const BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -24,7 +24,7 @@ export interface MissionResult {
 
 export function generateMission(
   missionType: string,
-  config: Record<string, unknown>
+  config: Record<string, unknown>,
 ): { challenge: MissionChallenge; expected: MissionExpected } {
   switch (missionType) {
     case "block_explorer":
@@ -136,7 +136,12 @@ function genTxBuilder(config: Record<string, unknown>) {
         ? "Paiement unique"
         : "Consolidation : sélectionne TOUS les UTXO pour les regrouper en une seule sortie",
   };
-  const expected = { variant, utxoMap: Object.fromEntries(utxos.map((u) => [u.id, u.sats])), target, feeSats };
+  const expected = {
+    variant,
+    utxoMap: Object.fromEntries(utxos.map((u) => [u.id, u.sats])),
+    target,
+    feeSats,
+  };
   return { challenge, expected };
 }
 
@@ -220,7 +225,8 @@ function genTaproot() {
     internalKey,
     candidates,
     scriptPaths: ["récupération simple", "timelock 6 mois + récupération", "multisig 2-of-3"],
-    question: "Quelle sortie correspond à la clé interne tweakée, et quel est le chemin de dépense par défaut de Taproot ?",
+    question:
+      "Quelle sortie correspond à la clé interne tweakée, et quel est le chemin de dépense par défaut de Taproot ?",
   };
   const expected = { correctIdx, path: "key" };
   return { challenge, expected };
@@ -231,7 +237,7 @@ function genTaproot() {
 export function validateMission(
   missionType: string,
   session: { challenge: MissionChallenge; expected: MissionExpected },
-  answer: MissionAnswer
+  answer: MissionAnswer,
 ): MissionResult {
   try {
     switch (missionType) {
@@ -261,12 +267,14 @@ export function validateMission(
 
 function checkBlockExplorer(
   session: { challenge: MissionChallenge; expected: MissionExpected },
-  answer: MissionAnswer
+  answer: MissionAnswer,
 ): MissionResult {
   const exp = session.expected as { txCount: number; hashSuffix: string };
   const challenge = session.challenge as unknown as { height: number; hash: string };
   const txCount = Number(answer.txCount);
-  const suffix = String(answer.hashSuffix ?? "").trim().toLowerCase();
+  const suffix = String(answer.hashSuffix ?? "")
+    .trim()
+    .toLowerCase();
   if (txCount !== exp.txCount) {
     return {
       success: false,
@@ -286,24 +294,34 @@ function checkBlockExplorer(
   };
 }
 
-function checkKeyForge(session: { challenge: MissionChallenge; expected: MissionExpected }, answer: MissionAnswer): MissionResult {
+function checkKeyForge(
+  session: { challenge: MissionChallenge; expected: MissionExpected },
+  answer: MissionAnswer,
+): MissionResult {
   const exp = session.expected as { addressSuffix: string };
   const challenge = session.challenge as unknown as { address: string; pubkey: string };
-  const suffix = String(answer.addressSuffix ?? "").trim().toLowerCase();
+  const suffix = String(answer.addressSuffix ?? "")
+    .trim()
+    .toLowerCase();
   if (suffix !== exp.addressSuffix.toLowerCase()) {
     return {
       success: false,
-      feedback: "Suffixe incorrect. Vérifie les 4 derniers caractères de l'adresse générée — toujours vérifier une adresse avant d'envoyer !",
+      feedback:
+        "Suffixe incorrect. Vérifie les 4 derniers caractères de l'adresse générée — toujours vérifier une adresse avant d'envoyer !",
     };
   }
   return {
     success: true,
-    feedback: "Paire de clés forgée et adresse vérifiée. Not your keys, not your coins — désormais tu sais ce que ça veut dire.",
+    feedback:
+      "Paire de clés forgée et adresse vérifiée. Not your keys, not your coins — désormais tu sais ce que ça veut dire.",
     proof: { type: "keys", address: challenge.address, pubkey: challenge.pubkey },
   };
 }
 
-function checkTxBuilder(session: { challenge: MissionChallenge; expected: MissionExpected }, answer: MissionAnswer): MissionResult {
+function checkTxBuilder(
+  session: { challenge: MissionChallenge; expected: MissionExpected },
+  answer: MissionAnswer,
+): MissionResult {
   const exp = session.expected as {
     variant: string;
     utxoMap: Record<string, number>;
@@ -317,7 +335,8 @@ function checkTxBuilder(session: { challenge: MissionChallenge; expected: Missio
     if (speed !== "fast") {
       return {
         success: false,
-        feedback: "Mauvaise vitesse : le mempool est saturé, seuls les frais rapides garantissent une confirmation dans le prochain bloc.",
+        feedback:
+          "Mauvaise vitesse : le mempool est saturé, seuls les frais rapides garantissent une confirmation dans le prochain bloc.",
       };
     }
     const expectedFee = Number(session.expected.totalFee);
@@ -335,7 +354,11 @@ function checkTxBuilder(session: { challenge: MissionChallenge; expected: Missio
         txid: randHex(32),
         fee: totalFee,
         change: 0,
-        feeRate: Number(session.challenge && (session.challenge as Record<string, unknown>).feeRates ? ((session.challenge as Record<string, unknown>).feeRates as Record<string, number>).fast : 80),
+        feeRate: Number(
+          session.challenge && (session.challenge as Record<string, unknown>).feeRates
+            ? ((session.challenge as Record<string, unknown>).feeRates as Record<string, number>).fast
+            : 80,
+        ),
       },
     };
   }
@@ -344,7 +367,10 @@ function checkTxBuilder(session: { challenge: MissionChallenge; expected: Missio
   const speed = String(answer.speed ?? "medium");
   const fee = exp.feeSats[speed] ?? 0;
   if (selected.length === 0) {
-    return { success: false, feedback: "Aucun UTXO sélectionné. Une transaction doit consommer au moins un input." };
+    return {
+      success: false,
+      feedback: "Aucun UTXO sélectionné. Une transaction doit consommer au moins un input.",
+    };
   }
   const sum = selected.reduce((acc, id) => acc + (exp.utxoMap[id] ?? 0), 0);
   if (sum === 0) {
@@ -361,7 +387,10 @@ function checkTxBuilder(session: { challenge: MissionChallenge; expected: Missio
     }
     const change = sum - fee;
     if (change <= 0) {
-      return { success: false, feedback: "Les frais dépassent le total. Choisis une vitesse de confirmation plus lente." };
+      return {
+        success: false,
+        feedback: "Les frais dépassent le total. Choisis une vitesse de confirmation plus lente.",
+      };
     }
     return {
       success: true,
@@ -386,7 +415,10 @@ function checkTxBuilder(session: { challenge: MissionChallenge; expected: Missio
   };
 }
 
-function checkMineNonce(session: { challenge: MissionChallenge; expected: MissionExpected }, answer: MissionAnswer): MissionResult {
+function checkMineNonce(
+  session: { challenge: MissionChallenge; expected: MissionExpected },
+  answer: MissionAnswer,
+): MissionResult {
   const exp = session.expected as { prefix: string; header: string };
   const nonce = Math.floor(Number(answer.nonce));
   if (!Number.isFinite(nonce) || nonce < 0 || nonce > 100_000_000) {
@@ -406,7 +438,10 @@ function checkMineNonce(session: { challenge: MissionChallenge; expected: Missio
   };
 }
 
-function checkLnChannel(session: { challenge: MissionChallenge; expected: MissionExpected }, answer: MissionAnswer): MissionResult {
+function checkLnChannel(
+  session: { challenge: MissionChallenge; expected: MissionExpected },
+  answer: MissionAnswer,
+): MissionResult {
   const exp = session.expected as {
     myBalance: number;
     peers: { name: string; minCapacity: number; pubkey: string }[];
@@ -418,10 +453,17 @@ function checkLnChannel(session: { challenge: MissionChallenge; expected: Missio
   }
   const peer = exp.peers[peerIndex];
   if (capacity < 20_000) {
-    return { success: false, feedback: "Capacité trop faible : en dessous de 20 000 sats (dust limit), le canal est refusé par le réseau." };
+    return {
+      success: false,
+      feedback:
+        "Capacité trop faible : en dessous de 20 000 sats (dust limit), le canal est refusé par le réseau.",
+    };
   }
   if (capacity > exp.myBalance) {
-    return { success: false, feedback: `Tu ne disposes que de ${exp.myBalance.toLocaleString("fr-FR")} sats dans le wallet BitLab.` };
+    return {
+      success: false,
+      feedback: `Tu ne disposes que de ${exp.myBalance.toLocaleString("fr-FR")} sats dans le wallet BitLab.`,
+    };
   }
   if (capacity < peer.minCapacity) {
     return {
@@ -432,28 +474,48 @@ function checkLnChannel(session: { challenge: MissionChallenge; expected: Missio
   return {
     success: true,
     feedback: `Canal ouvert avec ${peer.name} : ${capacity.toLocaleString("fr-FR")} sats de capacité locale. Bienvenue sur le Lightning Network.`,
-    proof: { type: "channel", channelId: randHex(16), fundingTxid: randHex(32), capacity, peer: peer.name, peerPubkey: peer.pubkey },
+    proof: {
+      type: "channel",
+      channelId: randHex(16),
+      fundingTxid: randHex(32),
+      capacity,
+      peer: peer.name,
+      peerPubkey: peer.pubkey,
+    },
   };
 }
 
-function checkLnInvoice(session: { challenge: MissionChallenge; expected: MissionExpected }, answer: MissionAnswer): MissionResult {
+function checkLnInvoice(
+  session: { challenge: MissionChallenge; expected: MissionExpected },
+  answer: MissionAnswer,
+): MissionResult {
   const exp = session.expected as { amount: number; expiry: number };
   const amount = Math.floor(Number(answer.amount));
   const expiry = Math.floor(Number(answer.expiry));
   if (amount !== exp.amount) {
-    return { success: false, feedback: "Montant incorrect : décode bien le montant encodé juste après « lntb » dans la facture." };
+    return {
+      success: false,
+      feedback: "Montant incorrect : décode bien le montant encodé juste après « lntb » dans la facture.",
+    };
   }
   if (expiry !== exp.expiry) {
-    return { success: false, feedback: "Expiration incorrecte : cherche le champ « exp » dans la facture BOLT11." };
+    return {
+      success: false,
+      feedback: "Expiration incorrecte : cherche le champ « exp » dans la facture BOLT11.",
+    };
   }
   return {
     success: true,
-    feedback: "Facture décodée : montant et expiration extraits correctement. Tu peux payer en toute confiance.",
+    feedback:
+      "Facture décodée : montant et expiration extraits correctement. Tu peux payer en toute confiance.",
     proof: { type: "invoice", paymentHash: randHex(32), amount, expiry },
   };
 }
 
-function checkMultisig(session: { challenge: MissionChallenge; expected: MissionExpected }, answer: MissionAnswer): MissionResult {
+function checkMultisig(
+  session: { challenge: MissionChallenge; expected: MissionExpected },
+  answer: MissionAnswer,
+): MissionResult {
   const exp = session.expected as { m: number; n: number };
   const signers = Array.isArray(answer.signers) ? (answer.signers as unknown[]).map(Number) : [];
   const unique = new Set(signers);
@@ -473,20 +535,25 @@ function checkMultisig(session: { challenge: MissionChallenge; expected: Mission
   };
 }
 
-function checkTaproot(session: { challenge: MissionChallenge; expected: MissionExpected }, answer: MissionAnswer): MissionResult {
+function checkTaproot(
+  session: { challenge: MissionChallenge; expected: MissionExpected },
+  answer: MissionAnswer,
+): MissionResult {
   const exp = session.expected as { correctIdx: number; path: string };
   const choice = Math.floor(Number(answer.choice));
   const path = String(answer.path ?? "");
   if (choice !== exp.correctIdx) {
     return {
       success: false,
-      feedback: "Mauvaise sortie : seule l'une des trois clés est le résultat du tweak de la clé interne. Cherche la dérivation cohérente.",
+      feedback:
+        "Mauvaise sortie : seule l'une des trois clés est le résultat du tweak de la clé interne. Cherche la dérivation cohérente.",
     };
   }
   if (path !== exp.path) {
     return {
       success: false,
-      feedback: "Le chemin par défaut de Taproot est le key path : la signature Schnorr sur la clé tweakée révèle le moins d'information possible.",
+      feedback:
+        "Le chemin par défaut de Taproot est le key path : la signature Schnorr sur la clé tweakée révèle le moins d'information possible.",
     };
   }
   return {

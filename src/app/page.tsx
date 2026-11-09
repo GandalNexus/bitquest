@@ -66,9 +66,7 @@ function BitQuestApp() {
         />
       ) : (
         <>
-          {view === "dashboard" && (
-            <Dashboard onOpenQuest={openQuest} onNavigate={setView} />
-          )}
+          {view === "dashboard" && <Dashboard onOpenQuest={openQuest} onNavigate={setView} />}
           {view === "quests" && <QuestMap onOpenQuest={openQuest} />}
           {view === "profile" && <ProfileView />}
           {view === "wallet" && <WalletView />}
@@ -86,7 +84,7 @@ export default function Page() {
         defaultOptions: {
           queries: { staleTime: 15_000, refetchOnWindowFocus: false },
         },
-      })
+      }),
   );
 
   return (

@@ -16,7 +16,16 @@ function verifyPassword(password: string, stored: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(check, "hex"));
 }
 
-const GUEST_NAMES = ["Satoshi Jr", "BlockRunner", "SatHunter", "MemExplorer", "NodeRider", "HodlerX", "BitRookie", "ChainWalker"];
+const GUEST_NAMES = [
+  "Satoshi Jr",
+  "BlockRunner",
+  "SatHunter",
+  "MemExplorer",
+  "NodeRider",
+  "HodlerX",
+  "BitRookie",
+  "ChainWalker",
+];
 
 export async function POST(req: Request) {
   try {
@@ -24,7 +33,9 @@ export async function POST(req: Request) {
     const action = body.action as string;
 
     if (action === "register") {
-      const email = String(body.email ?? "").trim().toLowerCase();
+      const email = String(body.email ?? "")
+        .trim()
+        .toLowerCase();
       const pseudo = String(body.pseudo ?? "").trim();
       const password = String(body.password ?? "");
       if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
@@ -34,7 +45,10 @@ export async function POST(req: Request) {
         return Response.json({ error: "Le pseudo doit contenir entre 3 et 20 caractères." }, { status: 400 });
       }
       if (password.length < 6) {
-        return Response.json({ error: "Le mot de passe doit contenir au moins 6 caractères." }, { status: 400 });
+        return Response.json(
+          { error: "Le mot de passe doit contenir au moins 6 caractères." },
+          { status: 400 },
+        );
       }
       const existingEmail = await db.user.findUnique({ where: { email } });
       if (existingEmail) {
@@ -57,7 +71,9 @@ export async function POST(req: Request) {
     }
 
     if (action === "login") {
-      const email = String(body.email ?? "").trim().toLowerCase();
+      const email = String(body.email ?? "")
+        .trim()
+        .toLowerCase();
       const password = String(body.password ?? "");
       const user = await db.user.findUnique({ where: { email } });
       if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {

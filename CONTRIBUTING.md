@@ -1,10 +1,11 @@
 # Contributing to BitQuest
 
-Thank you for your interest in contributing to BitQuest! 
+Thank you for your interest in contributing to BitQuest!
 
 ## Code of Conduct
 
-By participating in this project, you agree to abide by our code of conduct. Be respectful, inclusive, and constructive in all your interactions.
+By participating in this project, you agree to abide by our code of conduct. Be
+respectful, inclusive, and constructive in all your interactions.
 
 ## How to Contribute
 
@@ -12,7 +13,8 @@ By participating in this project, you agree to abide by our code of conduct. Be 
 
 If you find a bug:
 
-1. First check that the bug hasn't already been reported in [Issues](https://github.com/your-username/bitquest/issues)
+1. First check that the bug hasn't already been reported in
+   [Issues](https://github.com/your-username/bitquest/issues)
 2. Open a new issue with the "Bug Report" template
 3. Include:
    - A clear description of the problem
@@ -61,6 +63,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 - `chore:` Maintenance, dependencies, etc.
 
 Examples:
+
 ```
 feat: add badge system
 fix: correct XP calculation
@@ -113,23 +116,27 @@ bitquest/
 ## Development Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/your-username/bitquest.git
    cd bitquest
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Configure environment**
+
    ```bash
    cp .env.example .env
    # Edit .env with your information
    ```
 
 4. **Setup database**
+
    ```bash
    createdb bitquest
    npx drizzle-kit generate
@@ -146,21 +153,23 @@ bitquest/
 Before submitting a PR:
 
 1. Check that code compiles without errors
+
    ```bash
    npm run build
    ```
 
 2. Check linting
+
    ```bash
    npm run lint
    ```
 
 3. Manually test your changes
 
-
 ## License
 
-By contributing to BitQuest, you agree that your contributions will be licensed under AGPL-3.0.
+By contributing to BitQuest, you agree that your contributions will be licensed
+under AGPL-3.0.
 
 ---
 

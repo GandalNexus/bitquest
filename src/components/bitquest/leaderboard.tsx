@@ -3,13 +3,7 @@
 import { motion } from "framer-motion";
 import { Crown, Flame, Trophy, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLeaderboard } from "@/lib/bitquest/hooks";
 import { formatSats, type LeaderboardEntry } from "@/lib/bitquest/client";
 import { EmptyState, ErrorState, LoadingState } from "./ui-bits";
@@ -98,9 +92,7 @@ function RankRow({ entry }: { entry: LeaderboardEntry }) {
           </Badge>
         )}
         {entry.isMe && (
-          <Badge className="shrink-0 bg-primary/15 px-1.5 py-0 text-[10px] text-primary">
-            toi
-          </Badge>
+          <Badge className="shrink-0 bg-primary/15 px-1.5 py-0 text-[10px] text-primary">toi</Badge>
         )}
       </div>
       {/* Niveau */}

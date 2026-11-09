@@ -1,0 +1,51 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "nextjs", "unicorn"],
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "settings": {
+    "react": {
+      "version": "19"
+    }
+  },
+  "rules": {
+    /* ── Corrections rapides ── */
+    "no-debugger": "error",
+    "no-var": "error",
+    "prefer-const": "warn",
+    "eqeqeq": ["warn", "always", { "null": "ignore" }],
+
+    /* ── TypeScript ── */
+    "typescript/no-explicit-any": "off",
+    "typescript/no-unused-vars": "off",
+    "typescript/ban-ts-comment": "off",
+    "typescript/no-non-null-assertion": "off",
+
+    /* ── React ── */
+    "react/jsx-no-target-blank": "error",
+    "react/no-danger": "warn",
+    "react/no-unescaped-entities": "off",
+    "react/react-in-jsx-scope": "off",
+    "react/display-name": "off",
+
+    /* ── Next.js ── */
+    "nextjs/no-html-link-for-pages": "off",
+
+    /* ── Unicorn (bonnes pratiques) ── */
+    "unicorn/no-array-for-each": "warn",
+    "unicorn/prefer-includes": "warn",
+    "unicorn/throw-new-error": "error"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    "out/",
+    "build/",
+    "next-env.d.ts",
+    "*.config.*",
+    "prisma/"
+  ]
+}

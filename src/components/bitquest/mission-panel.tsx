@@ -131,10 +131,7 @@ function MonoField({ label, value, truncate }: { label: string; value: string; t
   return (
     <div className="flex items-baseline justify-between gap-3">
       <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-      <code
-        className={cn("font-mono text-xs", truncate && "truncate")}
-        title={value}
-      >
+      <code className={cn("font-mono text-xs", truncate && "truncate")} title={value}>
         {value}
       </code>
     </div>
@@ -143,7 +140,14 @@ function MonoField({ label, value, truncate }: { label: string; value: string; t
 
 /* ============ 1. block_explorer ============ */
 
-function BlockExplorerMission({ challenge, hint, attemptsLeft, submitting, disabled, onSubmit }: MissionComponentProps) {
+function BlockExplorerMission({
+  challenge,
+  hint,
+  attemptsLeft,
+  submitting,
+  disabled,
+  onSubmit,
+}: MissionComponentProps) {
   const { toast } = useToast();
   const c = asRecord(challenge);
   const height = num(c.height);
@@ -159,7 +163,11 @@ function BlockExplorerMission({ challenge, hint, attemptsLeft, submitting, disab
       toast({ title: "Hash complet copié dans le presse-papiers" });
       setTimeout(() => setCopied(false), 1800);
     } catch {
-      toast({ variant: "destructive", title: "Copie impossible", description: "Ton navigateur a refusé l'accès au presse-papiers." });
+      toast({
+        variant: "destructive",
+        title: "Copie impossible",
+        description: "Ton navigateur a refusé l'accès au presse-papiers.",
+      });
     }
   };
 
@@ -169,10 +177,19 @@ function BlockExplorerMission({ challenge, hint, attemptsLeft, submitting, disab
       : null;
 
   return (
-    <MissionFrame hint={hint} answer={answer} attemptsLeft={attemptsLeft} submitting={submitting} disabled={disabled} onSubmit={onSubmit}>
+    <MissionFrame
+      hint={hint}
+      answer={answer}
+      attemptsLeft={attemptsLeft}
+      submitting={submitting}
+      disabled={disabled}
+      onSubmit={onSubmit}
+    >
       <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="font-display text-2xl font-bold tracking-tight text-primary">#{formatSats(height)}</div>
+          <div className="font-display text-2xl font-bold tracking-tight text-primary">
+            #{formatSats(height)}
+          </div>
           <Badge variant="outline" className="border-primary/40 text-primary">
             Bloc miné
           </Badge>
@@ -229,7 +246,14 @@ function BlockExplorerMission({ challenge, hint, attemptsLeft, submitting, disab
 
 /* ============ 2. key_forge ============ */
 
-function KeyForgeMission({ challenge, hint, attemptsLeft, submitting, disabled, onSubmit }: MissionComponentProps) {
+function KeyForgeMission({
+  challenge,
+  hint,
+  attemptsLeft,
+  submitting,
+  disabled,
+  onSubmit,
+}: MissionComponentProps) {
   const c = asRecord(challenge);
   const wif = str(c.wif);
   const pubkey = str(c.pubkey);
@@ -253,12 +277,17 @@ function KeyForgeMission({ challenge, hint, attemptsLeft, submitting, disabled, 
   };
 
   const answer =
-    phase === "forged" && suffix.trim().length === 4
-      ? { addressSuffix: suffix.trim().toLowerCase() }
-      : null;
+    phase === "forged" && suffix.trim().length === 4 ? { addressSuffix: suffix.trim().toLowerCase() } : null;
 
   return (
-    <MissionFrame hint={hint} answer={answer} attemptsLeft={attemptsLeft} submitting={submitting} disabled={disabled} onSubmit={onSubmit}>
+    <MissionFrame
+      hint={hint}
+      answer={answer}
+      attemptsLeft={attemptsLeft}
+      submitting={submitting}
+      disabled={disabled}
+      onSubmit={onSubmit}
+    >
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <Badge variant="outline" className="border-primary/40 text-primary">
@@ -299,10 +328,15 @@ function KeyForgeMission({ challenge, hint, attemptsLeft, submitting, disabled, 
               <div className="flex items-baseline justify-between gap-3">
                 <span className="shrink-0 text-xs text-muted-foreground">WIF (clé privée)</span>
               </div>
-              <code className="block select-none break-all rounded-lg border bg-background px-3 py-2 font-mono text-xs blur-[2px]" title="Clé privée masquée — ne jamais partager">
+              <code
+                className="block select-none break-all rounded-lg border bg-background px-3 py-2 font-mono text-xs blur-[2px]"
+                title="Clé privée masquée — ne jamais partager"
+              >
                 {wif}
               </code>
-              <p className="text-[11px] text-rose-500">Clé privée masquée — ne jamais partager, ne jamais la coller en ligne.</p>
+              <p className="text-[11px] text-rose-500">
+                Clé privée masquée — ne jamais partager, ne jamais la coller en ligne.
+              </p>
             </div>
             <MonoField label="Clé publique" value={`${pubkey.slice(0, 20)}…${pubkey.slice(-8)}`} />
             <div className="space-y-1">
@@ -327,7 +361,8 @@ function KeyForgeMission({ challenge, hint, attemptsLeft, submitting, disabled, 
               disabled={submitting || disabled}
             />
             <p className="text-[11px] text-muted-foreground">
-              Réflexe de sécurité : vérifie toujours les derniers caractères d&apos;une adresse avant d&apos;envoyer des fonds.
+              Réflexe de sécurité : vérifie toujours les derniers caractères d&apos;une adresse avant
+              d&apos;envoyer des fonds.
             </p>
           </div>
         )}
@@ -338,7 +373,14 @@ function KeyForgeMission({ challenge, hint, attemptsLeft, submitting, disabled, 
 
 /* ============ 3. tx_builder (payment / consolidation) ============ */
 
-function TxBuilderMission({ challenge, hint, attemptsLeft, submitting, disabled, onSubmit }: MissionComponentProps) {
+function TxBuilderMission({
+  challenge,
+  hint,
+  attemptsLeft,
+  submitting,
+  disabled,
+  onSubmit,
+}: MissionComponentProps) {
   const c = asRecord(challenge);
   const variant = str(c.variant, "payment");
   const isConsolidation = variant === "consolidation";
@@ -374,13 +416,17 @@ function TxBuilderMission({ challenge, hint, attemptsLeft, submitting, disabled,
     { key: "fast", label: "Rapide" },
   ];
 
-  const answer =
-    selected.length > 0 && speed
-      ? { selected, speed }
-      : null;
+  const answer = selected.length > 0 && speed ? { selected, speed } : null;
 
   return (
-    <MissionFrame hint={hint} answer={answer} attemptsLeft={attemptsLeft} submitting={submitting} disabled={disabled} onSubmit={onSubmit}>
+    <MissionFrame
+      hint={hint}
+      answer={answer}
+      attemptsLeft={attemptsLeft}
+      submitting={submitting}
+      disabled={disabled}
+      onSubmit={onSubmit}
+    >
       <div className="space-y-4">
         {isConsolidation && (
           <Alert>
@@ -417,7 +463,7 @@ function TxBuilderMission({ challenge, hint, attemptsLeft, submitting, disabled,
                 key={u.id}
                 className={cn(
                   "flex min-h-10 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-colors",
-                  selected.includes(u.id) ? "border-primary/50 bg-primary/5" : "bg-card hover:bg-accent/40"
+                  selected.includes(u.id) ? "border-primary/50 bg-primary/5" : "bg-card hover:bg-accent/40",
                 )}
               >
                 <Checkbox
@@ -435,7 +481,8 @@ function TxBuilderMission({ challenge, hint, attemptsLeft, submitting, disabled,
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="text-muted-foreground">
-              Sélectionné : <span className="font-semibold text-foreground">{formatSats(selectedSum)} sats</span>
+              Sélectionné :{" "}
+              <span className="font-semibold text-foreground">{formatSats(selectedSum)} sats</span>
               {isConsolidation && ` · ${selected.length}/${utxos.length} UTXO`}
             </span>
             {!isConsolidation && (
@@ -446,7 +493,9 @@ function TxBuilderMission({ challenge, hint, attemptsLeft, submitting, disabled,
               </span>
             )}
             {isConsolidation && speed && (
-              <span className={cn("font-medium", selectedSum - fee > 0 ? "text-emerald-500" : "text-rose-500")}>
+              <span
+                className={cn("font-medium", selectedSum - fee > 0 ? "text-emerald-500" : "text-rose-500")}
+              >
                 {selectedSum - fee > 0
                   ? `Change estimé après frais : ${formatSats(selectedSum - fee)} sats`
                   : "Les frais dépassent le total sélectionné"}
@@ -469,13 +518,15 @@ function TxBuilderMission({ challenge, hint, attemptsLeft, submitting, disabled,
                 htmlFor={`bq-speed-${s.key}`}
                 className={cn(
                   "min-h-10 cursor-pointer items-center justify-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-                  speed === s.key ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40"
+                  speed === s.key ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40",
                 )}
               >
                 <RadioGroupItem id={`bq-speed-${s.key}`} value={s.key} />
                 <span className="min-w-0">
                   <span className="block font-medium">{s.label}</span>
-                  <span className="block text-xs text-muted-foreground">{formatSats(feeSats[s.key])} sats</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {formatSats(feeSats[s.key])} sats
+                  </span>
                 </span>
               </Label>
             ))}
@@ -488,7 +539,14 @@ function TxBuilderMission({ challenge, hint, attemptsLeft, submitting, disabled,
 
 /* ============ 3c. tx_builder fee_opt ============ */
 
-function FeeOptMission({ challenge, hint, attemptsLeft, submitting, disabled, onSubmit }: MissionComponentProps) {
+function FeeOptMission({
+  challenge,
+  hint,
+  attemptsLeft,
+  submitting,
+  disabled,
+  onSubmit,
+}: MissionComponentProps) {
   const c = asRecord(challenge);
   const vbytes = num(c.vbytes);
   const feeRatesRaw = asRecord(c.feeRates);
@@ -512,13 +570,21 @@ function FeeOptMission({ challenge, hint, attemptsLeft, submitting, disabled, on
   ];
 
   return (
-    <MissionFrame hint={hint} answer={answer} attemptsLeft={attemptsLeft} submitting={submitting} disabled={disabled} onSubmit={onSubmit}>
+    <MissionFrame
+      hint={hint}
+      answer={answer}
+      attemptsLeft={attemptsLeft}
+      submitting={submitting}
+      disabled={disabled}
+      onSubmit={onSubmit}
+    >
       <div className="space-y-4">
         <Alert>
           <Activity className="h-4 w-4" />
           <AlertTitle>Mempool : {mempool}</AlertTitle>
           <AlertDescription>
-            Taux estimé pour le prochain bloc : {nextBlockRate} sats/vByte. Taille de ta transaction : {formatSats(vbytes)} vBytes.
+            Taux estimé pour le prochain bloc : {nextBlockRate} sats/vByte. Taille de ta transaction :{" "}
+            {formatSats(vbytes)} vBytes.
           </AlertDescription>
         </Alert>
 
@@ -546,7 +612,7 @@ function FeeOptMission({ challenge, hint, attemptsLeft, submitting, disabled, on
                 htmlFor={`bq-fee-${r.key}`}
                 className={cn(
                   "min-h-10 cursor-pointer items-center justify-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-                  speed === r.key ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40"
+                  speed === r.key ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40",
                 )}
               >
                 <RadioGroupItem id={`bq-fee-${r.key}`} value={r.key} />
@@ -590,7 +656,14 @@ async function sha256Hex(input: string): Promise<string> {
     .join("");
 }
 
-function MineNonceMission({ challenge, hint, attemptsLeft, submitting, disabled, onSubmit }: MissionComponentProps) {
+function MineNonceMission({
+  challenge,
+  hint,
+  attemptsLeft,
+  submitting,
+  disabled,
+  onSubmit,
+}: MissionComponentProps) {
   const { toast } = useToast();
   const c = asRecord(challenge);
   const header = str(c.header);
@@ -640,7 +713,10 @@ function MineNonceMission({ challenge, hint, attemptsLeft, submitting, disabled,
             setCurrentNonce(n);
             setHashCount(hashes);
             setProgressPct(100);
-            toast({ title: "Hash valide trouvé !", description: `Nonce ${n} après ${hashes} hash calculés.` });
+            toast({
+              title: "Hash valide trouvé !",
+              description: `Nonce ${n} après ${hashes} hash calculés.`,
+            });
             return;
           }
         }
@@ -660,7 +736,14 @@ function MineNonceMission({ challenge, hint, attemptsLeft, submitting, disabled,
   const answer = nonce !== "" ? { nonce: Number(nonce) } : null;
 
   return (
-    <MissionFrame hint={hint} answer={answer} attemptsLeft={attemptsLeft} submitting={submitting} disabled={disabled} onSubmit={onSubmit}>
+    <MissionFrame
+      hint={hint}
+      answer={answer}
+      attemptsLeft={attemptsLeft}
+      submitting={submitting}
+      disabled={disabled}
+      onSubmit={onSubmit}
+    >
       <div className="space-y-4">
         <div className="space-y-1.5 rounded-xl border bg-muted/30 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -670,7 +753,9 @@ function MineNonceMission({ challenge, hint, attemptsLeft, submitting, disabled,
               Cible : hash commençant par « {prefix} »
             </Badge>
           </div>
-          <code className="block break-all rounded-lg border bg-background px-3 py-2 font-mono text-xs">{header}</code>
+          <code className="block break-all rounded-lg border bg-background px-3 py-2 font-mono text-xs">
+            {header}
+          </code>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -733,7 +818,14 @@ function MineNonceMission({ challenge, hint, attemptsLeft, submitting, disabled,
 
 /* ============ 5. ln_channel ============ */
 
-function LnChannelMission({ challenge, hint, attemptsLeft, submitting, disabled, onSubmit }: MissionComponentProps) {
+function LnChannelMission({
+  challenge,
+  hint,
+  attemptsLeft,
+  submitting,
+  disabled,
+  onSubmit,
+}: MissionComponentProps) {
   const c = asRecord(challenge);
   const myBalance = num(c.myBalance);
   const dustLimit = num(c.dustLimit);
@@ -765,7 +857,14 @@ function LnChannelMission({ challenge, hint, attemptsLeft, submitting, disabled,
   const answer = peerIndex !== null && capacityNum !== null ? { peerIndex, capacity: capacityNum } : null;
 
   return (
-    <MissionFrame hint={hint} answer={answer} attemptsLeft={attemptsLeft} submitting={submitting} disabled={disabled} onSubmit={onSubmit}>
+    <MissionFrame
+      hint={hint}
+      answer={answer}
+      attemptsLeft={attemptsLeft}
+      submitting={submitting}
+      disabled={disabled}
+      onSubmit={onSubmit}
+    >
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-muted/30 p-3">
           <span className="text-sm text-muted-foreground">Solde BitLab disponible</span>
@@ -783,8 +882,10 @@ function LnChannelMission({ challenge, hint, attemptsLeft, submitting, disabled,
                 aria-pressed={peerIndex === i}
                 className={cn(
                   "min-h-10 rounded-xl border p-3 text-left transition-colors",
-                  peerIndex === i ? "border-primary/60 bg-primary/5 ring-1 ring-primary/40" : "bg-card hover:bg-accent/40",
-                  submitting || disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                  peerIndex === i
+                    ? "border-primary/60 bg-primary/5 ring-1 ring-primary/40"
+                    : "bg-card hover:bg-accent/40",
+                  submitting || disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
                 )}
                 disabled={submitting || disabled}
               >
@@ -797,7 +898,10 @@ function LnChannelMission({ challenge, hint, attemptsLeft, submitting, disabled,
                     min. {formatSats(p.minCapacity)} sats
                   </Badge>
                 </div>
-                <code className="mt-1 block truncate font-mono text-[11px] text-muted-foreground" title={p.pubkey}>
+                <code
+                  className="mt-1 block truncate font-mono text-[11px] text-muted-foreground"
+                  title={p.pubkey}
+                >
                   {p.pubkey.slice(0, 16)}…{p.pubkey.slice(-6)}
                 </code>
                 <div className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
@@ -824,15 +928,17 @@ function LnChannelMission({ challenge, hint, attemptsLeft, submitting, disabled,
             disabled={submitting || disabled}
           />
           <p className="text-[11px] text-muted-foreground">
-            Contraintes : capacité ≥ {peer ? formatSats(peer.minCapacity) : "min. du pair"} sats (exigence du pair), ≥{" "}
-            {formatSats(dustLimit)} sats (dust limit) et ≤ {formatSats(myBalance)} sats (ton solde).
+            Contraintes : capacité ≥ {peer ? formatSats(peer.minCapacity) : "min. du pair"} sats (exigence du
+            pair), ≥ {formatSats(dustLimit)} sats (dust limit) et ≤ {formatSats(myBalance)} sats (ton solde).
           </p>
           {peer && capacityNum !== null && !valid && (
             <p className="text-[11px] font-medium text-rose-500">
               Capacité invalide pour {peer.name} — ajuste-la pour respecter les contraintes ci-dessus.
             </p>
           )}
-          {valid && <p className="text-[11px] font-medium text-emerald-500">Capacité valide pour {peer?.name}.</p>}
+          {valid && (
+            <p className="text-[11px] font-medium text-emerald-500">Capacité valide pour {peer?.name}.</p>
+          )}
         </div>
       </div>
     </MissionFrame>
@@ -841,7 +947,14 @@ function LnChannelMission({ challenge, hint, attemptsLeft, submitting, disabled,
 
 /* ============ 6. ln_invoice ============ */
 
-function LnInvoiceMission({ challenge, hint, attemptsLeft, submitting, disabled, onSubmit }: MissionComponentProps) {
+function LnInvoiceMission({
+  challenge,
+  hint,
+  attemptsLeft,
+  submitting,
+  disabled,
+  onSubmit,
+}: MissionComponentProps) {
   const c = asRecord(challenge);
   const bolt11 = str(c.bolt11);
   const payeeNode = str(c.payeeNode);
@@ -850,11 +963,17 @@ function LnInvoiceMission({ challenge, hint, attemptsLeft, submitting, disabled,
   const [amount, setAmount] = useState("");
   const [expiry, setExpiry] = useState("");
 
-  const answer =
-    amount !== "" && expiry !== "" ? { amount: Number(amount), expiry: Number(expiry) } : null;
+  const answer = amount !== "" && expiry !== "" ? { amount: Number(amount), expiry: Number(expiry) } : null;
 
   return (
-    <MissionFrame hint={hint} answer={answer} attemptsLeft={attemptsLeft} submitting={submitting} disabled={disabled} onSubmit={onSubmit}>
+    <MissionFrame
+      hint={hint}
+      answer={answer}
+      attemptsLeft={attemptsLeft}
+      submitting={submitting}
+      disabled={disabled}
+      onSubmit={onSubmit}
+    >
       <div className="space-y-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -896,7 +1015,8 @@ function LnInvoiceMission({ challenge, hint, attemptsLeft, submitting, disabled,
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          La facture est du texte lisible si tu sais où regarder : le montant suit le préfixe « lntb » et l&apos;expiration suit le marqueur « exp ».
+          La facture est du texte lisible si tu sais où regarder : le montant suit le préfixe « lntb » et
+          l&apos;expiration suit le marqueur « exp ».
         </p>
       </div>
     </MissionFrame>
@@ -905,7 +1025,14 @@ function LnInvoiceMission({ challenge, hint, attemptsLeft, submitting, disabled,
 
 /* ============ 7. multisig_sign ============ */
 
-function MultisigMission({ challenge, hint, attemptsLeft, submitting, disabled, onSubmit }: MissionComponentProps) {
+function MultisigMission({
+  challenge,
+  hint,
+  attemptsLeft,
+  submitting,
+  disabled,
+  onSubmit,
+}: MissionComponentProps) {
   const c = asRecord(challenge);
   const policy = str(c.policy, "2-of-3");
   const m = num(c.m, 2);
@@ -925,7 +1052,14 @@ function MultisigMission({ challenge, hint, attemptsLeft, submitting, disabled, 
   const answer = signers.length === m ? { signers } : null;
 
   return (
-    <MissionFrame hint={hint} answer={answer} attemptsLeft={attemptsLeft} submitting={submitting} disabled={disabled} onSubmit={onSubmit}>
+    <MissionFrame
+      hint={hint}
+      answer={answer}
+      attemptsLeft={attemptsLeft}
+      submitting={submitting}
+      disabled={disabled}
+      onSubmit={onSubmit}
+    >
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="border-primary/40 text-primary">
@@ -945,7 +1079,7 @@ function MultisigMission({ challenge, hint, attemptsLeft, submitting, disabled, 
                 key={k.pubkey}
                 className={cn(
                   "flex min-h-10 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-colors",
-                  signers.includes(i) ? "border-primary/50 bg-primary/5" : "bg-card hover:bg-accent/40"
+                  signers.includes(i) ? "border-primary/50 bg-primary/5" : "bg-card hover:bg-accent/40",
                 )}
               >
                 <Checkbox
@@ -956,7 +1090,10 @@ function MultisigMission({ challenge, hint, attemptsLeft, submitting, disabled, 
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{k.label}</span>
-                  <code className="block truncate font-mono text-[11px] text-muted-foreground" title={k.pubkey}>
+                  <code
+                    className="block truncate font-mono text-[11px] text-muted-foreground"
+                    title={k.pubkey}
+                  >
                     {k.pubkey.slice(0, 20)}…{k.pubkey.slice(-6)}
                   </code>
                 </span>
@@ -971,7 +1108,14 @@ function MultisigMission({ challenge, hint, attemptsLeft, submitting, disabled, 
 
 /* ============ 8. taproot_tweak ============ */
 
-function TaprootMission({ challenge, hint, attemptsLeft, submitting, disabled, onSubmit }: MissionComponentProps) {
+function TaprootMission({
+  challenge,
+  hint,
+  attemptsLeft,
+  submitting,
+  disabled,
+  onSubmit,
+}: MissionComponentProps) {
   const c = asRecord(challenge);
   const internalKey = str(c.internalKey);
   const question = str(c.question);
@@ -984,11 +1128,20 @@ function TaprootMission({ challenge, hint, attemptsLeft, submitting, disabled, o
   const answer = choice !== null && path !== null ? { choice, path } : null;
 
   return (
-    <MissionFrame hint={hint} answer={answer} attemptsLeft={attemptsLeft} submitting={submitting} disabled={disabled} onSubmit={onSubmit}>
+    <MissionFrame
+      hint={hint}
+      answer={answer}
+      attemptsLeft={attemptsLeft}
+      submitting={submitting}
+      disabled={disabled}
+      onSubmit={onSubmit}
+    >
       <div className="space-y-4">
         <div className="space-y-1.5">
           <span className="text-xs text-muted-foreground">Clé interne</span>
-          <code className="block break-all rounded-lg border bg-background px-3 py-2 font-mono text-xs">{internalKey}</code>
+          <code className="block break-all rounded-lg border bg-background px-3 py-2 font-mono text-xs">
+            {internalKey}
+          </code>
         </div>
 
         <p className="text-sm font-medium leading-relaxed">{question}</p>
@@ -1007,7 +1160,7 @@ function TaprootMission({ challenge, hint, attemptsLeft, submitting, disabled, o
                 htmlFor={`bq-taproot-${i}`}
                 className={cn(
                   "min-h-10 cursor-pointer items-center justify-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-                  choice === i ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40"
+                  choice === i ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40",
                 )}
               >
                 <RadioGroupItem id={`bq-taproot-${i}`} value={String(i)} />
@@ -1034,20 +1187,22 @@ function TaprootMission({ challenge, hint, attemptsLeft, submitting, disabled, o
               htmlFor="bq-path-key"
               className={cn(
                 "min-h-10 cursor-pointer items-center justify-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-                path === "key" ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40"
+                path === "key" ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40",
               )}
             >
               <RadioGroupItem id="bq-path-key" value="key" />
               <span className="min-w-0">
                 <span className="block font-medium">Key path (signature Schnorr)</span>
-                <span className="block text-[11px] text-muted-foreground">Dépense directe sur la clé tweakée</span>
+                <span className="block text-[11px] text-muted-foreground">
+                  Dépense directe sur la clé tweakée
+                </span>
               </span>
             </Label>
             <Label
               htmlFor="bq-path-script"
               className={cn(
                 "min-h-10 cursor-pointer items-center justify-start gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-                path === "script" ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40"
+                path === "script" ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40",
               )}
             >
               <RadioGroupItem id="bq-path-script" value="script" />
@@ -1083,9 +1238,17 @@ function UnknownMission({ challenge }: { challenge: Record<string, unknown> }) {
 /* ============ Panneau principal ============ */
 
 export function MissionPanel(props: MissionPanelProps) {
-  const { missionType, challenge, brief, hint, attemptsLeft, submitting, lastFeedback, onSubmit, disabled } = props;
+  const { missionType, challenge, brief, hint, attemptsLeft, submitting, lastFeedback, onSubmit, disabled } =
+    props;
 
-  const missionProps: MissionComponentProps = { challenge, hint, attemptsLeft, submitting, disabled, onSubmit };
+  const missionProps: MissionComponentProps = {
+    challenge,
+    hint,
+    attemptsLeft,
+    submitting,
+    disabled,
+    onSubmit,
+  };
   const txVariant = str(asRecord(challenge).variant, "payment");
 
   return (

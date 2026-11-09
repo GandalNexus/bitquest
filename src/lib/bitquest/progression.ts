@@ -66,8 +66,7 @@ export function updateStreak(user: { streak: number; lastActiveDate: string | nu
 } {
   const today = todayStr();
   if (user.lastActiveDate === today) return { streak: user.streak, changed: false };
-  const next =
-    user.lastActiveDate === yesterdayStr() ? user.streak + 1 : 1;
+  const next = user.lastActiveDate === yesterdayStr() ? user.streak + 1 : 1;
   return { streak: next, changed: true };
 }
 

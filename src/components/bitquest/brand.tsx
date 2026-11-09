@@ -56,7 +56,7 @@ export function QuestBubble({ className }: { className?: string }) {
     <span
       className={cn(
         "inline-block rounded-full border border-primary/40 bg-primary/10 px-2 py-px text-[11px] font-medium text-primary",
-        className
+        className,
       )}
     >
       Quest
