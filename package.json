@@ -1,7 +1,10 @@
 {
-  "name": "nextjs_tailwind_shadcn_ts",
+  "name": "bitquest",
   "version": "0.2.1",
   "private": true,
+  "description": "BitQuest — gamified educational platform for learning Bitcoin and the Lightning Network (GandalNexus).",
+  "license": "AGPL-3.0",
+  "author": "GandalNexus",
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
@@ -9,6 +12,9 @@
     "lint": "oxlint --config oxlint.json src/ && eslint .",
     "lint:eslint": "eslint .",
     "lint:oxc": "oxlint --config oxlint.json src/",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:push": "prisma db push --accept-data-loss",
@@ -80,7 +86,6 @@
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.1.0",
     "vaul": "^1.1.2",
-    "z-ai-web-dev-sdk": "^0.0.18",
     "zod": "^4.0.2",
     "zustand": "^5.0.6"
   },
@@ -91,10 +96,12 @@
     "bun-types": "^1.3.4",
     "eslint": "^9",
     "eslint-config-next": "^16.1.1",
+    "happy-dom": "^19.0.0",
     "oxlint": "^1.92.0",
     "prettier": "^3.9.10",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.5",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.0"
   }
 }

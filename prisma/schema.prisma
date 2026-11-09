@@ -58,8 +58,6 @@ model QuizQuestion {
   options     String // JSON array of options (empty for TRUE_FALSE)
   correct     String // JSON: { index } for MCQ, { bool } for TRUE_FALSE
   explanation String
-
-  quest2 String?
 }
 
 model UserQuestProgress {
