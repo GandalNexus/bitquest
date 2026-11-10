@@ -7,6 +7,7 @@ import {
   adminCourseUpdateSchema,
   adminLessonCreateSchema,
   adminLessonUpdateSchema,
+  adminQuestQuizSchema,
   adminQuestTheorySchema,
   adminQuestUpdateSchema,
   authBodySchema,
@@ -499,6 +500,130 @@ describe("adminQuestTheorySchema", () => {
     expect(
       adminQuestTheorySchema.safeParse({
         sections: [{ title: "ok", body: "x".repeat(10_001) }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* adminQuestQuizSchema                                                */
+/* ------------------------------------------------------------------ */
+
+describe("adminQuestQuizSchema — MCQ", () => {
+  const validMcq = {
+    type: "MCQ" as const,
+    question: "Quel est le bloc 0 ?",
+    options: ["Genesis", "Bloc miné en 2010", "Rien de spécial"],
+    correctIndex: 0,
+    explanation: "Satoshi a miné le bloc genesis le 3 janvier 2009.",
+  };
+
+  it("valide un MCQ bien formé", () => {
+    expect(adminQuestQuizSchema.safeParse({ questions: [validMcq] }).success).toBe(true);
+  });
+
+  it("rejette moins de 2 options", () => {
+    expect(
+      adminQuestQuizSchema.safeParse({ questions: [{ ...validMcq, options: ["un"] }] }).success,
+    ).toBe(false);
+  });
+
+  it("rejette plus de 6 options", () => {
+    expect(
+      adminQuestQuizSchema.safeParse({
+        questions: [{ ...validMcq, options: ["a", "b", "c", "d", "e", "f", "g"] }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejette correctIndex hors plage via refine", () => {
+    expect(
+      adminQuestQuizSchema.safeParse({ questions: [{ ...validMcq, correctIndex: 5 }] }).success,
+    ).toBe(false);
+    expect(
+      adminQuestQuizSchema.safeParse({ questions: [{ ...validMcq, correctIndex: -1 }] }).success,
+    ).toBe(false);
+  });
+
+  it("rejette une option vide (après trim/min 1)", () => {
+    expect(
+      adminQuestQuizSchema.safeParse({
+        questions: [{ ...validMcq, options: ["ok", "   "] }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("adminQuestQuizSchema — TRUE_FALSE", () => {
+  const validTf = {
+    type: "TRUE_FALSE" as const,
+    question: "Bitcoin a été lancé en 2009.",
+    correctBool: true,
+    explanation: "Oui, bloc 0 miné le 3 janvier 2009.",
+  };
+
+  it("valide une question Vrai/Faux", () => {
+    expect(adminQuestQuizSchema.safeParse({ questions: [validTf] }).success).toBe(true);
+  });
+
+  it("rejette correctBool non booléen", () => {
+    expect(
+      adminQuestQuizSchema.safeParse({
+        questions: [{ ...validTf, correctBool: "true" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejette correctBool manquant", () => {
+    const { correctBool, ...withoutBool } = validTf;
+    void correctBool;
+    expect(
+      adminQuestQuizSchema.safeParse({ questions: [withoutBool] }).success,
+    ).toBe(false);
+  });
+});
+
+describe("adminQuestQuizSchema — wrapper", () => {
+  it("rejette un questions=[] (min 1)", () => {
+    expect(adminQuestQuizSchema.safeParse({ questions: [] }).success).toBe(false);
+  });
+
+  it("rejette plus de 20 questions", () => {
+    const base = {
+      type: "TRUE_FALSE" as const,
+      question: "q",
+      correctBool: true,
+      explanation: "e",
+    };
+    const many = Array.from({ length: 21 }, () => base);
+    expect(adminQuestQuizSchema.safeParse({ questions: many }).success).toBe(false);
+  });
+
+  it("accepte un mix MCQ + TF", () => {
+    const r = adminQuestQuizSchema.safeParse({
+      questions: [
+        {
+          type: "MCQ",
+          question: "x",
+          options: ["a", "b"],
+          correctIndex: 1,
+          explanation: "e",
+        },
+        {
+          type: "TRUE_FALSE",
+          question: "y",
+          correctBool: false,
+          explanation: "e",
+        },
+      ],
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejette un type inconnu (discriminator)", () => {
+    expect(
+      adminQuestQuizSchema.safeParse({
+        questions: [{ type: "OPEN_ENDED", question: "x", explanation: "e" }],
       }).success,
     ).toBe(false);
   });

@@ -99,14 +99,31 @@ export default async function EditQuestPage({
         </CardContent>
       </Card>
 
-      {/* Mission — lecture seule (Phase 2.6b-2 à venir) */}
+      {/* Quiz — éditable */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="text-sm">
+              Quiz ({quest._count.quizQuestions} question{quest._count.quizQuestions > 1 ? "s" : ""})
+            </CardTitle>
+            <CardDescription>
+              Questions MCQ et Vrai/Faux proposées après la phase « Théorie ».
+            </CardDescription>
+          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/admin/quests/${quest.code}/quiz`}>Éditer</Link>
+          </Button>
+        </CardHeader>
+      </Card>
+
+      {/* Mission — lecture seule (Phase 2.6b-3 à venir) */}
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">
             Mission : <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">{quest.missionType}</code>
           </CardTitle>
           <CardDescription>
-            Builder dédié à venir en Phase 2.6b-2 (8 types de missions BitLab).
+            Builder dédié à venir en Phase 2.6b-3 (8 types de missions BitLab).
           </CardDescription>
         </CardHeader>
         <CardContent>

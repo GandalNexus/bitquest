@@ -215,6 +215,46 @@ export const adminQuestTheorySchema = z
 export type AdminQuestTheoryBody = z.infer<typeof adminQuestTheorySchema>;
 export type TheorySection = z.infer<typeof theorySectionSchema>;
 
+/* ---------- /api/admin/quests/[code]/quiz ---------- */
+
+const mcqQuestionSchema = z
+  .object({
+    type: z.literal("MCQ"),
+    question: z.string().trim().min(1, "Question requise.").max(500),
+    options: z
+      .array(z.string().trim().min(1).max(200))
+      .min(2, "MCQ : au moins 2 options requises.")
+      .max(6, "MCQ : maximum 6 options."),
+    correctIndex: z.number().int().nonnegative(),
+    explanation: z.string().trim().min(1, "Explication requise.").max(1000),
+  })
+  .refine((d) => d.correctIndex < d.options.length, {
+    message: "correctIndex doit pointer vers une option existante.",
+    path: ["correctIndex"],
+  });
+
+const trueFalseQuestionSchema = z.object({
+  type: z.literal("TRUE_FALSE"),
+  question: z.string().trim().min(1, "Question requise.").max(500),
+  correctBool: z.boolean(),
+  explanation: z.string().trim().min(1, "Explication requise.").max(1000),
+});
+
+export const quizQuestionSchema = z.discriminatedUnion("type", [
+  mcqQuestionSchema,
+  trueFalseQuestionSchema,
+]);
+
+export const adminQuestQuizSchema = z.object({
+  questions: z
+    .array(quizQuestionSchema)
+    .min(1, "Au moins une question est requise.")
+    .max(20, "Maximum 20 questions par quête."),
+});
+
+export type AdminQuestQuizBody = z.infer<typeof adminQuestQuizSchema>;
+export type QuizQuestionInput = z.infer<typeof quizQuestionSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**
