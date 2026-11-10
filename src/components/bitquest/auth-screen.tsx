@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { api, type PublicUser } from "@/lib/bitquest/client";
 import { useBitQuest } from "@/lib/bitquest/store";
 import { OrbiteMark, BitQuestWordmark } from "./brand";
+import { useT } from "@/i18n/locale-provider";
+import { LanguageSwitch } from "@/i18n/language-switch";
 
 const FEATURES = [
   { icon: BookOpen, keyword: "Apprends", label: "Parcours pédagogiques" },
@@ -22,6 +24,7 @@ const FEATURES = [
 export function AuthScreen() {
   const setSession = useBitQuest((s) => s.setSession);
   const { toast } = useToast();
+  const t = useT();
 
   const [registerPseudo, setRegisterPseudo] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
@@ -122,6 +125,11 @@ export function AuthScreen() {
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(232,114,12,0.06),transparent_45%)]"
       />
 
+      {/* ===== Switch de langue ===== */}
+      <div className="absolute right-4 top-4 z-20">
+        <LanguageSwitch />
+      </div>
+
       {/* ===== Contenu principal ===== */}
       <main className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center gap-8 px-4 py-10">
         {/* Hero */}
@@ -186,9 +194,9 @@ export function AuthScreen() {
                 }}
               >
                 <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="register">Créer un compte</TabsTrigger>
-                  <TabsTrigger value="login">Connexion</TabsTrigger>
-                  <TabsTrigger value="guest">Invité</TabsTrigger>
+                  <TabsTrigger value="register">{t("auth.tab.register")}</TabsTrigger>
+                  <TabsTrigger value="login">{t("auth.tab.login")}</TabsTrigger>
+                  <TabsTrigger value="guest">{t("auth.tab.guest")}</TabsTrigger>
                 </TabsList>
 
                 {/* --- Inscription --- */}
@@ -256,7 +264,7 @@ export function AuthScreen() {
                       ) : (
                         <UserPlus className="h-4 w-4" aria-hidden />
                       )}
-                      Commencer l&apos;aventure
+                      {t("auth.submit.register")}
                     </Button>
                   </form>
                 </TabsContent>
@@ -305,7 +313,7 @@ export function AuthScreen() {
                       ) : (
                         <LogIn className="h-4 w-4" aria-hidden />
                       )}
-                      Se connecter
+                      {t("auth.submit.login")}
                     </Button>
                   </form>
                 </TabsContent>
@@ -332,7 +340,7 @@ export function AuthScreen() {
                       disabled={loading}
                     >
                       {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                      Entrer en mode invité
+                      {t("auth.submit.guest")}
                     </Button>
                   </div>
                 </TabsContent>

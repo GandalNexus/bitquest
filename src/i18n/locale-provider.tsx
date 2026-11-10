@@ -16,8 +16,20 @@ import { translate } from "./dictionaries";
 
 interface LocaleContextValue {
   locale: Locale;
-  t: (key: string) => string;
+  t: (key: string, vars?: Record<string, string | number>) => string;
   setLocale: (locale: Locale) => void;
+}
+
+/**
+ * Remplace les `{var}` par leur valeur. Simple et sûr (pas d'eval).
+ * Si `vars` est absent, renvoie le string inchangé.
+ */
+function interpolate(template: string, vars?: Record<string, string | number>): string {
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (_, key) => {
+    const v = vars[key];
+    return v === undefined ? `{${key}}` : String(v);
+  });
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
@@ -62,7 +74,8 @@ export function LocaleProvider({
     }
   };
 
-  const t = (key: string) => translate(locale, key);
+  const t = (key: string, vars?: Record<string, string | number>) =>
+    interpolate(translate(locale, key), vars);
 
   return (
     <LocaleContext.Provider value={{ locale, t, setLocale }}>{children}</LocaleContext.Provider>
@@ -75,14 +88,14 @@ export function useLocale(): LocaleContextValue {
     // Fallback utile : composants rendus hors provider → locale par défaut
     return {
       locale: DEFAULT_LOCALE,
-      t: (key) => translate(DEFAULT_LOCALE, key),
+      t: (key, vars) => interpolate(translate(DEFAULT_LOCALE, key), vars),
       setLocale: () => {},
     };
   }
   return ctx;
 }
 
-/** Hook ergonomique : `const t = useT(); t("nav.dashboard")`. */
-export function useT(): (key: string) => string {
+/** Hook ergonomique : `const t = useT(); t("dashboard.greeting", { name: "Alice" })`. */
+export function useT(): (key: string, vars?: Record<string, string | number>) => string {
   return useLocale().t;
 }

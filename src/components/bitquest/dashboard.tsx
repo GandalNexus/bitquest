@@ -43,6 +43,7 @@ import {
   relativeTime,
 } from "./dashboard.utils";
 import { DailyChallengeTile } from "./daily-challenge-tile";
+import { useT } from "@/i18n/locale-provider";
 
 /* ============ Helpers visuels (non testables car React) ============ */
 
@@ -217,6 +218,7 @@ export function Dashboard({
   onNavigate?: (view: View) => void;
 } = {}) {
   const router = useRouter();
+  const t = useT();
   const openQuest = (code: string) => {
     if (onOpenQuest) onOpenQuest(code);
     else router.push(`/quests/${code}`);
@@ -285,16 +287,16 @@ export function Dashboard({
                 id={heroId}
                 className="font-display text-2xl font-bold tracking-tight sm:text-3xl"
               >
-                Bonjour, {me.pseudo}
+                {t("dashboard.greeting", { name: me.pseudo })}
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Niv. {level.level} · {level.title}
+                {t("dashboard.level", { level: level.level, title: level.title })}
               </p>
               {!allCompleted && remaining > 0 && !showOnboarding && (
                 <p className="mt-2 max-w-md text-sm">
                   {remaining === 1
-                    ? "Une quête t'attend encore : chaque victoire rapproche du rang de Maître Satoshi !"
-                    : `${remaining} quêtes t'attendent encore : chaque victoire rapproche du rang de Maître Satoshi !`}
+                    ? t("dashboard.remaining.one")
+                    : t("dashboard.remaining.many", { count: remaining })}
                 </p>
               )}
             </div>
@@ -303,12 +305,17 @@ export function Dashboard({
               <div className="space-y-1 text-sm">
                 <div className="font-semibold">
                   {formatSats(me.xp)} XP{" "}
-                  <span className="font-normal text-muted-foreground">au total</span>
+                  <span className="font-normal text-muted-foreground">
+                    {t("dashboard.xp.total")}
+                  </span>
                 </div>
                 <div className="text-muted-foreground">
                   {level.next !== null
-                    ? `${formatSats(level.needed - level.into)} XP avant Nv. ${level.level + 1}`
-                    : "Niveau maximum atteint"}
+                    ? t("dashboard.xp.before.next", {
+                        remaining: formatSats(level.needed - level.into),
+                        next: level.level + 1,
+                      })
+                    : t("dashboard.xp.max")}
                 </div>
               </div>
             </div>
@@ -332,14 +339,22 @@ export function Dashboard({
         <h2 id={statsId} className="sr-only">
           Statistiques d&apos;aventurier
         </h2>
-        <StatCard icon={Star} label="XP total" value={formatSats(me.xp)} />
+        <StatCard icon={Star} label={t("dashboard.stat.xp")} value={formatSats(me.xp)} />
         <StatCard
           icon={Map}
-          label="Quêtes terminées"
+          label={t("dashboard.stat.quests")}
           value={questsQuery.isLoading ? "…" : `${completedQuests.length} / ${totalQuests}`}
         />
-        <StatCard icon={Trophy} label="Badges débloqués" value={meQuery.data.badges.length} />
-        <StatCard icon={Coins} label="Solde sats" value={`${formatSats(me.sats)} sats`} />
+        <StatCard
+          icon={Trophy}
+          label={t("dashboard.stat.badges")}
+          value={meQuery.data.badges.length}
+        />
+        <StatCard
+          icon={Coins}
+          label={t("dashboard.stat.sats")}
+          value={`${formatSats(me.sats)} sats`}
+        />
       </motion.section>
 
       {/* ===== Grille principale ===== */}
