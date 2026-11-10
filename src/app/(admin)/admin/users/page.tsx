@@ -4,6 +4,7 @@ import { requireRoleSsr } from "@/lib/auth/server";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RoleForm } from "./role-form";
+import { PurgeButton } from "./purge-button";
 
 export const dynamic = "force-dynamic";
 
@@ -24,21 +25,26 @@ function formatDate(d: Date): string {
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string }>;
+  searchParams: Promise<{ role?: string; view?: string }>;
 }) {
   // Le layout parent (admin/layout.tsx) garantit déjà ADMIN ; on récupère
   // l'id courant pour marquer "toi" sur la bonne ligne.
   const auth = await requireRoleSsr("ADMIN");
   const currentUserId = auth.ok ? auth.user.id : null;
 
-  const { role: roleFilter } = await searchParams;
+  const { role: roleFilter, view: viewFilter } = await searchParams;
   const filter = roleFilter && ["APPRENTICE", "EDITOR", "ADMIN"].includes(roleFilter)
     ? roleFilter
     : null;
+  const showDeleted = viewFilter === "deleted";
 
   const users = await db.user.findMany({
-    where: { deletedAt: null, ...(filter ? { role: filter } : {}) },
-    orderBy: [{ role: "asc" }, { createdAt: "desc" }],
+    where: showDeleted
+      ? { deletedAt: { not: null } }
+      : { deletedAt: null, ...(filter ? { role: filter } : {}) },
+    orderBy: showDeleted
+      ? [{ deletedAt: "desc" }]
+      : [{ role: "asc" }, { createdAt: "desc" }],
     select: {
       id: true,
       pseudo: true,
@@ -49,14 +55,16 @@ export default async function AdminUsersPage({
       xp: true,
       sats: true,
       createdAt: true,
+      deletedAt: true,
     },
   });
 
-  const [totalCount, admins, editors, apprentices] = await Promise.all([
+  const [totalCount, admins, editors, apprentices, deletedCount] = await Promise.all([
     db.user.count({ where: { deletedAt: null } }),
     db.user.count({ where: { deletedAt: null, role: "ADMIN" } }),
     db.user.count({ where: { deletedAt: null, role: "EDITOR" } }),
     db.user.count({ where: { deletedAt: null, role: "APPRENTICE" } }),
+    db.user.count({ where: { deletedAt: { not: null } } }),
   ]);
 
   return (
@@ -71,21 +79,30 @@ export default async function AdminUsersPage({
 
       {/* Compteurs + filtres */}
       <section className="flex flex-wrap items-center gap-2">
-        <FilterChip href="/admin/users" active={filter === null} label={`Tous (${totalCount})`} />
+        <FilterChip
+          href="/admin/users"
+          active={!showDeleted && filter === null}
+          label={`Tous (${totalCount})`}
+        />
         <FilterChip
           href="/admin/users?role=ADMIN"
-          active={filter === "ADMIN"}
+          active={!showDeleted && filter === "ADMIN"}
           label={`Admin (${admins})`}
         />
         <FilterChip
           href="/admin/users?role=EDITOR"
-          active={filter === "EDITOR"}
+          active={!showDeleted && filter === "EDITOR"}
           label={`Editor (${editors})`}
         />
         <FilterChip
           href="/admin/users?role=APPRENTICE"
-          active={filter === "APPRENTICE"}
+          active={!showDeleted && filter === "APPRENTICE"}
           label={`Apprentice (${apprentices})`}
+        />
+        <FilterChip
+          href="/admin/users?view=deleted"
+          active={showDeleted}
+          label={`Supprimés (${deletedCount})`}
         />
       </section>
 
@@ -107,8 +124,12 @@ export default async function AdminUsersPage({
                 <th className="px-4 py-2 font-medium">Email</th>
                 <th className="px-4 py-2 font-medium">Rôle</th>
                 <th className="px-4 py-2 font-medium">XP</th>
-                <th className="px-4 py-2 font-medium">Créé le</th>
-                <th className="px-4 py-2 font-medium">Changer</th>
+                <th className="px-4 py-2 font-medium">
+                  {showDeleted ? "Supprimé le" : "Créé le"}
+                </th>
+                <th className="px-4 py-2 font-medium">
+                  {showDeleted ? "Purge" : "Changer"}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -140,14 +161,22 @@ export default async function AdminUsersPage({
                     <td className="px-4 py-2 tabular-nums text-muted-foreground">
                       {u.xp.toLocaleString("fr-FR")}
                     </td>
-                    <td className="px-4 py-2 text-muted-foreground">{formatDate(u.createdAt)}</td>
+                    <td className="px-4 py-2 text-muted-foreground">
+                      {showDeleted && u.deletedAt
+                        ? formatDate(u.deletedAt)
+                        : formatDate(u.createdAt)}
+                    </td>
                     <td className="px-4 py-2">
-                      <RoleForm
-                        userId={u.id}
-                        pseudo={u.pseudo}
-                        currentRole={u.role}
-                        isSelf={isSelf}
-                      />
+                      {showDeleted ? (
+                        <PurgeButton userId={u.id} pseudo={u.pseudo} />
+                      ) : (
+                        <RoleForm
+                          userId={u.id}
+                          pseudo={u.pseudo}
+                          currentRole={u.role}
+                          isSelf={isSelf}
+                        />
+                      )}
                     </td>
                   </tr>
                 );

@@ -34,7 +34,8 @@ export type AuditAction =
   | "BADGE_DELETE"
   | "CHALLENGE_CREATE"
   | "CHALLENGE_UPDATE"
-  | "CHALLENGE_DELETE";
+  | "CHALLENGE_DELETE"
+  | "USER_PURGE";
 
 export async function logAdminAction(
   actorId: string,
