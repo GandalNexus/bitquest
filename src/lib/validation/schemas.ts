@@ -401,6 +401,30 @@ export const deleteAccountSchema = z.object({
 
 export type DeleteAccountBody = z.infer<typeof deleteAccountSchema>;
 
+/* ---------- /api/bitlab/proof ---------- */
+
+export const BITLAB_NETWORKS = ["testnet4", "signet", "regtest"] as const;
+export const BITLAB_PROOF_KINDS = ["TX", "BLOCK", "INVOICE", "CHANNEL", "ADDRESS"] as const;
+
+/**
+ * Soumission d'une preuve de mission. Shape volontairement permissive sur
+ * le payload : chaque kind a ses champs attendus et la validation métier
+ * (vérif mempool / décodage BOLT11) vit dans le handler, pas le schema.
+ */
+export const bitlabProofSchema = z.object({
+  questCode: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "questCode doit être en kebab-case."),
+  kind: z.enum(BITLAB_PROOF_KINDS),
+  network: z.enum(BITLAB_NETWORKS),
+  payload: z.record(z.string(), z.unknown()).default({}),
+});
+
+export type BitlabProofBody = z.infer<typeof bitlabProofSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**

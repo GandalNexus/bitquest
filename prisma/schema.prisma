@@ -31,6 +31,7 @@ model User {
   lessonProgress LessonProgress[]
   adminAuditLogs AdminAuditLog[]
   dailyChallengeCompletions DailyChallengeCompletion[]
+  bitLabProofs BitLabProof[]
 }
 
 model Quest {
@@ -253,4 +254,27 @@ model DailyChallengeCompletion {
 
   @@id([userId, challengeId])
   @@index([userId])
+}
+
+/* =============================================================
+ * BITLAB INTEGRATION — Phase 3 foundation
+ * Preuves cryptographiques de mission réelle (txid testnet4, invoice BOLT11).
+ * Pour l'instant, aucun Quest n'est câblé sur ce modèle — c'est une fondation
+ * à activer quête par quête dans un sprint ultérieur.
+ * ============================================================= */
+
+model BitLabProof {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questCode  String // code de la quête concernée (pas FK — on garde la preuve même si la quête est supprimée)
+  kind       String // TX | BLOCK | INVOICE | CHANNEL | ADDRESS
+  network    String // testnet4 | signet | regtest
+  payload    String // JSON { txid, blockHash, bolt11, … }
+  verifiedAt DateTime @default(now())
+  consumed   Boolean  @default(false) // true quand la preuve a déjà donné lieu à l'octroi de récompense
+
+  @@unique([userId, questCode, kind])
+  @@index([userId])
+  @@index([questCode])
 }
