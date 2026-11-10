@@ -1,8 +1,19 @@
 import { db } from "@/lib/db";
 import { publicUser } from "@/lib/bitquest/progression";
-import { rateLimit } from "@/lib/bitquest/session";
+import { buildSessionCookie, rateLimit } from "@/lib/bitquest/session";
 import { authBodySchema, parseJsonBody } from "@/lib/validation/schemas";
 import crypto from "crypto";
+
+/** Réponse JSON + Set-Cookie avec le token de session. */
+function jsonWithSession(payload: unknown, token: string): Response {
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Set-Cookie": buildSessionCookie(token, { maxAgeSeconds: 60 * 60 * 24 * 30 }),
+    },
+  });
+}
 
 function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString("hex");
@@ -53,7 +64,7 @@ export async function POST(req: Request) {
           lastActiveDate: new Date().toISOString().slice(0, 10),
         },
       });
-      return Response.json({ user: publicUser(user), token: user.token });
+      return jsonWithSession({ user: publicUser(user), token: user.token }, user.token);
     }
 
     if (body.action === "login") {
@@ -64,7 +75,7 @@ export async function POST(req: Request) {
       }
       const token = crypto.randomBytes(24).toString("hex");
       await db.user.update({ where: { id: user.id }, data: { token } });
-      return Response.json({ user: publicUser(user), token });
+      return jsonWithSession({ user: publicUser(user), token }, token);
     }
 
     if (body.action === "guest") {
@@ -84,7 +95,7 @@ export async function POST(req: Request) {
           lastActiveDate: new Date().toISOString().slice(0, 10),
         },
       });
-      return Response.json({ user: publicUser(user), token: user.token });
+      return jsonWithSession({ user: publicUser(user), token: user.token }, user.token);
     }
 
     /* Branch impossible grâce à la discriminated union, mais TypeScript l'exige. */
