@@ -23,6 +23,9 @@ const ACTIONS = [
   "BADGE_CREATE",
   "BADGE_UPDATE",
   "BADGE_DELETE",
+  "CHALLENGE_CREATE",
+  "CHALLENGE_UPDATE",
+  "CHALLENGE_DELETE",
 ] as const;
 
 type Action = (typeof ACTIONS)[number];
@@ -45,6 +48,9 @@ const actionStyles: Record<string, string> = {
   BADGE_CREATE: "border-emerald-500/40 bg-emerald-500/10 text-emerald-500",
   BADGE_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
   BADGE_DELETE: "border-destructive/40 bg-destructive/10 text-destructive",
+  CHALLENGE_CREATE: "border-emerald-500/40 bg-emerald-500/10 text-emerald-500",
+  CHALLENGE_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
+  CHALLENGE_DELETE: "border-destructive/40 bg-destructive/10 text-destructive",
 };
 
 function formatDateTime(d: Date): string {

@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   adminBadgeCreateSchema,
   adminBadgeUpdateSchema,
+  adminChallengeCreateSchema,
+  adminChallengeUpdateSchema,
   adminChangeRoleSchema,
   adminChapterCreateSchema,
   adminChapterUpdateSchema,
@@ -803,6 +805,71 @@ describe("adminBadgeUpdateSchema", () => {
   it("applique les contraintes de rarity et conditionType", () => {
     expect(adminBadgeUpdateSchema.safeParse({ rarity: "MYTHIC" }).success).toBe(false);
     expect(adminBadgeUpdateSchema.safeParse({ conditionType: "UNKNOWN" }).success).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* adminChallengeCreateSchema / adminChallengeUpdateSchema             */
+/* ------------------------------------------------------------------ */
+
+describe("adminChallengeCreateSchema", () => {
+  const base = {
+    date: "2026-11-10",
+    title: "Vérifier une adresse",
+    prompt: "Compare les 4 premiers et derniers caractères de l'adresse à sa source.",
+  };
+
+  it("valide un payload minimal (defaults xp=10, sats=50)", () => {
+    const r = adminChallengeCreateSchema.safeParse(base);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.xpReward).toBe(10);
+      expect(r.data.satsReward).toBe(50);
+    }
+  });
+
+  it("rejette une date mal formée", () => {
+    expect(adminChallengeCreateSchema.safeParse({ ...base, date: "2026/11/10" }).success).toBe(false);
+    expect(adminChallengeCreateSchema.safeParse({ ...base, date: "demain" }).success).toBe(false);
+    expect(adminChallengeCreateSchema.safeParse({ ...base, date: "" }).success).toBe(false);
+  });
+
+  it("rejette une date calendaire impossible (31 février)", () => {
+    expect(adminChallengeCreateSchema.safeParse({ ...base, date: "2026-02-31" }).success).toBe(false);
+    expect(adminChallengeCreateSchema.safeParse({ ...base, date: "2026-13-01" }).success).toBe(false);
+  });
+
+  it("rejette un prompt trop court (< 10 chars)", () => {
+    expect(adminChallengeCreateSchema.safeParse({ ...base, prompt: "trop" }).success).toBe(false);
+    expect(adminChallengeCreateSchema.safeParse({ ...base, prompt: "" }).success).toBe(false);
+  });
+
+  it("borne xpReward et satsReward à 500", () => {
+    expect(adminChallengeCreateSchema.safeParse({ ...base, xpReward: 501 }).success).toBe(false);
+    expect(adminChallengeCreateSchema.safeParse({ ...base, satsReward: 501 }).success).toBe(false);
+    expect(adminChallengeCreateSchema.safeParse({ ...base, xpReward: 500, satsReward: 500 }).success).toBe(true);
+  });
+
+  it("accepte xp=0 et sats=0 (défi sans récompense)", () => {
+    expect(
+      adminChallengeCreateSchema.safeParse({ ...base, xpReward: 0, satsReward: 0 }).success,
+    ).toBe(true);
+  });
+});
+
+describe("adminChallengeUpdateSchema", () => {
+  it("accepte un patch vide", () => {
+    expect(adminChallengeUpdateSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("accepte un patch partiel", () => {
+    expect(adminChallengeUpdateSchema.safeParse({ title: "Nouveau" }).success).toBe(true);
+    expect(adminChallengeUpdateSchema.safeParse({ xpReward: 25 }).success).toBe(true);
+  });
+
+  it("applique les contraintes de date sur le patch", () => {
+    expect(adminChallengeUpdateSchema.safeParse({ date: "invalid" }).success).toBe(false);
+    expect(adminChallengeUpdateSchema.safeParse({ date: "2026-99-99" }).success).toBe(false);
   });
 });
 

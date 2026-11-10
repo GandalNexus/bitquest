@@ -340,6 +340,41 @@ export const adminBadgeUpdateSchema = z.object({
 
 export type AdminBadgeUpdateBody = z.infer<typeof adminBadgeUpdateSchema>;
 
+/* ---------- /api/admin/challenges ---------- */
+
+/** Date ISO day stricte "YYYY-MM-DD" (pas de timestamp, pas de timezone). */
+export const isoDaySchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Format de date attendu : YYYY-MM-DD.")
+  .refine(
+    (v) => {
+      const d = new Date(`${v}T00:00:00Z`);
+      return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(v);
+    },
+    { message: "Date calendaire invalide (vérifier mois/jour)." },
+  );
+
+export const adminChallengeCreateSchema = z.object({
+  date: isoDaySchema,
+  title: z.string().trim().min(2).max(120),
+  prompt: z.string().trim().min(10).max(2000),
+  xpReward: z.number().int().nonnegative().max(500).default(10),
+  satsReward: z.number().int().nonnegative().max(500).default(50),
+});
+
+export type AdminChallengeCreateBody = z.infer<typeof adminChallengeCreateSchema>;
+
+export const adminChallengeUpdateSchema = z.object({
+  date: isoDaySchema.optional(),
+  title: z.string().trim().min(2).max(120).optional(),
+  prompt: z.string().trim().min(10).max(2000).optional(),
+  xpReward: z.number().int().nonnegative().max(500).optional(),
+  satsReward: z.number().int().nonnegative().max(500).optional(),
+});
+
+export type AdminChallengeUpdateBody = z.infer<typeof adminChallengeUpdateSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**

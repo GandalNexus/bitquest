@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   BookOpen,
   ClipboardList,
+  Flame,
   LayoutDashboard,
   Lock,
   LogIn,
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/admin/courses", label: "Cours", icon: BookOpen },
   { href: "/admin/quests", label: "Quêtes", icon: Map },
   { href: "/admin/badges", label: "Badges", icon: Trophy },
+  { href: "/admin/challenges", label: "Défis", icon: Flame },
   { href: "/admin/audit", label: "Audit log", icon: ClipboardList },
 ];
 
