@@ -1,0 +1,127 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, Users } from "lucide-react";
+import { db } from "@/lib/db";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { QuestForm } from "../quest-form";
+
+export const dynamic = "force-dynamic";
+
+const TRACKS = ["INITIATION", "INTERMEDIATE", "ADVANCED", "SPECIAL"] as const;
+type Track = (typeof TRACKS)[number];
+
+function isTrack(value: string): value is Track {
+  return (TRACKS as readonly string[]).includes(value);
+}
+
+export default async function EditQuestPage({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}) {
+  const { code } = await params;
+  const quest = await db.quest.findUnique({
+    where: { code },
+    include: {
+      _count: { select: { progress: true, quizQuestions: true } },
+    },
+  });
+  if (!quest) notFound();
+
+  const theorySections = parseJsonArray(quest.theorySections);
+  const missionConfig = parseJsonObject(quest.missionConfig);
+
+  return (
+    <div className="space-y-6">
+      <Button asChild variant="ghost" size="sm" className="-ml-2">
+        <Link href="/admin/quests">
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          Retour aux quêtes
+        </Link>
+      </Button>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Éditer : {quest.title}</CardTitle>
+          <CardDescription>
+            <span className="inline-flex items-center gap-1">
+              <Users className="h-3 w-3" aria-hidden />
+              {quest._count.progress} progression{quest._count.progress > 1 ? "s" : ""} ·{" "}
+              {quest._count.quizQuestions} question{quest._count.quizQuestions > 1 ? "s" : ""} de
+              quiz
+            </span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <QuestForm
+            initial={{
+              code: quest.code,
+              track: isTrack(quest.track) ? quest.track : "INITIATION",
+              order: quest.order,
+              title: quest.title,
+              subtitle: quest.subtitle,
+              description: quest.description,
+              intro: quest.intro,
+              xpReward: quest.xpReward,
+              satsReward: quest.satsReward,
+              requiredLevel: quest.requiredLevel,
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Contexte lecture seule */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Contenu non éditable ici</CardTitle>
+          <CardDescription>
+            Ces champs sont gérés par le seed en attendant les éditeurs dédiés (Phase 2.6b).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <div>
+            <div className="font-medium">Sections théoriques ({theorySections.length})</div>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">
+              {theorySections.length === 0 ? (
+                <li>Aucune section.</li>
+              ) : (
+                theorySections.map((s, i) => (
+                  <li key={i}>{typeof s.title === "string" ? s.title : `Section ${i + 1}`}</li>
+                ))
+              )}
+            </ul>
+          </div>
+          <div>
+            <div className="font-medium">
+              Mission : <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">{quest.missionType}</code>
+            </div>
+            <pre className="mt-1 max-h-40 overflow-auto rounded-md border bg-muted/40 p-2 text-[10px] text-muted-foreground">
+              {JSON.stringify(missionConfig, null, 2)}
+            </pre>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/* ---- Helpers ---- */
+
+function parseJsonArray(raw: string): { title?: unknown }[] {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseJsonObject(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}

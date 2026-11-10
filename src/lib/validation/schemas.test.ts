@@ -7,6 +7,7 @@ import {
   adminCourseUpdateSchema,
   adminLessonCreateSchema,
   adminLessonUpdateSchema,
+  adminQuestUpdateSchema,
   authBodySchema,
   parseJsonBody,
   questProgressBodySchema,
@@ -385,6 +386,54 @@ describe("adminLessonUpdateSchema", () => {
 
   it("applique les contraintes du create sur les champs fournis", () => {
     expect(adminLessonUpdateSchema.safeParse({ estimatedMinutes: 500 }).success).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* adminQuestUpdateSchema                                              */
+/* ------------------------------------------------------------------ */
+
+describe("adminQuestUpdateSchema", () => {
+  it("accepte un patch vide", () => {
+    expect(adminQuestUpdateSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("accepte un patch partiel", () => {
+    expect(adminQuestUpdateSchema.safeParse({ title: "New" }).success).toBe(true);
+    expect(adminQuestUpdateSchema.safeParse({ xpReward: 100, satsReward: 500 }).success).toBe(true);
+  });
+
+  it("accepte les quatre tracks valides", () => {
+    for (const t of ["INITIATION", "INTERMEDIATE", "ADVANCED", "SPECIAL"]) {
+      expect(adminQuestUpdateSchema.safeParse({ track: t }).success).toBe(true);
+    }
+  });
+
+  it("rejette un track inconnu", () => {
+    expect(adminQuestUpdateSchema.safeParse({ track: "SECRET" }).success).toBe(false);
+  });
+
+  it("borne xpReward entre 0 et 10 000", () => {
+    expect(adminQuestUpdateSchema.safeParse({ xpReward: -1 }).success).toBe(false);
+    expect(adminQuestUpdateSchema.safeParse({ xpReward: 10_001 }).success).toBe(false);
+    expect(adminQuestUpdateSchema.safeParse({ xpReward: 10_000 }).success).toBe(true);
+  });
+
+  it("borne satsReward entre 0 et 1 000 000", () => {
+    expect(adminQuestUpdateSchema.safeParse({ satsReward: -1 }).success).toBe(false);
+    expect(adminQuestUpdateSchema.safeParse({ satsReward: 1_000_001 }).success).toBe(false);
+    expect(adminQuestUpdateSchema.safeParse({ satsReward: 1_000_000 }).success).toBe(true);
+  });
+
+  it("borne requiredLevel entre 1 et 10", () => {
+    expect(adminQuestUpdateSchema.safeParse({ requiredLevel: 0 }).success).toBe(false);
+    expect(adminQuestUpdateSchema.safeParse({ requiredLevel: 11 }).success).toBe(false);
+    expect(adminQuestUpdateSchema.safeParse({ requiredLevel: 1 }).success).toBe(true);
+    expect(adminQuestUpdateSchema.safeParse({ requiredLevel: 10 }).success).toBe(true);
+  });
+
+  it("rejette un title trop long", () => {
+    expect(adminQuestUpdateSchema.safeParse({ title: "x".repeat(121) }).success).toBe(false);
   });
 });
 

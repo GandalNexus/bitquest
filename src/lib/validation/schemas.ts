@@ -167,6 +167,30 @@ export const adminLessonUpdateSchema = z.object({
 
 export type AdminLessonUpdateBody = z.infer<typeof adminLessonUpdateSchema>;
 
+/* ---------- /api/admin/quests/[code] ---------- */
+
+export const QUEST_TRACKS = ["INITIATION", "INTERMEDIATE", "ADVANCED", "SPECIAL"] as const;
+
+/**
+ * Patch des métadonnées d'une quête.
+ * - `code` n'est PAS éditable (ancre publique + clé des badges QUEST_COMPLETE).
+ * - `theorySections` / `quiz` / `missionConfig` sont gérés dans des éditeurs
+ *   dédiés à venir (Phase 2.6b).
+ */
+export const adminQuestUpdateSchema = z.object({
+  track: z.enum(QUEST_TRACKS).optional(),
+  order: z.number().int().nonnegative().optional(),
+  title: z.string().trim().min(2).max(120).optional(),
+  subtitle: z.string().trim().min(2).max(240).optional(),
+  description: z.string().trim().min(2).max(2000).optional(),
+  intro: z.string().trim().min(2).max(2000).optional(),
+  xpReward: z.number().int().nonnegative().max(10_000).optional(),
+  satsReward: z.number().int().nonnegative().max(1_000_000).optional(),
+  requiredLevel: z.number().int().positive().max(10).optional(),
+});
+
+export type AdminQuestUpdateBody = z.infer<typeof adminQuestUpdateSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**
