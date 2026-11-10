@@ -3,6 +3,7 @@ import { authenticate, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { getTransaction, getBlock, type Network } from "@/lib/bitlab/mempool";
 import { decodeInvoice } from "@/lib/bitlab/bolt11";
+import { verifyChallengeOrRespond } from "@/lib/bitlab/jwt";
 import { bitlabProofSchema, parseJsonBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/log";
 
@@ -36,12 +37,25 @@ export async function POST(req: Request) {
 
   const parsed = await parseJsonBody(req, bitlabProofSchema);
   if (!parsed.ok) return parsed.response;
-  const { questCode, kind, network, payload } = parsed.data;
+  const { questCode, kind, network, payload, challenge } = parsed.data;
 
   // Vérifie que la quête existe (pas de FK Prisma mais on refuse les quêtes inconnues).
   const quest = await db.quest.findUnique({ where: { code: questCode }, select: { id: true } });
   if (!quest) {
     return Response.json({ error: "Quête inconnue." }, { status: 404 });
+  }
+
+  // Si un JWT challenge est fourni, le vérifier et consommer le nonce.
+  if (challenge) {
+    const chk = await verifyChallengeOrRespond(challenge);
+    if (!chk.ok) return chk.response;
+    const claims = chk.claims;
+    if (claims.userId !== user.id || claims.questCode !== questCode || claims.kind !== kind) {
+      return Response.json(
+        { error: "JWT bitlab : paire (user, quest, kind) ne correspond pas." },
+        { status: 400 },
+      );
+    }
   }
 
   // Vérif explorateur selon le kind.

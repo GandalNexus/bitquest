@@ -421,9 +421,29 @@ export const bitlabProofSchema = z.object({
   kind: z.enum(BITLAB_PROOF_KINDS),
   network: z.enum(BITLAB_NETWORKS),
   payload: z.record(z.string(), z.unknown()).default({}),
+  /**
+   * JWT challenge optionnel. Si fourni, il est vérifié + le nonce est consommé.
+   * Phase 3 : foundation — on accepte encore les preuves sans JWT pour ne
+   * pas casser les tests. Un sprint ultérieur pourra rendre le JWT obligatoire.
+   */
+  challenge: z.string().optional(),
 });
 
 export type BitlabProofBody = z.infer<typeof bitlabProofSchema>;
+
+/* ---------- /api/bitlab/challenge ---------- */
+
+export const bitlabChallengeSchema = z.object({
+  questCode: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "questCode doit être en kebab-case."),
+  kind: z.enum(BITLAB_PROOF_KINDS),
+});
+
+export type BitlabChallengeBody = z.infer<typeof bitlabChallengeSchema>;
 
 /* ---------- Helper générique ---------- */
 
