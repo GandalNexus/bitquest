@@ -37,13 +37,12 @@ describe("logAdminAction", () => {
   });
 
   it("n'avale pas l'exception mais ne la relance pas", async () => {
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     createMock.mockRejectedValueOnce(new Error("boom"));
+    // Le logger pino écrit sur stdout — on vérifie juste la promesse résolue.
     await expect(
       logAdminAction("actor-3", "LESSON_DELETE", "lesson:x", { why: "orphan" }),
     ).resolves.toBeUndefined();
-    expect(spy).toHaveBeenCalled();
-    spy.mockRestore();
+    expect(createMock).toHaveBeenCalledOnce();
   });
 
   it("gère un meta avec valeurs non primitives (serialisation JSON)", async () => {

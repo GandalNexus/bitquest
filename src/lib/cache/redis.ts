@@ -1,4 +1,7 @@
 import Redis from "ioredis";
+import { logger } from "@/lib/log";
+
+const log = logger("redis");
 
 /* ============================================================
  * Client Redis lazy — Phase 1.4
@@ -33,17 +36,18 @@ async function createClient(): Promise<Redis | null> {
   client.on("error", (err) => {
     if (!errorLogged) {
       errorLogged = true;
-      console.warn("[redis] unavailable — falling back to in-memory", err.message);
+      log.warn({ err: err.message }, "redis unavailable — falling back to in-memory");
     }
   });
 
   try {
     await client.connect();
+    log.info({ url: url.replace(/:[^:/]+@/, ":***@") }, "redis connected");
     return client;
   } catch (err) {
-    console.warn(
-      "[redis] connect failed — falling back to in-memory",
-      err instanceof Error ? err.message : err,
+    log.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "redis connect failed — falling back to in-memory",
     );
     // Détache les listeners et termine proprement.
     client.disconnect();

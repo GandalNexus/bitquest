@@ -1,6 +1,9 @@
 import { db } from "@/lib/db";
 import { authenticate, unauthorized, rateLimit } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
+import { logger } from "@/lib/log";
+
+const log = logger("quest-progress");
 import {
   XP_RULES,
   QUIZ_PASS_THRESHOLD,
@@ -304,7 +307,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
     return Response.json({ error: "Action inconnue." }, { status: 400 });
   } catch (e) {
-    console.error("progress error", e);
+    log.error({ err: e, questCode: code, action: body.action, userId: user.id }, "progress handler failed");
     return Response.json({ error: "Erreur serveur." }, { status: 500 });
   }
 }

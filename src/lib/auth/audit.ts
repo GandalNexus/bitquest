@@ -1,4 +1,7 @@
 import { db } from "@/lib/db";
+import { logger } from "@/lib/log";
+
+const log = logger("admin-audit");
 
 /* ============================================================
  * Admin audit log — traces persistantes des mutations admin.
@@ -49,6 +52,6 @@ export async function logAdminAction(
       },
     });
   } catch (err) {
-    console.error("admin audit log failed", { action, resource, err });
+    log.error({ err, action, resource }, "admin audit log failed");
   }
 }

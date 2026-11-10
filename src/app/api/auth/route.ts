@@ -2,8 +2,11 @@ import { db } from "@/lib/db";
 import { publicUser } from "@/lib/bitquest/progression";
 import { buildSessionCookie, rateLimit } from "@/lib/bitquest/session";
 import { buildCsrfCookie, computeCsrfToken } from "@/lib/auth/csrf";
+import { logger } from "@/lib/log";
 import { authBodySchema, parseJsonBody } from "@/lib/validation/schemas";
 import crypto from "crypto";
+
+const log = logger("auth");
 
 /** Réponse JSON + Set-Cookie session (HttpOnly) + Set-Cookie CSRF (readable). */
 function jsonWithSession(payload: unknown, token: string): Response {
@@ -100,7 +103,7 @@ export async function POST(req: Request) {
     /* Branch impossible grâce à la discriminated union, mais TypeScript l'exige. */
     return Response.json({ error: "Action inconnue." }, { status: 400 });
   } catch (e) {
-    console.error("auth error", e);
+    log.error({ err: e, action: body.action }, "auth handler failed");
     return Response.json({ error: "Erreur serveur." }, { status: 500 });
   }
 }
