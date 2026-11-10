@@ -1,4 +1,5 @@
 import pino, { type Logger, type LoggerOptions } from "pino";
+import { captureException } from "@/lib/obs/sentry";
 
 /* ============================================================
  * Logger structuré — Phase 5.1b
@@ -75,7 +76,29 @@ function makeLogger(): Logger {
 /** Logger racine. Utiliser `log.child({ scope: "…" })` plutôt que ce singleton direct. */
 export const log = makeLogger();
 
-/** Helper ergonomique pour créer un sous-logger avec un scope nommé. */
+/**
+ * Helper ergonomique pour créer un sous-logger avec un scope nommé.
+ *
+ * On wrap `.error()` pour relayer automatiquement vers Sentry (si DSN
+ * configuré). Les callers ne font qu'un seul `log.error(...)` et la
+ * bascule observabilité est transparente.
+ */
 export function logger(scope: string): Logger {
-  return log.child({ scope });
+  const child = log.child({ scope });
+  const originalError = child.error.bind(child);
+  child.error = ((...args: Parameters<Logger["error"]>) => {
+    try {
+      const [first, msg] = args;
+      if (first && typeof first === "object" && "err" in first) {
+        const err = (first as { err: unknown }).err;
+        if (err) captureException(err, { scope, msg, ...(first as Record<string, unknown>) });
+      } else if (first instanceof Error) {
+        captureException(first, { scope, msg });
+      }
+    } catch {
+      /* Sentry no-op, swallow */
+    }
+    return originalError(...args);
+  }) as Logger["error"];
+  return child;
 }
