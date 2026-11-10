@@ -6,10 +6,7 @@ on:
   pull_request:
     branches: [main, develop]
 
-# Variables globales — SQLite est fourni via le fichier versionné db/custom.db,
-# aucune base externe n'est requise pour lint / typecheck / test / build.
 env:
-  DATABASE_URL: file:./db/custom.db
   NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
@@ -30,6 +27,8 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://bitquest:bitquest_ci@localhost:5432/bitquest?schema=public
 
       - name: Run linter (oxlint + eslint)
         run: npm run lint
@@ -51,6 +50,8 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://bitquest:bitquest_ci@localhost:5432/bitquest?schema=public
 
       - name: Run TypeScript compiler
         run: npm run typecheck
@@ -73,19 +74,113 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://bitquest:bitquest_ci@localhost:5432/bitquest?schema=public
 
       - name: Run unit tests
         run: npm test
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    # Depuis Phase 5.2 : tests Playwright qui requièrent Postgres + Redis + dev server.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bitquest
+          POSTGRES_PASSWORD: bitquest_ci
+          POSTGRES_DB: bitquest
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bitquest"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://bitquest:bitquest_ci@localhost:5432/bitquest?schema=public
+      REDIS_URL: redis://localhost:6379
+      CSRF_SECRET: ci-fixed-secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browsers (and OS deps)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright OS deps (cache hit case)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed database
+        run: npx tsx prisma/seed.ts
+
+      - name: Create test users (editor-test / learner-test)
+        run: node scripts/ci-test-users.js
+
+      - name: Build Next.js (non-blocking)
+        run: npm run build
+        continue-on-error: true
+
+      - name: Start dev server
+        run: nohup npx next dev -p 3000 > next.log 2>&1 &
+
+      - name: Wait for dev server ready
+        run: npx wait-on --timeout 90000 http://localhost:3000/api/health
+
+      - name: Run Playwright tests
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload dev server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-dev-log
+          path: next.log
+          retention-days: 7
 
   build:
     name: Build (non-blocking)
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
     # Known issue: pre-existing Next.js 16 + Turbopack prerender failure on
-    # /_global-error (TypeError: Cannot read properties of null reading
-    # 'useContext'). The failure predates the Phase 0 hygiene work and will
-    # be investigated in Phase 1 — see docs/PHASE_0_REPORT.md.
-    # Build is run for visibility but doesn't block the pipeline until fixed.
+    # /_global-error. Investigation reportée hors de ce lot.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -101,6 +196,8 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://bitquest:bitquest_ci@localhost:5432/bitquest?schema=public
 
       - name: Build Next.js
         run: npm run build
