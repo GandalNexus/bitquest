@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  Activity,
   BookOpen,
   ClipboardList,
   Flame,
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/admin/badges", label: "Badges", icon: Trophy },
   { href: "/admin/challenges", label: "Défis", icon: Flame },
   { href: "/admin/audit", label: "Audit log", icon: ClipboardList },
+  { href: "/admin/health", label: "État service", icon: Activity },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
