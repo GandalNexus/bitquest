@@ -78,6 +78,49 @@ export const adminChangeRoleSchema = z.object({
 
 export type AdminChangeRoleBody = z.infer<typeof adminChangeRoleSchema>;
 
+/* ---------- /api/admin/courses ---------- */
+
+/** Slug : kebab-case ASCII, 2-80 caractères, ne commence/termine pas par -. */
+export const slugSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(2, "Le slug doit contenir au moins 2 caractères.")
+  .max(80, "Le slug est trop long (80 max).")
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Le slug doit être en kebab-case (ex. mon-cours).");
+
+/**
+ * Horodatage ISO ou null. Un cours publié a `publishedAt` non null.
+ * L'entrée peut être `null`, une string ISO parse-able, ou absente (undefined).
+ */
+const publishedAtSchema = z
+  .union([z.string().datetime({ message: "Date ISO 8601 attendue." }), z.null()])
+  .optional();
+
+export const adminCourseCreateSchema = z.object({
+  slug: slugSchema,
+  title: z.string().trim().min(2).max(120),
+  subtitle: z.string().trim().min(2).max(240),
+  description: z.string().trim().min(2).max(2000),
+  coverIcon: z.string().trim().min(1).max(40).default("BookOpen"),
+  order: z.number().int().nonnegative().default(0),
+  publishedAt: publishedAtSchema,
+});
+
+export type AdminCourseCreateBody = z.infer<typeof adminCourseCreateSchema>;
+
+export const adminCourseUpdateSchema = z.object({
+  slug: slugSchema.optional(),
+  title: z.string().trim().min(2).max(120).optional(),
+  subtitle: z.string().trim().min(2).max(240).optional(),
+  description: z.string().trim().min(2).max(2000).optional(),
+  coverIcon: z.string().trim().min(1).max(40).optional(),
+  order: z.number().int().nonnegative().optional(),
+  publishedAt: publishedAtSchema,
+});
+
+export type AdminCourseUpdateBody = z.infer<typeof adminCourseUpdateSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**

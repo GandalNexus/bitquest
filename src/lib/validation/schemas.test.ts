@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   adminChangeRoleSchema,
+  adminCourseCreateSchema,
+  adminCourseUpdateSchema,
   authBodySchema,
   parseJsonBody,
   questProgressBodySchema,
+  slugSchema,
 } from "./schemas";
 
 /* ------------------------------------------------------------------ */
@@ -176,6 +179,116 @@ describe("adminChangeRoleSchema", () => {
 
   it("rejette un role non-string", () => {
     expect(adminChangeRoleSchema.safeParse({ role: 1 }).success).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* slugSchema                                                          */
+/* ------------------------------------------------------------------ */
+
+describe("slugSchema", () => {
+  it("accepte un slug kebab-case valide", () => {
+    for (const s of ["bitcoin", "fondamentaux-bitcoin", "ln-channels", "a1-b2"]) {
+      expect(slugSchema.safeParse(s).success).toBe(true);
+    }
+  });
+
+  it("normalise en lowercase et trim", () => {
+    const r = slugSchema.safeParse("  Bitcoin-101  ");
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data).toBe("bitcoin-101");
+  });
+
+  it("rejette les slugs trop courts ou trop longs", () => {
+    expect(slugSchema.safeParse("a").success).toBe(false);
+    expect(slugSchema.safeParse("x".repeat(81)).success).toBe(false);
+  });
+
+  it("rejette les caractères non autorisés (accents, _ , / , espaces)", () => {
+    expect(slugSchema.safeParse("héhé").success).toBe(false);
+    expect(slugSchema.safeParse("snake_case").success).toBe(false);
+    expect(slugSchema.safeParse("bit/coin").success).toBe(false);
+    expect(slugSchema.safeParse("avec espace").success).toBe(false);
+  });
+
+  it("rejette un slug commençant ou finissant par -", () => {
+    expect(slugSchema.safeParse("-bitcoin").success).toBe(false);
+    expect(slugSchema.safeParse("bitcoin-").success).toBe(false);
+    expect(slugSchema.safeParse("a--b").success).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* adminCourseCreateSchema / adminCourseUpdateSchema                   */
+/* ------------------------------------------------------------------ */
+
+describe("adminCourseCreateSchema", () => {
+  const base = {
+    slug: "fondamentaux-bitcoin",
+    title: "Fondamentaux Bitcoin",
+    subtitle: "Comprendre Bitcoin de l'intérieur.",
+    description: "Un parcours complet pour maîtriser les bases.",
+  };
+
+  it("valide un payload minimal (defaults appliqués)", () => {
+    const r = adminCourseCreateSchema.safeParse(base);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.coverIcon).toBe("BookOpen"); // default
+      expect(r.data.order).toBe(0); // default
+    }
+  });
+
+  it("accepte publishedAt null ou une date ISO", () => {
+    expect(adminCourseCreateSchema.safeParse({ ...base, publishedAt: null }).success).toBe(true);
+    expect(
+      adminCourseCreateSchema.safeParse({ ...base, publishedAt: new Date().toISOString() }).success,
+    ).toBe(true);
+  });
+
+  it("rejette publishedAt non-ISO", () => {
+    expect(
+      adminCourseCreateSchema.safeParse({ ...base, publishedAt: "yesterday" }).success,
+    ).toBe(false);
+  });
+
+  it("rejette un titre vide ou trop long", () => {
+    expect(adminCourseCreateSchema.safeParse({ ...base, title: "" }).success).toBe(false);
+    expect(adminCourseCreateSchema.safeParse({ ...base, title: "x".repeat(121) }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejette un slug mal formé", () => {
+    expect(adminCourseCreateSchema.safeParse({ ...base, slug: "invalide_ici" }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejette un order négatif ou non-entier", () => {
+    expect(adminCourseCreateSchema.safeParse({ ...base, order: -1 }).success).toBe(false);
+    expect(adminCourseCreateSchema.safeParse({ ...base, order: 1.5 }).success).toBe(false);
+  });
+});
+
+describe("adminCourseUpdateSchema", () => {
+  it("accepte un objet vide (patch sans champ)", () => {
+    expect(adminCourseUpdateSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("accepte un patch partiel", () => {
+    const r = adminCourseUpdateSchema.safeParse({ title: "Nouveau titre" });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data).toEqual({ title: "Nouveau titre" });
+  });
+
+  it("valide les mêmes contraintes que create pour les champs fournis", () => {
+    expect(adminCourseUpdateSchema.safeParse({ slug: "bad_slug" }).success).toBe(false);
+    expect(adminCourseUpdateSchema.safeParse({ order: -3 }).success).toBe(false);
+  });
+
+  it("accepte publishedAt null pour dépublier", () => {
+    expect(adminCourseUpdateSchema.safeParse({ publishedAt: null }).success).toBe(true);
   });
 });
 
