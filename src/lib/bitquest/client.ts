@@ -251,6 +251,7 @@ export type ProgressAction =
 /* ============ Client HTTP ============ */
 
 const SESSION_KEY = "bitquest_session";
+const CSRF_COOKIE = "bq_csrf";
 
 export function loadStoredSession(): { userId: string; token: string } | null {
   if (typeof window === "undefined") return null;
@@ -273,18 +274,39 @@ export function clearStoredSession() {
   window.localStorage.removeItem(SESSION_KEY);
 }
 
+/** Lit la valeur d'un cookie côté document (readable seulement). */
+export function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const target = `${name}=`;
+  for (const part of document.cookie.split(";")) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(target)) {
+      return decodeURIComponent(trimmed.slice(target.length));
+    }
+  }
+  return null;
+}
+
 async function request<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const session = loadStoredSession();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
+  // Back-compat : envoie les headers legacy tant que la session localStorage existe.
   if (session) {
     headers["x-gn-user-id"] = session.userId;
     headers["x-gn-token"] = session.token;
   }
+  // CSRF sur les mutations (si cookie disponible — sinon le serveur fera confiance aux headers legacy).
+  const method = init?.method ?? "GET";
+  if (method !== "GET" && method !== "HEAD") {
+    const csrf = readCookie(CSRF_COOKIE);
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+  }
   const res = await fetch(path, {
-    method: init?.method ?? "GET",
+    method,
     headers,
+    credentials: "include", // envoie bq_session (HttpOnly) et bq_csrf (readable)
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
@@ -337,6 +359,7 @@ export const api = {
       `/api/academy/lessons/${lessonId}/complete`,
       { method: "POST", body: {} },
     ),
+  logout: () => request<{ ok: true }>("/api/auth/logout", { method: "POST", body: {} }),
 };
 
 /* ============ Formats ============ */

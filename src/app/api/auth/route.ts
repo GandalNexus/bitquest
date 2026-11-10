@@ -1,18 +1,17 @@
 import { db } from "@/lib/db";
 import { publicUser } from "@/lib/bitquest/progression";
 import { buildSessionCookie, rateLimit } from "@/lib/bitquest/session";
+import { buildCsrfCookie, computeCsrfToken } from "@/lib/auth/csrf";
 import { authBodySchema, parseJsonBody } from "@/lib/validation/schemas";
 import crypto from "crypto";
 
-/** Réponse JSON + Set-Cookie avec le token de session. */
+/** Réponse JSON + Set-Cookie session (HttpOnly) + Set-Cookie CSRF (readable). */
 function jsonWithSession(payload: unknown, token: string): Response {
-  return new Response(JSON.stringify(payload), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Set-Cookie": buildSessionCookie(token, { maxAgeSeconds: 60 * 60 * 24 * 30 }),
-    },
-  });
+  const maxAge = 60 * 60 * 24 * 30; // 30 jours
+  const headers = new Headers({ "Content-Type": "application/json" });
+  headers.append("Set-Cookie", buildSessionCookie(token, { maxAgeSeconds: maxAge }));
+  headers.append("Set-Cookie", buildCsrfCookie(computeCsrfToken(token), { maxAgeSeconds: maxAge }));
+  return new Response(JSON.stringify(payload), { status: 200, headers });
 }
 
 function hashPassword(password: string): string {

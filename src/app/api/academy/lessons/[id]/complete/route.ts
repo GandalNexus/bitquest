@@ -1,4 +1,5 @@
 import { authenticate, rateLimit, unauthorized } from "@/lib/bitquest/session";
+import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { completeLesson } from "@/lib/bitquest/academy";
 
 /** Marque une leçon comme terminée pour l'utilisateur authentifié (idempotent). */
@@ -8,6 +9,10 @@ export async function POST(
 ) {
   const user = await authenticate(req);
   if (!user) return unauthorized();
+  if (isCookieAuthenticated(req)) {
+    const csrf = requireCsrf(req, user.token);
+    if (!csrf.ok) return csrf.response;
+  }
   if (!rateLimit(`lesson-complete:${user.id}`, 60, 60_000)) {
     return Response.json({ error: "Trop de requêtes, réessaie dans un instant." }, { status: 429 });
   }

@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { authenticate, unauthorized, rateLimit } from "@/lib/bitquest/session";
+import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import {
   XP_RULES,
   QUIZ_PASS_THRESHOLD,
@@ -30,6 +31,10 @@ async function touchStreak(userId: string) {
 export async function POST(req: Request, { params }: { params: Promise<{ code: string }> }) {
   const user = await authenticate(req);
   if (!user) return unauthorized();
+  if (isCookieAuthenticated(req)) {
+    const csrf = requireCsrf(req, user.token);
+    if (!csrf.ok) return csrf.response;
+  }
   if (!rateLimit("progress:" + user.id, 100, 60_000)) {
     return Response.json({ error: "Trop de requêtes, ralentis un peu." }, { status: 429 });
   }

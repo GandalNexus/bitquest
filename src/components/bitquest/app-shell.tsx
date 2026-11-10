@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useBitQuest, type View } from "@/lib/bitquest/store";
 import { useMe } from "@/lib/bitquest/hooks";
-import { clearStoredSession } from "@/lib/bitquest/client";
+import { api, clearStoredSession } from "@/lib/bitquest/client";
 import { XpBar } from "./ui-bits";
 import { OrbiteMark, QuestBubble } from "./brand";
 import { formatSats } from "@/lib/bitquest/client";
@@ -60,7 +60,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const me = data?.user ?? user;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch {
+      // Déconnexion locale même si le serveur ne répond pas.
+    }
     clearStoredSession();
     logout();
     window.location.reload();
