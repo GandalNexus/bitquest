@@ -1,6 +1,8 @@
 "use client";
 
 import { useTheme } from "next-themes";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useBitQuest, type View } from "@/lib/bitquest/store";
 import { useMe } from "@/lib/bitquest/hooks";
 import { clearStoredSession } from "@/lib/bitquest/client";
@@ -26,15 +28,16 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
-const NAV: { view: View; label: string; icon: LucideIcon }[] = [
-  { view: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-  { view: "quests", label: "Quêtes", icon: Map },
-  { view: "profile", label: "Profil", icon: User },
-  { view: "wallet", label: "Wallet", icon: Wallet },
-  { view: "leaderboard", label: "Classement", icon: Trophy },
+const NAV: { view: View; href: string; label: string; icon: LucideIcon }[] = [
+  { view: "dashboard", href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
+  { view: "quests", href: "/quests", label: "Quêtes", icon: Map },
+  { view: "profile", href: "/profile", label: "Profil", icon: User },
+  { view: "wallet", href: "/wallet", label: "Wallet", icon: Wallet },
+  { view: "leaderboard", href: "/leaderboard", label: "Classement", icon: Trophy },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const view = useBitQuest((s) => s.view);
   const setView = useBitQuest((s) => s.setView);
   const user = useBitQuest((s) => s.user);
@@ -42,7 +45,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data } = useMe();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  /** Détermine l'onglet actif : URL si on est sur une route /dashboard|/quests|…, sinon store.view (mode SPA /) */
+  const isRouteMode = pathname !== null && pathname !== "/" && !pathname.startsWith("/academy");
+  const isActive = (href: string, v: View) => {
+    if (isRouteMode) return pathname === href || pathname.startsWith(href + "/");
+    return view === v;
+  };
 
   useEffect(() => {
     const t = window.setTimeout(() => setMounted(true), 0);
@@ -66,14 +75,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3">
           {/* Lockup BitQuest : logo + bulle « Quest » (même pattern que « Lab » dans BitLab) */}
-          <button
+          <Link
+            href="/dashboard"
             className="flex items-center gap-2"
-            onClick={() => setView("dashboard")}
             aria-label="BitQuest — accueil"
+            onClick={() => setView("dashboard")}
           >
             <OrbiteMark className="h-8 w-8 shrink-0 text-foreground" />
             <QuestBubble className="hidden min-[400px]:inline-block" />
-          </button>
+          </Link>
 
           {/* Stats */}
           {me && (
@@ -137,22 +147,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Nav desktop */}
         <nav aria-label="Navigation principale" className="hidden border-t md:block">
           <div className="mx-auto flex w-full max-w-6xl gap-1 px-4">
-            {NAV.map((item) => (
-              <button
-                key={item.view}
-                onClick={() => setView(item.view)}
-                aria-current={view === item.view ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
-                  view === item.view
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </button>
-            ))}
+            {NAV.map((item) => {
+              const active = isActive(item.href, item.view);
+              return (
+                <Link
+                  key={item.view}
+                  href={item.href}
+                  onClick={() => setView(item.view)}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
+                    active
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
           </div>
         </nav>
       </header>
@@ -167,20 +181,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         aria-label="Navigation mobile"
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-background/95 backdrop-blur md:hidden"
       >
-        {NAV.map((item) => (
-          <button
-            key={item.view}
-            onClick={() => setView(item.view)}
-            aria-current={view === item.view ? "page" : undefined}
-            className={cn(
-              "flex min-h-[56px] flex-col items-center justify-center gap-0.5 text-[10px] font-medium",
-              view === item.view ? "text-primary" : "text-muted-foreground",
-            )}
-          >
-            <item.icon className="h-5 w-5" />
-            {item.label.split(" ")[0]}
-          </button>
-        ))}
+        {NAV.map((item) => {
+          const active = isActive(item.href, item.view);
+          return (
+            <Link
+              key={item.view}
+              href={item.href}
+              onClick={() => setView(item.view)}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex min-h-[56px] flex-col items-center justify-center gap-0.5 text-[10px] font-medium",
+                active ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              <item.icon className="h-5 w-5" />
+              {item.label.split(" ")[0]}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* ===== Footer sticky ===== */}

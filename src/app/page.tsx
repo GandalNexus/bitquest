@@ -63,6 +63,10 @@ function BitQuestApp() {
           code={activeQuestCode}
           onExit={closeQuest}
           onCompleted={closeQuest}
+          onGoToDashboard={() => {
+            setView("dashboard");
+            closeQuest();
+          }}
         />
       ) : (
         <>

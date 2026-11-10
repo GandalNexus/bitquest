@@ -15,6 +15,8 @@ import {
   Trophy,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -127,10 +129,10 @@ function AcademyTeaser() {
             commencer ou reprendre un cours.
           </p>
           <Button asChild className="w-full sm:w-auto">
-            <a href="/academy">
+            <Link href="/academy">
               Explorer l&apos;Académie
               <ArrowRight className="h-4 w-4" aria-hidden />
-            </a>
+            </Link>
           </Button>
         </CardContent>
       </Card>
@@ -202,13 +204,26 @@ function OnboardingBanner({ onStart }: { onStart: () => void }) {
 
 /* ============ Dashboard ============ */
 
+/**
+ * Dashboard — utilisable à la fois en mode SPA (via props onOpenQuest/onNavigate)
+ * et en mode routes (sans props : navigation via Link / router.push).
+ */
 export function Dashboard({
   onOpenQuest,
   onNavigate,
 }: {
-  onOpenQuest: (code: string) => void;
-  onNavigate: (view: View) => void;
-}) {
+  onOpenQuest?: (code: string) => void;
+  onNavigate?: (view: View) => void;
+} = {}) {
+  const router = useRouter();
+  const openQuest = (code: string) => {
+    if (onOpenQuest) onOpenQuest(code);
+    else router.push(`/quests/${code}`);
+  };
+  const navigate = (view: View) => {
+    if (onNavigate) onNavigate(view);
+    else router.push(`/${view}`);
+  };
   const meQuery = useMe();
   const questsQuery = useQuests();
 
@@ -301,7 +316,7 @@ export function Dashboard({
       </motion.section>
 
       {/* ===== Onboarding (D3 — nouveaux comptes uniquement) ===== */}
-      {showOnboarding && <OnboardingBanner onStart={() => onOpenQuest(firstAvailableCode)} />}
+      {showOnboarding && <OnboardingBanner onStart={() => openQuest(firstAvailableCode)} />}
 
       {/* ===== StatCards ===== */}
       <motion.section
@@ -360,7 +375,7 @@ export function Dashboard({
                       <Button
                         size="lg"
                         className="h-10 w-full sm:w-auto"
-                        onClick={() => onOpenQuest(nextQuest.code)}
+                        onClick={() => openQuest(nextQuest.code)}
                       >
                         {nextQuest.status === "AVAILABLE" ? "Commencer" : "Reprendre"} :{" "}
                         {nextQuest.title}
@@ -376,7 +391,7 @@ export function Dashboard({
                       Tu maîtrises désormais les fondamentaux de Bitcoin et du Lightning Network.
                       Compare ton XP aux autres aventuriers.
                     </p>
-                    <Button size="lg" className="h-10" onClick={() => onNavigate("leaderboard")}>
+                    <Button size="lg" className="h-10" onClick={() => navigate("leaderboard")}>
                       Voir le classement
                       <Trophy className="h-4 w-4" aria-hidden />
                     </Button>
@@ -391,7 +406,7 @@ export function Dashboard({
                       variant="outline"
                       size="lg"
                       className="h-10"
-                      onClick={() => onNavigate("leaderboard")}
+                      onClick={() => navigate("leaderboard")}
                     >
                       Voir le classement
                     </Button>
@@ -499,7 +514,7 @@ export function Dashboard({
                         variant="link"
                         size="sm"
                         className="text-muted-foreground"
-                        onClick={() => onNavigate("quests")}
+                        onClick={() => navigate("quests")}
                       >
                         Aller vers les quêtes
                         <ArrowRight className="h-3.5 w-3.5" aria-hidden />

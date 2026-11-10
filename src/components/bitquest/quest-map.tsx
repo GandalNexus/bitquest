@@ -2,6 +2,7 @@
 
 import { Fragment } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { BookOpen, CheckCircle2, ChevronRight, Lock, Map, Play, Target, Zap } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -71,7 +72,7 @@ function QuestCard({
 }: {
   quest: QuestState;
   index: number;
-  onOpenQuest: (code: string) => void;
+  onOpenQuest?: (code: string) => void;
 }) {
   const ts = getTrackStyle(quest.track);
   const locked = quest.locked;
@@ -143,7 +144,7 @@ function QuestCard({
     >
       {locked ? (
         <div aria-disabled="true">{card}</div>
-      ) : (
+      ) : onOpenQuest ? (
         <button
           type="button"
           onClick={() => onOpenQuest(quest.code)}
@@ -152,6 +153,14 @@ function QuestCard({
         >
           {card}
         </button>
+      ) : (
+        <Link
+          href={`/quests/${quest.code}`}
+          aria-label={`Ouvrir la quête ${quest.title}`}
+          className="block w-full text-left"
+        >
+          {card}
+        </Link>
       )}
     </motion.div>
   );
@@ -164,7 +173,7 @@ function TrackSection({
 }: {
   track: string;
   quests: QuestState[];
-  onOpenQuest: (code: string) => void;
+  onOpenQuest?: (code: string) => void;
 }) {
   const ts = getTrackStyle(track);
   const doneCount = quests.filter((q) => q.status === "COMPLETED").length;
@@ -196,7 +205,7 @@ function TrackSection({
   );
 }
 
-export function QuestMap({ onOpenQuest }: { onOpenQuest: (code: string) => void }) {
+export function QuestMap({ onOpenQuest }: { onOpenQuest?: (code: string) => void } = {}) {
   const { data, isLoading, isError, refetch } = useQuests();
 
   if (isLoading) {

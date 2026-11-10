@@ -35,7 +35,6 @@ import type {
   QuizSubmitResponse,
 } from "@/lib/bitquest/client";
 import { useInvalidateAll, useQuestDetail } from "@/lib/bitquest/hooks";
-import { useBitQuest } from "@/lib/bitquest/store";
 import {
   BadgeIcon,
   EmptyState,
@@ -804,14 +803,15 @@ export function QuestPlayer({
   code,
   onExit,
   onCompleted,
+  onGoToDashboard,
 }: {
   code: string;
   onExit: () => void;
   onCompleted: () => void;
+  onGoToDashboard?: () => void;
 }) {
   const { toast } = useToast();
   const invalidateAll = useInvalidateAll();
-  const setView = useBitQuest((s) => s.setView);
   const { data: detail, isLoading, isError, refetch } = useQuestDetail(code);
 
   const [step, setStep] = useState<Step>("intro");
@@ -1134,10 +1134,7 @@ export function QuestPlayer({
               questTitle={quest.title}
               rewards={rewards}
               onBackToMap={onCompleted}
-              onDashboard={() => {
-                setView("dashboard");
-                onCompleted();
-              }}
+              onDashboard={onGoToDashboard ?? onCompleted}
             />
           )}
         </motion.div>
