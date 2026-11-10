@@ -49,6 +49,7 @@ model Quest {
   requiredLevel  Int    @default(1)
   missionType    String
   missionConfig  String // JSON config for the BitLab mission generator
+  missionKind    String @default("SIMULATED") // SIMULATED | BITLAB_PROOF (Phase 3)
 
   quizQuestions QuizQuestion[]
   progress      UserQuestProgress[]

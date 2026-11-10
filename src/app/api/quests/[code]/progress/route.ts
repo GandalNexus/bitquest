@@ -209,23 +209,75 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     if (body.action === "mission_submit") {
       await touchStreak(user.id);
       const p = await ensureProgress();
-      if (!p.missionSession) {
-        return Response.json(
-          { error: "Aucune mission en cours. Lance d'abord la mission dans BitLab." },
-          { status: 400 },
-        );
-      }
       if (p.status === "COMPLETED") {
         return Response.json({ error: "Quête déjà complétée." }, { status: 400 });
       }
       if (p.missionAttempts >= MISSION_MAX_ATTEMPTS) {
         return Response.json({ error: "Nombre maximum de tentatives atteint." }, { status: 429 });
       }
-      const session = JSON.parse(p.missionSession) as {
-        challenge: Record<string, unknown>;
-        expected: Record<string, unknown>;
-      };
-      const result = validateMission(quest.missionType, session, body.answer);
+
+      /**
+       * Phase 3 : les quêtes BITLAB_PROOF utilisent une vraie preuve
+       * (testnet/signet) persistée via /api/bitlab/proof. On consomme
+       * une BitLabProof non-consumed à la place du simulated validator.
+       */
+      let result: { success: boolean; feedback: string; proof?: Record<string, unknown> };
+      if (quest.missionKind === "BITLAB_PROOF") {
+        const proof = await db.bitLabProof.findFirst({
+          where: { userId: user.id, questCode: quest.code, consumed: false },
+          orderBy: { verifiedAt: "desc" },
+        });
+        if (!proof) {
+          await db.userQuestProgress.update({
+            where: { id: p.id },
+            data: { missionAttempts: p.missionAttempts + 1 },
+          });
+          const refreshed = await db.userQuestProgress.findUniqueOrThrow({ where: { id: p.id } });
+          return Response.json({
+            success: false,
+            feedback:
+              "Aucune preuve BitLab enregistrée. Soumets d'abord ta preuve via /api/bitlab/proof.",
+            attemptsLeft: Math.max(0, MISSION_MAX_ATTEMPTS - refreshed.missionAttempts),
+            progress: refreshed,
+          });
+        }
+        // Marque la preuve comme consommée dans la même mise à jour atomique que les attempts.
+        await db.bitLabProof.update({
+          where: { id: proof.id },
+          data: { consumed: true },
+        });
+        const parsedPayload = (() => {
+          try {
+            return JSON.parse(proof.payload) as Record<string, unknown>;
+          } catch {
+            return {};
+          }
+        })();
+        result = {
+          success: true,
+          feedback: "Preuve BitLab vérifiée — mission validée !",
+          proof: {
+            type: proof.kind.toLowerCase(),
+            network: proof.network,
+            verifiedAt: proof.verifiedAt.toISOString(),
+            ...parsedPayload,
+          },
+        };
+      } else {
+        // Chemin historique SIMULATED : validator local.
+        if (!p.missionSession) {
+          return Response.json(
+            { error: "Aucune mission en cours. Lance d'abord la mission dans BitLab." },
+            { status: 400 },
+          );
+        }
+        const session = JSON.parse(p.missionSession) as {
+          challenge: Record<string, unknown>;
+          expected: Record<string, unknown>;
+        };
+        result = validateMission(quest.missionType, session, body.answer);
+      }
+
       await db.userQuestProgress.update({
         where: { id: p.id },
         data: { missionAttempts: p.missionAttempts + 1 },
