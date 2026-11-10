@@ -445,6 +445,14 @@ export const bitlabChallengeSchema = z.object({
 
 export type BitlabChallengeBody = z.infer<typeof bitlabChallengeSchema>;
 
+/* ---------- /api/auth/verify-email ---------- */
+
+export const verifyEmailSchema = z.object({
+  token: z.string().trim().min(16).max(128),
+});
+
+export type VerifyEmailBody = z.infer<typeof verifyEmailSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**

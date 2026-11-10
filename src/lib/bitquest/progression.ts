@@ -224,6 +224,7 @@ export function publicUser(user: {
   lastActiveDate: string | null;
   createdAt: Date;
   role?: string;
+  emailVerifiedAt?: Date | null;
 }) {
   return {
     id: user.id,
@@ -237,6 +238,7 @@ export function publicUser(user: {
     lastActiveDate: user.lastActiveDate,
     createdAt: user.createdAt,
     role: normalizeRole(user.role),
+    emailVerified: user.emailVerifiedAt !== null && user.emailVerifiedAt !== undefined,
     levelInfo: levelInfo(user.xp),
   };
 }

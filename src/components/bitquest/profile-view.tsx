@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   CheckCircle2,
   Coins,
   Flame,
   KeyRound,
+  Loader2,
   Lock,
   Mail,
   Map as MapIcon,
@@ -16,7 +18,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMe } from "@/lib/bitquest/hooks";
-import { formatDate } from "@/lib/bitquest/client";
+import { api, formatDate } from "@/lib/bitquest/client";
+import { useToast } from "@/hooks/use-toast";
 import {
   BadgeIcon,
   EmptyState,
@@ -35,6 +38,69 @@ const roleStyles: Record<string, string> = {
   ADMIN: "border-rose-500/40 bg-rose-500/10 text-rose-500",
   EDITOR: "border-amber-500/40 bg-amber-500/10 text-amber-500",
 };
+
+/**
+ * Sous-composant : propose de (ré)envoyer l'email de vérification.
+ * En dev, l'URL est retournée directement et affichée pour éviter SMTP.
+ */
+function EmailVerifyCta() {
+  const { toast } = useToast();
+  const [pending, setPending] = useState(false);
+  const [devUrl, setDevUrl] = useState<string | null>(null);
+
+  const onSend = async () => {
+    setPending(true);
+    try {
+      const res = await api.sendEmailVerification();
+      if (res.alreadyVerified) {
+        toast({ title: "Email déjà vérifié." });
+      } else {
+        setDevUrl(res.devUrl ?? null);
+        toast({
+          title: "Lien de vérification envoyé",
+          description: res.devUrl
+            ? "Développement : voir le lien ci-dessous."
+            : "Consulte ta boîte mail.",
+        });
+      }
+    } catch (e) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: e instanceof Error ? e.message : "Erreur inconnue.",
+      });
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <span className="ml-1 inline-flex flex-wrap items-center gap-1 text-[11px]">
+      <Badge variant="outline" className="gap-1 border-amber-500/40 bg-amber-500/10 text-amber-500">
+        Non vérifié
+      </Badge>
+      <button
+        type="button"
+        onClick={onSend}
+        disabled={pending}
+        className="text-primary underline-offset-2 hover:underline disabled:opacity-60"
+      >
+        {pending ? (
+          <>
+            <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> envoi…
+          </>
+        ) : (
+          "Renvoyer le lien"
+        )}
+      </button>
+      {devUrl && (
+        <code className="block w-full truncate rounded bg-muted px-1 py-0.5 font-mono text-[10px]" title={devUrl}>
+          {devUrl}
+        </code>
+      )}
+    </span>
+  );
+}
 
 /* Anneaux de rareté (rarityStyles n'expose pas de ring) */
 const RARITY_RING: Record<string, string> = {
@@ -108,6 +174,17 @@ export function ProfileView() {
                   <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
                     <Mail className="h-3 w-3" aria-hidden />
                     {user.email}
+                    {user.emailVerified ? (
+                      <Badge
+                        variant="outline"
+                        className="ml-1 gap-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
+                      >
+                        <CheckCircle2 className="h-3 w-3" aria-hidden />
+                        Vérifié
+                      </Badge>
+                    ) : (
+                      <EmailVerifyCta />
+                    )}
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">

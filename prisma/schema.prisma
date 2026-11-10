@@ -23,6 +23,8 @@ model User {
   lastActiveDate  String?
   createdAt       DateTime @default(now())
   deletedAt       DateTime? // soft-delete RGPD : row conservée pour l'audit, PII effacées à la suppression
+  emailVerifiedAt DateTime? // null = email non vérifié
+  verificationToken String? @unique // token actif courant (null une fois utilisé)
 
   progress       UserQuestProgress[]
   badges         UserBadge[]

@@ -23,6 +23,7 @@ export interface PublicUser {
   lastActiveDate: string | null;
   createdAt: string;
   role: Role;
+  emailVerified: boolean;
   levelInfo: LevelInfo;
 }
 
@@ -360,6 +361,11 @@ export const api = {
       { method: "POST", body: {} },
     ),
   logout: () => request<{ ok: true }>("/api/auth/logout", { method: "POST", body: {} }),
+  sendEmailVerification: () =>
+    request<{ ok: true; alreadyVerified?: boolean; devUrl?: string }>(
+      "/api/auth/verification/send",
+      { method: "POST", body: {} },
+    ),
   todayChallenge: () =>
     request<{
       challenge: {

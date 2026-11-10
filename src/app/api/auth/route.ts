@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { publicUser } from "@/lib/bitquest/progression";
 import { buildSessionCookie, rateLimit } from "@/lib/bitquest/session";
 import { buildCsrfCookie, computeCsrfToken } from "@/lib/auth/csrf";
+import { buildVerificationUrl, generateVerificationToken } from "@/lib/auth/email-verification";
 import { logger } from "@/lib/log";
 import { authBodySchema, parseJsonBody } from "@/lib/validation/schemas";
 import crypto from "crypto";
@@ -57,15 +58,21 @@ export async function POST(req: Request) {
       if (existingPseudo) {
         return Response.json({ error: "Ce pseudo est déjà pris." }, { status: 409 });
       }
+      const verificationToken = generateVerificationToken();
       const user = await db.user.create({
         data: {
           email,
           pseudo,
           passwordHash: hashPassword(password),
           token: crypto.randomBytes(24).toString("hex"),
+          verificationToken,
           lastActiveDate: new Date().toISOString().slice(0, 10),
         },
       });
+      log.info(
+        { userId: user.id, email: user.email, verificationUrl: buildVerificationUrl(verificationToken) },
+        "registration: verification URL emitted (console-only in dev)",
+      );
       return jsonWithSession({ user: publicUser(user), token: user.token }, user.token);
     }
 
