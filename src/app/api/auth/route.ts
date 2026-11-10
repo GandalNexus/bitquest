@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     }
 
     if (body.action === "guest") {
-      if (!rateLimit("guest:" + (req.headers.get("x-forwarded-for") ?? "local"), 10, 60_000)) {
+      if (!(await rateLimit("guest:" + (req.headers.get("x-forwarded-for") ?? "local"), 10, 60_000))) {
         return Response.json({ error: "Trop de tentatives, réessaie dans une minute." }, { status: 429 });
       }
       const base = GUEST_NAMES[Math.floor(Math.random() * GUEST_NAMES.length)];

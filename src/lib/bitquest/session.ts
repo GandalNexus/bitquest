@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getRedis } from "@/lib/cache/redis";
 
 /* ============================================================
  * Session BitQuest.
@@ -89,11 +90,12 @@ export function unauthorized() {
   return Response.json({ error: "Session invalide ou expirée." }, { status: 401 });
 }
 
-/* ============ Rate limiting simple en mémoire ============ */
+/* ============ Rate limiting (Redis si dispo, fallback in-memory) ============ */
 
 const hits = new Map<string, number[]>();
 
-export function rateLimit(key: string, max: number, windowMs: number): boolean {
+/** Backend in-memory — fenêtre glissante par clé. Export pour tests. */
+export function rateLimitInMemory(key: string, max: number, windowMs: number): boolean {
   const now = Date.now();
   const arr = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
   if (arr.length >= max) {
@@ -103,4 +105,30 @@ export function rateLimit(key: string, max: number, windowMs: number): boolean {
   arr.push(now);
   hits.set(key, arr);
   return true;
+}
+
+/**
+ * Rate limit distribué : fenêtre fixe par clé via Redis INCR + EXPIRE.
+ *
+ * - Premier hit dans la fenêtre : INCR retourne 1, on pose EXPIRE.
+ * - Hits suivants : INCR incrémente ; on refuse si > max.
+ * - Si Redis répond en erreur, on retombe sur le backend in-memory
+ *   pour ne jamais bloquer le flux utilisateur.
+ *
+ * Note : fenêtre fixe (pas glissante) côté Redis — plus simple et
+ * suffisant pour les protections anti-abus en place.
+ */
+export async function rateLimit(key: string, max: number, windowMs: number): Promise<boolean> {
+  const redis = await getRedis();
+  if (!redis) return rateLimitInMemory(key, max, windowMs);
+  try {
+    const bucketKey = `rl:${key}`;
+    const current = await redis.incr(bucketKey);
+    if (current === 1) {
+      await redis.pexpire(bucketKey, windowMs);
+    }
+    return current <= max;
+  } catch {
+    return rateLimitInMemory(key, max, windowMs);
+  }
 }

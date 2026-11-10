@@ -22,11 +22,15 @@ services:
       - NODE_ENV=development
       # Chemin absolu : non ambigu dans le conteneur, insensible au CWD de Prisma.
       - DATABASE_URL=file:/app/db/custom.db
+      # Redis pour le rate-limit distribué (fallback in-memory si indispo).
+      - REDIS_URL=redis://redis:6379
       # HMR fiable sur macOS (osxfs/virtiofs ne propage pas toujours inotify).
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
       # Désactive la télémétrie Next (évite les appels réseau au démarrage).
       - NEXT_TELEMETRY_DISABLED=1
+    depends_on:
+      - redis
     volumes:
       # Code source complet, en mode "cached" pour les perfs sur macOS.
       - ./:/app:cached
@@ -46,8 +50,22 @@ services:
     # redéclare ici pour qu'elle soit évidente à la lecture du compose.
     command: ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]
 
+  # Redis utilisé pour le rate-limit distribué. Optionnel en dev : si on
+  # arrête ce service (ou si REDIS_URL est vide), le code retombe sur
+  # une Map en mémoire (voir src/lib/cache/redis.ts).
+  redis:
+    image: redis:7-alpine
+    container_name: bitquest-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
 volumes:
   node_modules:
     name: bitquest_node_modules
   next_cache:
     name: bitquest_next_cache
+  redis_data:
+    name: bitquest_redis_data

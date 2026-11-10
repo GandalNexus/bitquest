@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     const csrf = requireCsrf(req, user.token);
     if (!csrf.ok) return csrf.response;
   }
-  if (!rateLimit("progress:" + user.id, 100, 60_000)) {
+  if (!(await rateLimit("progress:" + user.id, 100, 60_000))) {
     return Response.json({ error: "Trop de requêtes, ralentis un peu." }, { status: 429 });
   }
   const { code } = await params;

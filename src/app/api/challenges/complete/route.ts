@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const csrf = requireCsrf(req, user.token);
     if (!csrf.ok) return csrf.response;
   }
-  if (!rateLimit(`challenge:${user.id}`, 10, 60_000)) {
+  if (!(await rateLimit(`challenge:${user.id}`, 10, 60_000))) {
     return Response.json({ error: "Trop de requêtes, patiente une minute." }, { status: 429 });
   }
 

@@ -13,7 +13,7 @@ export async function POST(
     const csrf = requireCsrf(req, user.token);
     if (!csrf.ok) return csrf.response;
   }
-  if (!rateLimit(`lesson-complete:${user.id}`, 60, 60_000)) {
+  if (!(await rateLimit(`lesson-complete:${user.id}`, 60, 60_000))) {
     return Response.json({ error: "Trop de requêtes, réessaie dans un instant." }, { status: 429 });
   }
   const { id } = await params;
