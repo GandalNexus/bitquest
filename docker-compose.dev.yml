@@ -20,8 +20,8 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      # Chemin absolu : non ambigu dans le conteneur, insensible au CWD de Prisma.
-      - DATABASE_URL=file:/app/db/custom.db
+      # Postgres via le service `postgres` défini ci-dessous.
+      - DATABASE_URL=postgresql://bitquest:bitquest_dev_password@postgres:5432/bitquest?schema=public
       # Redis pour le rate-limit distribué (fallback in-memory si indispo).
       - REDIS_URL=redis://redis:6379
       # HMR fiable sur macOS (osxfs/virtiofs ne propage pas toujours inotify).
@@ -30,7 +30,10 @@ services:
       # Désactive la télémétrie Next (évite les appels réseau au démarrage).
       - NEXT_TELEMETRY_DISABLED=1
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
       # Code source complet, en mode "cached" pour les perfs sur macOS.
       - ./:/app:cached
@@ -49,6 +52,25 @@ services:
     # La commande est également définie dans le Dockerfile.dev ; on la
     # redéclare ici pour qu'elle soit évidente à la lecture du compose.
     command: ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]
+
+  # PostgreSQL : backend de production, remplace SQLite depuis Phase 0.4.
+  postgres:
+    image: postgres:16-alpine
+    container_name: bitquest-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: bitquest
+      POSTGRES_PASSWORD: bitquest_dev_password
+      POSTGRES_DB: bitquest
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bitquest"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
 
   # Redis utilisé pour le rate-limit distribué. Optionnel en dev : si on
   # arrête ce service (ou si REDIS_URL est vide), le code retombe sur
@@ -69,3 +91,5 @@ volumes:
     name: bitquest_next_cache
   redis_data:
     name: bitquest_redis_data
+  postgres_data:
+    name: bitquest_postgres_data

@@ -54,6 +54,9 @@ server.log
 /skills/
 
 # Snapshots locaux de la base SQLite (ne jamais versionner)
+# Note : depuis Phase 0.4, la base principale est Postgres (bitquest_postgres_data).
+# Les fichiers SQLite ci-dessous sont conservés pour l'historique mais ne sont
+# plus utilisés par l'app en dev.
 /db/*.bak*
 /db/*.db-journal
 /db/*.sqlite*
