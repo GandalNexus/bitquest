@@ -22,6 +22,7 @@ model User {
   streak          Int      @default(1)
   lastActiveDate  String?
   createdAt       DateTime @default(now())
+  deletedAt       DateTime? // soft-delete RGPD : row conservée pour l'audit, PII effacées à la suppression
 
   progress       UserQuestProgress[]
   badges         UserBadge[]

@@ -383,6 +383,8 @@ export const api = {
     }>("/api/challenges/complete", { method: "POST", body: {} }),
   changePassword: (body: { currentPassword: string; newPassword: string }) =>
     request<{ ok: true; token: string }>("/api/me/password", { method: "POST", body }),
+  deleteAccount: (body: { confirmation: "DELETE"; currentPassword?: string }) =>
+    request<{ ok: true }>("/api/me/delete", { method: "POST", body }),
 };
 
 /* ============ Formats ============ */

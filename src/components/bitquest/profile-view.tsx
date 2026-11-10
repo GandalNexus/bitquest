@@ -27,6 +27,7 @@ import {
   rarityStyles,
   trackStyles,
 } from "./ui-bits";
+import { AccountDeleteForm } from "./account-delete-form";
 import { PasswordChangeForm } from "./password-change-form";
 import { cn } from "@/lib/utils";
 
@@ -223,6 +224,23 @@ export function ProfileView() {
           </Card>
         </motion.section>
       )}
+
+      {/* ===== Zone de suppression RGPD ===== */}
+      <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.14 }}>
+        <Card className="rounded-xl border-destructive/20">
+          <CardHeader>
+            <CardTitle className="text-destructive">Supprimer mon compte</CardTitle>
+            <CardDescription>
+              RGPD · ton pseudo et ton email sont anonymisés, ton mot de passe effacé.
+              Les scores des autres apprenants restent cohérents.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AccountDeleteForm isGuest={user.isGuest} />
+          </CardContent>
+        </Card>
+      </motion.section>
+
 
       {/* ===== Historique des quêtes ===== */}
       <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.15 }}>

@@ -73,14 +73,14 @@ export async function authenticate(req: Request) {
   const cookieToken = cookies[SESSION_COOKIE];
   if (cookieToken) {
     const user = await db.user.findUnique({ where: { token: cookieToken } });
-    if (user) return user;
+    if (user && user.deletedAt === null) return user;
   }
 
   const userId = req.headers.get("x-gn-user-id");
   const headerToken = req.headers.get("x-gn-token");
   if (userId && headerToken) {
     const user = await db.user.findUnique({ where: { id: userId } });
-    if (user && user.token === headerToken) return user;
+    if (user && user.token === headerToken && user.deletedAt === null) return user;
   }
 
   return null;

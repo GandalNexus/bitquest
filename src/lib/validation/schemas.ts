@@ -387,6 +387,20 @@ export const changePasswordSchema = z.object({
 
 export type ChangePasswordBody = z.infer<typeof changePasswordSchema>;
 
+/* ---------- /api/me/delete ---------- */
+
+/**
+ * Suppression RGPD. Les comptes enregistrés doivent confirmer avec leur
+ * mot de passe courant ; les guests peuvent supprimer sans mot de passe
+ * (ils n'en ont pas) mais la chaîne "DELETE" doit correspondre.
+ */
+export const deleteAccountSchema = z.object({
+  confirmation: z.literal("DELETE", { message: 'Tape "DELETE" pour confirmer.' }),
+  currentPassword: z.string().optional(),
+});
+
+export type DeleteAccountBody = z.infer<typeof deleteAccountSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**

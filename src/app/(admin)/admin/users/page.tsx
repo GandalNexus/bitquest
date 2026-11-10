@@ -37,7 +37,7 @@ export default async function AdminUsersPage({
     : null;
 
   const users = await db.user.findMany({
-    where: filter ? { role: filter } : undefined,
+    where: { deletedAt: null, ...(filter ? { role: filter } : {}) },
     orderBy: [{ role: "asc" }, { createdAt: "desc" }],
     select: {
       id: true,
@@ -53,10 +53,10 @@ export default async function AdminUsersPage({
   });
 
   const [totalCount, admins, editors, apprentices] = await Promise.all([
-    db.user.count(),
-    db.user.count({ where: { role: "ADMIN" } }),
-    db.user.count({ where: { role: "EDITOR" } }),
-    db.user.count({ where: { role: "APPRENTICE" } }),
+    db.user.count({ where: { deletedAt: null } }),
+    db.user.count({ where: { deletedAt: null, role: "ADMIN" } }),
+    db.user.count({ where: { deletedAt: null, role: "EDITOR" } }),
+    db.user.count({ where: { deletedAt: null, role: "APPRENTICE" } }),
   ]);
 
   return (
