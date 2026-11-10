@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { normalizeRole } from "@/lib/auth/roles";
 
 /* ============ NIVEAUX & XP ============ */
 
@@ -222,6 +223,7 @@ export function publicUser(user: {
   streak: number;
   lastActiveDate: string | null;
   createdAt: Date;
+  role?: string;
 }) {
   return {
     id: user.id,
@@ -234,6 +236,7 @@ export function publicUser(user: {
     streak: user.streak,
     lastActiveDate: user.lastActiveDate,
     createdAt: user.createdAt,
+    role: normalizeRole(user.role),
     levelInfo: levelInfo(user.xp),
   };
 }

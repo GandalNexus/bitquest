@@ -9,6 +9,8 @@ export interface LevelInfo {
   pct: number;
 }
 
+export type Role = "APPRENTICE" | "EDITOR" | "ADMIN";
+
 export interface PublicUser {
   id: string;
   pseudo: string;
@@ -20,6 +22,7 @@ export interface PublicUser {
   streak: number;
   lastActiveDate: string | null;
   createdAt: string;
+  role: Role;
   levelInfo: LevelInfo;
 }
 
