@@ -11,6 +11,7 @@ import {
   publicUser,
 } from "@/lib/bitquest/progression";
 import { generateMission, validateMission } from "@/lib/bitquest/missions";
+import { parseJsonBody, questProgressBodySchema } from "@/lib/validation/schemas";
 
 type XpResult = Awaited<ReturnType<typeof awardXp>>;
 
@@ -33,8 +34,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return Response.json({ error: "Trop de requêtes, ralentis un peu." }, { status: 429 });
   }
   const { code } = await params;
-  const body = await req.json();
-  const action = body.action as string;
+  const parsed = await parseJsonBody(req, questProgressBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   const quest = await db.quest.findUnique({
     where: { code },
@@ -57,7 +59,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
   try {
     /* ---------- START ---------- */
-    if (action === "start") {
+    if (body.action === "start") {
       await touchStreak(user.id);
       let p = await ensureProgress();
       if (p.status === "AVAILABLE") {
@@ -67,11 +69,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     }
 
     /* ---------- LECTURE DE SECTION THÉORIQUE ---------- */
-    if (action === "read_section") {
+    if (body.action === "read_section") {
       await touchStreak(user.id);
       let p = await ensureProgress();
       const total = (JSON.parse(quest.theorySections) as unknown[]).length;
-      const index = Math.floor(Number(body.sectionIndex));
+      const index = body.sectionIndex;
       if (index < 0 || index >= total) {
         return Response.json({ error: "Section invalide." }, { status: 400 });
       }
@@ -99,10 +101,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     }
 
     /* ---------- SOUMISSION DU QUIZ ---------- */
-    if (action === "quiz_submit") {
+    if (body.action === "quiz_submit") {
       await touchStreak(user.id);
       let p = await ensureProgress();
-      const answers = Array.isArray(body.answers) ? body.answers : [];
+      const answers = body.answers;
       if (answers.length !== quest.quizQuestions.length) {
         return Response.json({ error: "Réponses incomplètes." }, { status: 400 });
       }
@@ -162,7 +164,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     }
 
     /* ---------- DÉMARRAGE MISSION BITLAB ---------- */
-    if (action === "mission_start") {
+    if (body.action === "mission_start") {
       await touchStreak(user.id);
       const p = await ensureProgress();
       if (p.quizBestScore < QUIZ_PASS_THRESHOLD) {
@@ -196,7 +198,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     }
 
     /* ---------- SOUMISSION MISSION BITLAB ---------- */
-    if (action === "mission_submit") {
+    if (body.action === "mission_submit") {
       await touchStreak(user.id);
       const p = await ensureProgress();
       if (!p.missionSession) {
@@ -215,7 +217,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
         challenge: Record<string, unknown>;
         expected: Record<string, unknown>;
       };
-      const result = validateMission(quest.missionType, session, body.answer ?? {});
+      const result = validateMission(quest.missionType, session, body.answer);
       await db.userQuestProgress.update({
         where: { id: p.id },
         data: { missionAttempts: p.missionAttempts + 1 },

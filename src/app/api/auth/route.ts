@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { publicUser } from "@/lib/bitquest/progression";
 import { rateLimit } from "@/lib/bitquest/session";
+import { authBodySchema, parseJsonBody } from "@/lib/validation/schemas";
 import crypto from "crypto";
 
 function hashPassword(password: string): string {
@@ -28,28 +29,13 @@ const GUEST_NAMES = [
 ];
 
 export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const action = body.action as string;
+  const parsed = await parseJsonBody(req, authBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
-    if (action === "register") {
-      const email = String(body.email ?? "")
-        .trim()
-        .toLowerCase();
-      const pseudo = String(body.pseudo ?? "").trim();
-      const password = String(body.password ?? "");
-      if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-        return Response.json({ error: "Adresse email invalide." }, { status: 400 });
-      }
-      if (!pseudo || pseudo.length < 3 || pseudo.length > 20) {
-        return Response.json({ error: "Le pseudo doit contenir entre 3 et 20 caractères." }, { status: 400 });
-      }
-      if (password.length < 6) {
-        return Response.json(
-          { error: "Le mot de passe doit contenir au moins 6 caractères." },
-          { status: 400 },
-        );
-      }
+  try {
+    if (body.action === "register") {
+      const { email, pseudo, password } = body;
       const existingEmail = await db.user.findUnique({ where: { email } });
       if (existingEmail) {
         return Response.json({ error: "Cet email est déjà utilisé." }, { status: 409 });
@@ -70,11 +56,8 @@ export async function POST(req: Request) {
       return Response.json({ user: publicUser(user), token: user.token });
     }
 
-    if (action === "login") {
-      const email = String(body.email ?? "")
-        .trim()
-        .toLowerCase();
-      const password = String(body.password ?? "");
+    if (body.action === "login") {
+      const { email, password } = body;
       const user = await db.user.findUnique({ where: { email } });
       if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
         return Response.json({ error: "Email ou mot de passe incorrect." }, { status: 401 });
@@ -84,7 +67,7 @@ export async function POST(req: Request) {
       return Response.json({ user: publicUser(user), token });
     }
 
-    if (action === "guest") {
+    if (body.action === "guest") {
       if (!rateLimit("guest:" + (req.headers.get("x-forwarded-for") ?? "local"), 10, 60_000)) {
         return Response.json({ error: "Trop de tentatives, réessaie dans une minute." }, { status: 429 });
       }
@@ -104,6 +87,7 @@ export async function POST(req: Request) {
       return Response.json({ user: publicUser(user), token: user.token });
     }
 
+    /* Branch impossible grâce à la discriminated union, mais TypeScript l'exige. */
     return Response.json({ error: "Action inconnue." }, { status: 400 });
   } catch (e) {
     console.error("auth error", e);
