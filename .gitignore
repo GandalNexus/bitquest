@@ -60,3 +60,8 @@ server.log
 /db/*.bak*
 /db/*.db-journal
 /db/*.sqlite*
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
