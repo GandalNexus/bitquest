@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { authenticate, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { getTransaction, getBlock, type Network } from "@/lib/bitlab/mempool";
+import { decodeInvoice } from "@/lib/bitlab/bolt11";
 import { bitlabProofSchema, parseJsonBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/log";
 
@@ -75,7 +76,25 @@ export async function POST(req: Request) {
     payload.height = block.height;
     payload.tx_count = block.tx_count;
   }
-  // INVOICE / CHANNEL / ADDRESS : acceptés en l'état pour l'instant.
+  if (kind === "INVOICE") {
+    const bolt11 = typeof payload.bolt11 === "string" ? payload.bolt11 : null;
+    if (!bolt11) {
+      return Response.json({ error: "Invoice BOLT11 manquante dans payload.bolt11." }, { status: 400 });
+    }
+    try {
+      const decoded = decodeInvoice(bolt11);
+      payload.amountSats = decoded.amountSats;
+      payload.network = decoded.network;
+      payload.paymentHash = decoded.paymentHash;
+      payload.expiry = decoded.expiry;
+    } catch (err) {
+      return Response.json(
+        { error: err instanceof Error ? err.message : "Invoice invalide." },
+        { status: 400 },
+      );
+    }
+  }
+  // CHANNEL / ADDRESS : acceptés en l'état pour l'instant.
 
   // Upsert idempotent sur (user, questCode, kind).
   const proof = await db.bitLabProof.upsert({
