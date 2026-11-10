@@ -369,8 +369,8 @@ export function Dashboard({
           >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle id={nextQuestId}>Continuer l&apos;apprentissage</CardTitle>
-                <CardDescription>Ta prochaine étape sur le chemin de Bitcoin.</CardDescription>
+                <CardTitle id={nextQuestId}>{t("dashboard.next.title")}</CardTitle>
+                <CardDescription>{t("dashboard.next.description")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {nextQuest ? (
@@ -396,8 +396,10 @@ export function Dashboard({
                         className="h-10 w-full sm:w-auto"
                         onClick={() => openQuest(nextQuest.code)}
                       >
-                        {nextQuest.status === "AVAILABLE" ? "Commencer" : "Reprendre"} :{" "}
-                        {nextQuest.title}
+                        {nextQuest.status === "AVAILABLE"
+                          ? t("dashboard.next.cta.start")
+                          : t("dashboard.next.cta.resume")}{" "}
+                        : {nextQuest.title}
                         <ArrowRight className="h-4 w-4" aria-hidden />
                       </Button>
                     </div>
@@ -405,21 +407,20 @@ export function Dashboard({
                 ) : allCompleted ? (
                   <div className="flex flex-col items-center gap-3 py-6 text-center">
                     <Sparkles className="h-8 w-8 text-primary" aria-hidden />
-                    <p className="font-semibold">Toutes les quêtes terminées, Maître Satoshi !</p>
+                    <p className="font-semibold">{t("dashboard.next.allDone.title")}</p>
                     <p className="text-sm text-muted-foreground">
-                      Tu maîtrises désormais les fondamentaux de Bitcoin et du Lightning Network.
-                      Compare ton XP aux autres aventuriers.
+                      {t("dashboard.next.allDone.sub")}
                     </p>
                     <Button size="lg" className="h-10" onClick={() => navigate("leaderboard")}>
-                      Voir le classement
+                      {t("dashboard.next.allDone.cta")}
                       <Trophy className="h-4 w-4" aria-hidden />
                     </Button>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3 py-6 text-center">
-                    <p className="font-medium">Aucune quête accessible pour l&apos;instant.</p>
+                    <p className="font-medium">{t("dashboard.next.none.title")}</p>
                     <p className="text-sm text-muted-foreground">
-                      Continue de gagner de l&apos;XP pour débloquer la suite du parcours.
+                      {t("dashboard.next.none.sub")}
                     </p>
                     <Button
                       variant="outline"
@@ -427,7 +428,7 @@ export function Dashboard({
                       className="h-10"
                       onClick={() => navigate("leaderboard")}
                     >
-                      Voir le classement
+                      {t("dashboard.next.allDone.cta")}
                     </Button>
                   </div>
                 )}
@@ -443,10 +444,8 @@ export function Dashboard({
           >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle id={tracksId}>Progression par parcours</CardTitle>
-                <CardDescription>
-                  Quatre pistes, de l&apos;initiation aux événements spéciaux.
-                </CardDescription>
+                <CardTitle id={tracksId}>{t("dashboard.tracks.title")}</CardTitle>
+                <CardDescription>{t("dashboard.tracks.description")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {TRACK_ORDER.map((track) => {
@@ -495,8 +494,8 @@ export function Dashboard({
           >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle id={badgesId}>Badges récents</CardTitle>
-                <CardDescription>Tes dernières récompenses de collectionneur.</CardDescription>
+                <CardTitle id={badgesId}>{t("dashboard.badges.title")}</CardTitle>
+                <CardDescription>{t("dashboard.badges.description")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {recentBadges.length > 0 ? (
@@ -525,8 +524,8 @@ export function Dashboard({
                   <div className="space-y-3">
                     <EmptyState
                       icon={Trophy}
-                      title="Aucun badge pour l'instant"
-                      sub="Complète ta première quête !"
+                      title={t("dashboard.badges.empty.title")}
+                      sub={t("dashboard.badges.empty.sub")}
                     />
                     <div className="text-center">
                       <Button
@@ -535,7 +534,7 @@ export function Dashboard({
                         className="text-muted-foreground"
                         onClick={() => navigate("quests")}
                       >
-                        Aller vers les quêtes
+                        {t("dashboard.badges.empty.cta")}
                         <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                       </Button>
                     </div>
@@ -553,8 +552,8 @@ export function Dashboard({
           >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle id={activityId}>Activité récente</CardTitle>
-                <CardDescription>Le journal de ton aventure.</CardDescription>
+                <CardTitle id={activityId}>{t("dashboard.activity.title")}</CardTitle>
+                <CardDescription>{t("dashboard.activity.description")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {recentEvents.length > 0 ? (
@@ -589,8 +588,7 @@ export function Dashboard({
                   </ul>
                 ) : (
                   <p className="py-4 text-center text-sm text-muted-foreground">
-                    Aucune activité pour l&apos;instant — lance-toi sur une quête, l&apos;histoire
-                    s&apos;écrit avec toi.
+                    {t("dashboard.activity.empty")}
                   </p>
                 )}
               </CardContent>
@@ -607,8 +605,9 @@ export function Dashboard({
           className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground"
         >
           <Flame className="h-3.5 w-3.5 text-orange-500" aria-hidden />
-          Série d&apos;activité : {me.streak} jour{me.streak > 1 ? "s" : ""} — reviens demain pour
-          un bonus accru.
+          {me.streak === 1
+            ? t("dashboard.streak.one", { count: me.streak })
+            : t("dashboard.streak.many", { count: me.streak })}
         </motion.p>
       )}
     </div>
