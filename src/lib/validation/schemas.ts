@@ -375,6 +375,18 @@ export const adminChallengeUpdateSchema = z.object({
 
 export type AdminChallengeUpdateBody = z.infer<typeof adminChallengeUpdateSchema>;
 
+/* ---------- /api/me/password ---------- */
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Mot de passe actuel requis."),
+  newPassword: z
+    .string()
+    .min(6, "Le nouveau mot de passe doit contenir au moins 6 caractères.")
+    .max(200, "Mot de passe trop long."),
+});
+
+export type ChangePasswordBody = z.infer<typeof changePasswordSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**

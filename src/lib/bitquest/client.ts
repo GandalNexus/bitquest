@@ -381,6 +381,8 @@ export const api = {
       satsGranted: number;
       satsCapped: boolean;
     }>("/api/challenges/complete", { method: "POST", body: {} }),
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    request<{ ok: true; token: string }>("/api/me/password", { method: "POST", body }),
 };
 
 /* ============ Formats ============ */

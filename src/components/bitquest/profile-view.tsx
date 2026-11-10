@@ -1,7 +1,18 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CheckCircle2, Coins, Flame, Lock, Map as MapIcon, Star, UserRound } from "lucide-react";
+import {
+  CheckCircle2,
+  Coins,
+  Flame,
+  KeyRound,
+  Lock,
+  Mail,
+  Map as MapIcon,
+  ShieldCheck,
+  Star,
+  UserRound,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMe } from "@/lib/bitquest/hooks";
@@ -16,7 +27,13 @@ import {
   rarityStyles,
   trackStyles,
 } from "./ui-bits";
+import { PasswordChangeForm } from "./password-change-form";
 import { cn } from "@/lib/utils";
+
+const roleStyles: Record<string, string> = {
+  ADMIN: "border-rose-500/40 bg-rose-500/10 text-rose-500",
+  EDITOR: "border-amber-500/40 bg-amber-500/10 text-amber-500",
+};
 
 /* Anneaux de rareté (rarityStyles n'expose pas de ring) */
 const RARITY_RING: Record<string, string> = {
@@ -76,10 +93,22 @@ export function ProfileView() {
                       Invité
                     </Badge>
                   )}
+                  {user.role && user.role !== "APPRENTICE" && (
+                    <Badge variant="outline" className={roleStyles[user.role] ?? ""}>
+                      <ShieldCheck className="h-3 w-3" aria-hidden />
+                      {user.role}
+                    </Badge>
+                  )}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Niv. {user.levelInfo.level} · {user.levelInfo.title}
                 </p>
+                {user.email && (
+                  <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <Mail className="h-3 w-3" aria-hidden />
+                    {user.email}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">
                   Aventurier depuis le {formatDate(user.createdAt)}
                 </p>
@@ -173,6 +202,27 @@ export function ProfileView() {
           </CardContent>
         </Card>
       </motion.section>
+
+      {/* ===== Sécurité du compte (seulement pour comptes enregistrés) ===== */}
+      {!user.isGuest && user.email && (
+        <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.12 }}>
+          <Card className="rounded-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <KeyRound className="h-5 w-5 text-primary" aria-hidden />
+                Sécurité du compte
+              </CardTitle>
+              <CardDescription>
+                Change ton mot de passe. Toutes les autres sessions seront déconnectées
+                automatiquement.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PasswordChangeForm userId={user.id} />
+            </CardContent>
+          </Card>
+        </motion.section>
+      )}
 
       {/* ===== Historique des quêtes ===== */}
       <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.15 }}>

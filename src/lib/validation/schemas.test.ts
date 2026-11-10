@@ -16,6 +16,7 @@ import {
   adminQuestTheorySchema,
   adminQuestUpdateSchema,
   authBodySchema,
+  changePasswordSchema,
   parseJsonBody,
   questProgressBodySchema,
   slugSchema,
@@ -870,6 +871,39 @@ describe("adminChallengeUpdateSchema", () => {
   it("applique les contraintes de date sur le patch", () => {
     expect(adminChallengeUpdateSchema.safeParse({ date: "invalid" }).success).toBe(false);
     expect(adminChallengeUpdateSchema.safeParse({ date: "2026-99-99" }).success).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* changePasswordSchema                                                */
+/* ------------------------------------------------------------------ */
+
+describe("changePasswordSchema", () => {
+  it("valide un payload correct", () => {
+    expect(
+      changePasswordSchema.safeParse({ currentPassword: "old-pass", newPassword: "new-pass" }).success,
+    ).toBe(true);
+  });
+
+  it("rejette un currentPassword vide", () => {
+    expect(
+      changePasswordSchema.safeParse({ currentPassword: "", newPassword: "abcdef" }).success,
+    ).toBe(false);
+  });
+
+  it("rejette un newPassword < 6 caractères", () => {
+    expect(
+      changePasswordSchema.safeParse({ currentPassword: "old", newPassword: "12345" }).success,
+    ).toBe(false);
+  });
+
+  it("rejette un newPassword > 200 caractères", () => {
+    expect(
+      changePasswordSchema.safeParse({
+        currentPassword: "old",
+        newPassword: "x".repeat(201),
+      }).success,
+    ).toBe(false);
   });
 });
 
