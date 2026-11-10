@@ -1,4 +1,13 @@
-import { Activity, CheckCircle2, Database, Gauge, Server, XCircle } from "lucide-react";
+import {
+  Activity,
+  CheckCircle2,
+  Database,
+  Gauge,
+  MinusCircle,
+  Server,
+  Zap,
+  XCircle,
+} from "lucide-react";
 import { getHealthStatus, HEALTH_DEGRADED_MS, type HealthReport } from "@/lib/health";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,6 +94,47 @@ export default async function AdminHealthPage() {
         </Card>
 
         <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Zap className="h-4 w-4 text-primary" aria-hidden />
+              Redis (rate-limit)
+            </CardTitle>
+            {report.redis.status === "ok" ? (
+              <CheckCircle2 className="h-5 w-5 text-emerald-500" aria-hidden />
+            ) : report.redis.status === "skipped" ? (
+              <MinusCircle className="h-5 w-5 text-muted-foreground" aria-hidden />
+            ) : (
+              <XCircle className="h-5 w-5 text-destructive" aria-hidden />
+            )}
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <Row label="Status" value={report.redis.status} />
+            <Row
+              label="Latence"
+              value={report.redis.latencyMs === null ? "—" : `${report.redis.latencyMs} ms`}
+              hint={
+                report.redis.status === "ok" && report.redis.latencyMs > HEALTH_DEGRADED_MS
+                  ? `au-delà du seuil (${HEALTH_DEGRADED_MS} ms)`
+                  : undefined
+              }
+            />
+            {report.redis.status === "skipped" && (
+              <p className="text-xs text-muted-foreground">
+                REDIS_URL non défini — le rate-limit utilise le fallback in-memory.
+              </p>
+            )}
+            {report.redis.status === "error" && report.redis.error && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-500">
+                <strong>Erreur :</strong> {report.redis.error}
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  Non critique — le fallback in-memory prend le relais.
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
           <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
             <CardTitle className="flex items-center gap-2 text-base">
               <Server className="h-4 w-4 text-primary" aria-hidden />
