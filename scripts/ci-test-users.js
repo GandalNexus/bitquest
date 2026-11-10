@@ -2,7 +2,11 @@
  * Script idempotent utilisé par la CI pour créer les comptes de test
  * (editor-test, learner-test) après le seed. Pas d'équivalent interactif
  * dans le seed principal — ces comptes sont spécifiques aux tests E2E.
+ *
+ * NB: fichier .js volontairement en CommonJS pour tourner avec `node`
+ * sans build intermédiaire.
  */
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { PrismaClient } = require("@prisma/client");
 const crypto = require("crypto");
 

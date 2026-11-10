@@ -27,13 +27,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import { LanguageSwitch } from "@/i18n/language-switch";
+import { useT } from "@/i18n/locale-provider";
 
-const NAV: { view: View; href: string; label: string; icon: LucideIcon }[] = [
-  { view: "dashboard", href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-  { view: "quests", href: "/quests", label: "Quêtes", icon: Map },
-  { view: "profile", href: "/profile", label: "Profil", icon: User },
-  { view: "wallet", href: "/wallet", label: "Wallet", icon: Wallet },
-  { view: "leaderboard", href: "/leaderboard", label: "Classement", icon: Trophy },
+/**
+ * NAV avec labels par clé i18n (résolues côté client via useT).
+ * Les clés sont statiques — pas de littéral côté hook.
+ */
+const NAV: { view: View; href: string; labelKey: string; icon: LucideIcon }[] = [
+  { view: "dashboard", href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { view: "quests", href: "/quests", labelKey: "nav.quests", icon: Map },
+  { view: "profile", href: "/profile", labelKey: "nav.profile", icon: User },
+  { view: "wallet", href: "/wallet", labelKey: "nav.wallet", icon: Wallet },
+  { view: "leaderboard", href: "/leaderboard", labelKey: "nav.leaderboard", icon: Trophy },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -44,6 +50,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const logout = useBitQuest((s) => s.logout);
   const { data } = useMe();
   const { theme, setTheme } = useTheme();
+  const t = useT();
   const [mounted, setMounted] = useState(false);
 
   /** Détermine l'onglet actif : URL si on est sur une route /dashboard|/quests|…, sinon store.view (mode SPA /) */
@@ -83,7 +90,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/dashboard"
             className="flex items-center gap-2"
-            aria-label="BitQuest — accueil"
+            aria-label={t("nav.home")}
             onClick={() => setView("dashboard")}
           >
             <OrbiteMark className="h-8 w-8 shrink-0 text-foreground" />
@@ -113,10 +120,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
 
           <div className="ml-auto flex items-center gap-1.5">
+            <LanguageSwitch />
             <Button
               variant="ghost"
               size="icon"
-              aria-label={theme === "dark" ? "Passer en thème clair" : "Passer en thème sombre"}
+              aria-label={theme === "dark" ? t("nav.theme.toLight") : t("nav.theme.toDark")}
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             >
               {mounted && theme === "dark" ? (
@@ -125,7 +133,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Moon className="h-4.5 w-4.5" />
               )}
             </Button>
-            <Button variant="ghost" size="icon" aria-label="Se déconnecter" onClick={handleLogout}>
+            <Button variant="ghost" size="icon" aria-label={t("nav.logout")} onClick={handleLogout}>
               <LogOut className="h-4.5 w-4.5" />
             </Button>
           </div>
@@ -168,7 +176,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   )}
                 >
                   <item.icon className="h-4 w-4" />
-                  {item.label}
+                  {t(item.labelKey)}
                 </Link>
               );
             })}
@@ -200,7 +208,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             >
               <item.icon className="h-5 w-5" />
-              {item.label.split(" ")[0]}
+              {t(item.labelKey).split(" ")[0]}
             </Link>
           );
         })}

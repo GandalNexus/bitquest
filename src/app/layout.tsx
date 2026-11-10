@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Orbitron, Exo_2, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { LocaleProvider } from "@/i18n/locale-provider";
+import { getServerLocale } from "@/i18n/server";
 
 /* Charte BitQuest : Orbitron (display & logos) + Exo 2 (texte courant) */
 const orbitron = Orbitron({
@@ -46,18 +48,21 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getServerLocale();
   return (
-    <html lang="fr" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <body
         className={`${orbitron.variable} ${exo2.variable} ${geistMono.variable} font-sans antialiased bg-background text-foreground`}
       >
-        {children}
-        <Toaster />
+        <LocaleProvider initial={locale}>
+          {children}
+          <Toaster />
+        </LocaleProvider>
       </body>
     </html>
   );
