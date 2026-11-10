@@ -29,6 +29,7 @@ model User {
   events         UserEvent[]
   lessonProgress LessonProgress[]
   adminAuditLogs AdminAuditLog[]
+  dailyChallengeCompletions DailyChallengeCompletion[]
 }
 
 model Quest {
@@ -222,4 +223,33 @@ model AdminAuditLog {
 
   @@index([createdAt])
   @@index([actorId])
+}
+
+/* =============================================================
+ * DAILY CHALLENGE — Phase 2.8
+ * Un défi par jour-calendrier. Pas de création/completion automatique,
+ * c'est un apport pédagogique léger qui vit à côté des quêtes.
+ * ============================================================= */
+
+model DailyChallenge {
+  id         String   @id @default(cuid())
+  date       String   @unique // ISO day "YYYY-MM-DD" — timezone UTC
+  title      String
+  prompt     String   // description courte
+  xpReward   Int      @default(10)
+  satsReward Int      @default(50)
+  createdAt  DateTime @default(now())
+
+  completions DailyChallengeCompletion[]
+}
+
+model DailyChallengeCompletion {
+  userId      String
+  challengeId String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge   DailyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  completedAt DateTime       @default(now())
+
+  @@id([userId, challengeId])
+  @@index([userId])
 }

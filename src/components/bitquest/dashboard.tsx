@@ -42,6 +42,7 @@ import {
   pickNextQuest,
   relativeTime,
 } from "./dashboard.utils";
+import { DailyChallengeTile } from "./daily-challenge-tile";
 
 /* ============ Helpers visuels (non testables car React) ============ */
 
@@ -317,6 +318,9 @@ export function Dashboard({
 
       {/* ===== Onboarding (D3 — nouveaux comptes uniquement) ===== */}
       {showOnboarding && <OnboardingBanner onStart={() => openQuest(firstAvailableCode)} />}
+
+      {/* ===== Défi du jour (Phase 2.8) ===== */}
+      <DailyChallengeTile />
 
       {/* ===== StatCards ===== */}
       <motion.section

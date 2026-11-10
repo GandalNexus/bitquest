@@ -360,6 +360,27 @@ export const api = {
       { method: "POST", body: {} },
     ),
   logout: () => request<{ ok: true }>("/api/auth/logout", { method: "POST", body: {} }),
+  todayChallenge: () =>
+    request<{
+      challenge: {
+        id: string;
+        date: string;
+        title: string;
+        prompt: string;
+        xpReward: number;
+        satsReward: number;
+        completed: boolean;
+        completedAt: string | null;
+      } | null;
+    }>("/api/challenges/today"),
+  completeChallenge: () =>
+    request<{
+      ok: true;
+      alreadyCompleted: boolean;
+      xpGained: number;
+      satsGranted: number;
+      satsCapped: boolean;
+    }>("/api/challenges/complete", { method: "POST", body: {} }),
 };
 
 /* ============ Formats ============ */

@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { questsSeed, badgesSeed, botUsersSeed } from "../src/lib/seed-data";
 import { academyCoursesSeed } from "../src/lib/academy-seed";
+import { dailyChallengesSeed, offsetIsoDay } from "../src/lib/challenges-seed";
 import crypto from "crypto";
 
 const db = new PrismaClient();
@@ -176,6 +177,29 @@ async function main() {
   console.log(
     `Académie : ${academyCoursesSeed.length} cours · ${totalChapters} chapitres · ${totalLessons} leçons`,
   );
+
+  /* ---- Défis du jour (fenêtre glissante 7 jours à partir d'aujourd'hui) ---- */
+  const today = new Date().toISOString().slice(0, 10);
+  for (const c of dailyChallengesSeed) {
+    const date = offsetIsoDay(today, c.dayOffset);
+    await db.dailyChallenge.upsert({
+      where: { date },
+      update: {
+        title: c.title,
+        prompt: c.prompt,
+        xpReward: c.xpReward,
+        satsReward: c.satsReward,
+      },
+      create: {
+        date,
+        title: c.title,
+        prompt: c.prompt,
+        xpReward: c.xpReward,
+        satsReward: c.satsReward,
+      },
+    });
+  }
+  console.log(`Défis du jour : ${dailyChallengesSeed.length} seedés (fenêtre aujourd'hui + 6 j)`);
 
   console.log("Seed terminé.");
 }
