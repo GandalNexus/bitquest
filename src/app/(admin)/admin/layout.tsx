@@ -7,6 +7,7 @@ import {
   LogIn,
   Map,
   ShieldAlert,
+  Trophy,
   Users,
 } from "lucide-react";
 import { requireRoleSsr } from "@/lib/auth/server";
@@ -23,6 +24,7 @@ const NAV = [
   { href: "/admin/users", label: "Utilisateurs", icon: Users },
   { href: "/admin/courses", label: "Cours", icon: BookOpen },
   { href: "/admin/quests", label: "Quêtes", icon: Map },
+  { href: "/admin/badges", label: "Badges", icon: Trophy },
   { href: "/admin/audit", label: "Audit log", icon: ClipboardList },
 ];
 

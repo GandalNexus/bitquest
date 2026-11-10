@@ -25,7 +25,10 @@ export type AuditAction =
   | "QUEST_UPDATE"
   | "QUEST_THEORY_UPDATE"
   | "QUEST_QUIZ_UPDATE"
-  | "QUEST_MISSION_UPDATE";
+  | "QUEST_MISSION_UPDATE"
+  | "BADGE_CREATE"
+  | "BADGE_UPDATE"
+  | "BADGE_DELETE";
 
 export async function logAdminAction(
   actorId: string,

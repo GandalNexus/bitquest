@@ -293,6 +293,53 @@ export const adminQuestMissionSchema = z
 
 export type AdminQuestMissionBody = z.infer<typeof adminQuestMissionSchema>;
 
+/* ---------- /api/admin/badges ---------- */
+
+export const BADGE_RARITIES = ["COMMON", "RARE", "EPIC"] as const;
+
+export const BADGE_CONDITION_TYPES = [
+  "QUEST_COMPLETE",
+  "QUEST_COUNT",
+  "TRACK_COMPLETE",
+  "STREAK",
+  "LEVEL",
+  "SATS_TOTAL",
+  "PERFECT_QUIZ",
+] as const;
+
+/** Code badge : identifiant stable (kebab-case ASCII, 2-60 caractères). */
+const badgeCodeSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(2, "Le code doit contenir au moins 2 caractères.")
+  .max(60, "Le code est trop long (60 max).")
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Le code doit être en kebab-case (ex. first-quest).");
+
+export const adminBadgeCreateSchema = z.object({
+  code: badgeCodeSchema,
+  name: z.string().trim().min(2).max(120),
+  description: z.string().trim().min(2).max(500),
+  icon: z.string().trim().min(1).max(40),
+  rarity: z.enum(BADGE_RARITIES),
+  conditionType: z.enum(BADGE_CONDITION_TYPES),
+  conditionValue: z.record(z.string(), z.unknown()).default({}),
+});
+
+export type AdminBadgeCreateBody = z.infer<typeof adminBadgeCreateSchema>;
+
+/** Patch : code immuable (référencé par UserBadge + usages hors-DB). */
+export const adminBadgeUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  description: z.string().trim().min(2).max(500).optional(),
+  icon: z.string().trim().min(1).max(40).optional(),
+  rarity: z.enum(BADGE_RARITIES).optional(),
+  conditionType: z.enum(BADGE_CONDITION_TYPES).optional(),
+  conditionValue: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type AdminBadgeUpdateBody = z.infer<typeof adminBadgeUpdateSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**

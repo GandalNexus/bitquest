@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  adminBadgeCreateSchema,
+  adminBadgeUpdateSchema,
   adminChangeRoleSchema,
   adminChapterCreateSchema,
   adminChapterUpdateSchema,
@@ -710,6 +712,97 @@ describe("adminQuestMissionSchema", () => {
     expect(
       adminQuestMissionSchema.safeParse({ ...base, config: { blob: huge } }).success,
     ).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* adminBadgeCreateSchema / adminBadgeUpdateSchema                     */
+/* ------------------------------------------------------------------ */
+
+describe("adminBadgeCreateSchema", () => {
+  const base = {
+    code: "first-quest",
+    name: "Première quête",
+    description: "Compléter la quête Genesis.",
+    icon: "Rocket",
+    rarity: "COMMON" as const,
+    conditionType: "QUEST_COMPLETE" as const,
+    conditionValue: { questCode: "genesis" },
+  };
+
+  it("valide un payload complet", () => {
+    expect(adminBadgeCreateSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("conditionValue default {} si omis", () => {
+    const { conditionValue, ...rest } = base;
+    void conditionValue;
+    const r = adminBadgeCreateSchema.safeParse(rest);
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.conditionValue).toEqual({});
+  });
+
+  it("normalise le code en lowercase (tolère SnakeCase)", () => {
+    const r = adminBadgeCreateSchema.safeParse({ ...base, code: "SnakeCase" });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.code).toBe("snakecase");
+  });
+
+  it("rejette un code contenant underscore ou espace", () => {
+    expect(adminBadgeCreateSchema.safeParse({ ...base, code: "under_score" }).success).toBe(false);
+    expect(adminBadgeCreateSchema.safeParse({ ...base, code: "with space" }).success).toBe(false);
+  });
+
+  it("accepte les 3 raretés et rejette les autres", () => {
+    for (const r of ["COMMON", "RARE", "EPIC"]) {
+      expect(adminBadgeCreateSchema.safeParse({ ...base, rarity: r }).success).toBe(true);
+    }
+    expect(adminBadgeCreateSchema.safeParse({ ...base, rarity: "MYTHIC" }).success).toBe(false);
+  });
+
+  it("accepte les 7 types de condition", () => {
+    const types = [
+      "QUEST_COMPLETE",
+      "QUEST_COUNT",
+      "TRACK_COMPLETE",
+      "STREAK",
+      "LEVEL",
+      "SATS_TOTAL",
+      "PERFECT_QUIZ",
+    ];
+    for (const t of types) {
+      expect(adminBadgeCreateSchema.safeParse({ ...base, conditionType: t }).success).toBe(true);
+    }
+  });
+
+  it("rejette un conditionType inconnu", () => {
+    expect(
+      adminBadgeCreateSchema.safeParse({ ...base, conditionType: "KYC_PASSED" }).success,
+    ).toBe(false);
+  });
+
+  it("rejette un conditionValue non objet", () => {
+    expect(adminBadgeCreateSchema.safeParse({ ...base, conditionValue: [1, 2] }).success).toBe(
+      false,
+    );
+    expect(adminBadgeCreateSchema.safeParse({ ...base, conditionValue: "nope" }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("adminBadgeUpdateSchema", () => {
+  it("accepte un patch vide", () => {
+    expect(adminBadgeUpdateSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("accepte un patch partiel", () => {
+    expect(adminBadgeUpdateSchema.safeParse({ rarity: "EPIC" }).success).toBe(true);
+  });
+
+  it("applique les contraintes de rarity et conditionType", () => {
+    expect(adminBadgeUpdateSchema.safeParse({ rarity: "MYTHIC" }).success).toBe(false);
+    expect(adminBadgeUpdateSchema.safeParse({ conditionType: "UNKNOWN" }).success).toBe(false);
   });
 });
 
