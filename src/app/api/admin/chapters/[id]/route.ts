@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { requireRoleAndCsrf } from "@/lib/auth/guard";
+import { logAdminAction } from "@/lib/auth/audit";
 import { adminChapterUpdateSchema, parseJsonBody } from "@/lib/validation/schemas";
 
 /** PATCH /api/admin/chapters/[id] — met à jour un chapitre. */
@@ -41,6 +42,9 @@ export async function PATCH(
       ...(data.order !== undefined && { order: data.order }),
     },
   });
+  await logAdminAction(guard.user.id, "CHAPTER_UPDATE", `chapter:${chapter.id}`, {
+    changedFields: Object.keys(data),
+  });
   return Response.json({ ok: true, chapter });
 }
 
@@ -63,10 +67,19 @@ export async function DELETE(
     );
   }
 
+  const existingForLog = await db.chapter.findUnique({
+    where: { id },
+    select: { slug: true, title: true, courseId: true },
+  });
   try {
     await db.chapter.delete({ where: { id } });
   } catch {
     return Response.json({ error: "Chapitre introuvable." }, { status: 404 });
   }
+  await logAdminAction(guard.user.id, "CHAPTER_DELETE", `chapter:${id}`, {
+    slug: existingForLog?.slug,
+    title: existingForLog?.title,
+    courseId: existingForLog?.courseId,
+  });
   return Response.json({ ok: true });
 }

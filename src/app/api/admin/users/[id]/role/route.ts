@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { requireRole } from "@/lib/auth/roles";
+import { logAdminAction } from "@/lib/auth/audit";
 import { adminChangeRoleSchema, parseJsonBody } from "@/lib/validation/schemas";
 
 /**
@@ -70,6 +71,12 @@ export async function POST(
         newRole,
       }),
     },
+  });
+
+  await logAdminAction(actor.id, "ROLE_CHANGE", `user:${target.id}`, {
+    targetPseudo: target.pseudo,
+    previousRole,
+    newRole,
   });
 
   return Response.json({ ok: true, user: publicUserLite(updated) });

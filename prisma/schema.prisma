@@ -28,6 +28,7 @@ model User {
   transactions   WalletTransaction[]
   events         UserEvent[]
   lessonProgress LessonProgress[]
+  adminAuditLogs AdminAuditLog[]
 }
 
 model Quest {
@@ -203,4 +204,22 @@ model ChapterQuest {
 
   @@id([chapterId, questId])
   @@index([chapterId])
+}
+
+/* =============================================================
+ * ADMIN AUDIT LOG — Phase 2.3+
+ * Trace toutes les mutations admin (role change, CRUD contenu, etc.)
+ * ============================================================= */
+
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  actor     User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  action    String   // ROLE_CHANGE | COURSE_CREATE | COURSE_UPDATE | COURSE_DELETE | CHAPTER_* | LESSON_*
+  resource  String   // ex. "course:cmwb...", "lesson:cmw9..."
+  meta      String   // JSON snapshot (changements, contexte)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId])
 }

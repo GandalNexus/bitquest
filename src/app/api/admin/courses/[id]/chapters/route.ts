@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { requireRoleAndCsrf } from "@/lib/auth/guard";
+import { logAdminAction } from "@/lib/auth/audit";
 import { adminChapterCreateSchema, parseJsonBody } from "@/lib/validation/schemas";
 
 /** POST /api/admin/courses/[id]/chapters — crée un chapitre sous un cours. */
@@ -35,6 +36,11 @@ export async function POST(
       summary: data.summary,
       order: data.order,
     },
+  });
+  await logAdminAction(guard.user.id, "CHAPTER_CREATE", `chapter:${chapter.id}`, {
+    courseId,
+    slug: chapter.slug,
+    title: chapter.title,
   });
   return Response.json({ ok: true, chapter }, { status: 201 });
 }

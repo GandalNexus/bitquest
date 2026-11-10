@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { requireRoleAndCsrf } from "@/lib/auth/guard";
+import { logAdminAction } from "@/lib/auth/audit";
 import { adminLessonUpdateSchema, parseJsonBody } from "@/lib/validation/schemas";
 
 /** PATCH /api/admin/lessons/[id] — met à jour une leçon. */
@@ -46,6 +47,9 @@ export async function PATCH(
       }),
     },
   });
+  await logAdminAction(guard.user.id, "LESSON_UPDATE", `lesson:${lesson.id}`, {
+    changedFields: Object.keys(data),
+  });
   return Response.json({ ok: true, lesson });
 }
 
@@ -58,10 +62,19 @@ export async function DELETE(
   if (!guard.ok) return guard.response;
 
   const { id } = await params;
+  const existingForLog = await db.lesson.findUnique({
+    where: { id },
+    select: { slug: true, title: true, chapterId: true },
+  });
   try {
     await db.lesson.delete({ where: { id } });
   } catch {
     return Response.json({ error: "Leçon introuvable." }, { status: 404 });
   }
+  await logAdminAction(guard.user.id, "LESSON_DELETE", `lesson:${id}`, {
+    slug: existingForLog?.slug,
+    title: existingForLog?.title,
+    chapterId: existingForLog?.chapterId,
+  });
   return Response.json({ ok: true });
 }

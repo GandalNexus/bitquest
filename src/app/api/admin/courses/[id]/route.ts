@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { requireRoleAndCsrf } from "@/lib/auth/guard";
+import { logAdminAction } from "@/lib/auth/audit";
 import { adminCourseUpdateSchema, parseJsonBody } from "@/lib/validation/schemas";
 
 /** PATCH /api/admin/courses/[id] — met à jour un cours (ADMIN). */
@@ -42,6 +43,10 @@ export async function PATCH(
       }),
     },
   });
+  await logAdminAction(guard.user.id, "COURSE_UPDATE", `course:${course.id}`, {
+    slug: course.slug,
+    changedFields: Object.keys(data),
+  });
   return Response.json({ ok: true, course });
 }
 
@@ -64,10 +69,18 @@ export async function DELETE(
     );
   }
 
+  const existingForLog = await db.course.findUnique({
+    where: { id },
+    select: { slug: true, title: true },
+  });
   try {
     await db.course.delete({ where: { id } });
   } catch {
     return Response.json({ error: "Cours introuvable." }, { status: 404 });
   }
+  await logAdminAction(guard.user.id, "COURSE_DELETE", `course:${id}`, {
+    slug: existingForLog?.slug,
+    title: existingForLog?.title,
+  });
   return Response.json({ ok: true });
 }

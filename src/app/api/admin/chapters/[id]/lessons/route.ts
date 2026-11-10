@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { requireRoleAndCsrf } from "@/lib/auth/guard";
+import { logAdminAction } from "@/lib/auth/audit";
 import { adminLessonCreateSchema, parseJsonBody } from "@/lib/validation/schemas";
 
 /** POST /api/admin/chapters/[id]/lessons — crée une leçon sous un chapitre. */
@@ -38,6 +39,11 @@ export async function POST(
       order: data.order,
       publishedAt: data.publishedAt ? new Date(data.publishedAt) : null,
     },
+  });
+  await logAdminAction(guard.user.id, "LESSON_CREATE", `lesson:${lesson.id}`, {
+    chapterId,
+    slug: lesson.slug,
+    title: lesson.title,
   });
   return Response.json({ ok: true, lesson }, { status: 201 });
 }

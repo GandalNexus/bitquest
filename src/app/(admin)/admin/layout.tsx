@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   BookOpen,
+  ClipboardList,
   LayoutDashboard,
   Lock,
   LogIn,
@@ -16,12 +17,13 @@ export const metadata = {
   description: "Console d'administration BitQuest",
 };
 
-/** Navigation admin : prête pour les CRUD à venir (Phase 2.4+). */
+/** Navigation admin. */
 const NAV = [
   { href: "/admin", label: "Vue d'ensemble", icon: LayoutDashboard },
   { href: "/admin/users", label: "Utilisateurs", icon: Users },
   { href: "/admin/courses", label: "Cours", icon: BookOpen },
   { href: "/admin/quests", label: "Quêtes", icon: Map },
+  { href: "/admin/audit", label: "Audit log", icon: ClipboardList },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
