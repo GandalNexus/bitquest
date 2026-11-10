@@ -17,6 +17,7 @@ const ACTIONS = [
   "LESSON_UPDATE",
   "LESSON_DELETE",
   "QUEST_UPDATE",
+  "QUEST_THEORY_UPDATE",
 ] as const;
 
 type Action = (typeof ACTIONS)[number];
@@ -33,6 +34,7 @@ const actionStyles: Record<string, string> = {
   LESSON_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
   LESSON_DELETE: "border-destructive/40 bg-destructive/10 text-destructive",
   QUEST_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
+  QUEST_THEORY_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
 };
 
 function formatDateTime(d: Date): string {

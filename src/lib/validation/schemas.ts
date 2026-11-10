@@ -191,6 +191,30 @@ export const adminQuestUpdateSchema = z.object({
 
 export type AdminQuestUpdateBody = z.infer<typeof adminQuestUpdateSchema>;
 
+/* ---------- /api/admin/quests/[code]/theory ---------- */
+
+/**
+ * Une section théorique d'une quête. `keypoints` peut être vide.
+ * Le total sérialisé est borné à ~80 KB pour éviter les JSON extrêmes.
+ */
+const theorySectionSchema = z.object({
+  title: z.string().trim().min(1, "Titre requis.").max(200),
+  body: z.string().trim().min(1, "Corps requis.").max(10_000),
+  keypoints: z.array(z.string().trim().min(1).max(500)).max(20).default([]),
+});
+
+export const adminQuestTheorySchema = z
+  .object({
+    sections: z.array(theorySectionSchema).min(1, "Au moins une section est requise.").max(12),
+  })
+  .refine(
+    (v) => JSON.stringify(v.sections).length <= 80_000,
+    { message: "Les sections dépassent la taille maximale (80 KB sérialisés)." },
+  );
+
+export type AdminQuestTheoryBody = z.infer<typeof adminQuestTheorySchema>;
+export type TheorySection = z.infer<typeof theorySectionSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**

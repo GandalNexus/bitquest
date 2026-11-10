@@ -71,35 +71,48 @@ export default async function EditQuestPage({
         </CardContent>
       </Card>
 
-      {/* Contexte lecture seule */}
+      {/* Sections théoriques — éditables */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="text-sm">
+              Sections théoriques ({theorySections.length})
+            </CardTitle>
+            <CardDescription>
+              Contenu enseigné pendant la phase « Théorie » de la quête.
+            </CardDescription>
+          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/admin/quests/${quest.code}/theory`}>Éditer</Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <ul className="list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">
+            {theorySections.length === 0 ? (
+              <li>Aucune section.</li>
+            ) : (
+              theorySections.map((s, i) => (
+                <li key={i}>{typeof s.title === "string" ? s.title : `Section ${i + 1}`}</li>
+              ))
+            )}
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Mission — lecture seule (Phase 2.6b-2 à venir) */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Contenu non éditable ici</CardTitle>
+          <CardTitle className="text-sm">
+            Mission : <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">{quest.missionType}</code>
+          </CardTitle>
           <CardDescription>
-            Ces champs sont gérés par le seed en attendant les éditeurs dédiés (Phase 2.6b).
+            Builder dédié à venir en Phase 2.6b-2 (8 types de missions BitLab).
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <div>
-            <div className="font-medium">Sections théoriques ({theorySections.length})</div>
-            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">
-              {theorySections.length === 0 ? (
-                <li>Aucune section.</li>
-              ) : (
-                theorySections.map((s, i) => (
-                  <li key={i}>{typeof s.title === "string" ? s.title : `Section ${i + 1}`}</li>
-                ))
-              )}
-            </ul>
-          </div>
-          <div>
-            <div className="font-medium">
-              Mission : <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">{quest.missionType}</code>
-            </div>
-            <pre className="mt-1 max-h-40 overflow-auto rounded-md border bg-muted/40 p-2 text-[10px] text-muted-foreground">
-              {JSON.stringify(missionConfig, null, 2)}
-            </pre>
-          </div>
+        <CardContent>
+          <pre className="max-h-40 overflow-auto rounded-md border bg-muted/40 p-2 text-[10px] text-muted-foreground">
+            {JSON.stringify(missionConfig, null, 2)}
+          </pre>
         </CardContent>
       </Card>
     </div>

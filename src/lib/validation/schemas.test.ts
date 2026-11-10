@@ -7,6 +7,7 @@ import {
   adminCourseUpdateSchema,
   adminLessonCreateSchema,
   adminLessonUpdateSchema,
+  adminQuestTheorySchema,
   adminQuestUpdateSchema,
   authBodySchema,
   parseJsonBody,
@@ -434,6 +435,72 @@ describe("adminQuestUpdateSchema", () => {
 
   it("rejette un title trop long", () => {
     expect(adminQuestUpdateSchema.safeParse({ title: "x".repeat(121) }).success).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* adminQuestTheorySchema                                              */
+/* ------------------------------------------------------------------ */
+
+describe("adminQuestTheorySchema", () => {
+  const validSection = { title: "S1", body: "Corps.", keypoints: ["un", "deux"] };
+
+  it("valide un tableau d'une section minimale", () => {
+    const r = adminQuestTheorySchema.safeParse({ sections: [validSection] });
+    expect(r.success).toBe(true);
+  });
+
+  it("keypoints default [] si omis", () => {
+    const r = adminQuestTheorySchema.safeParse({
+      sections: [{ title: "S", body: "Corps" }],
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.sections[0].keypoints).toEqual([]);
+  });
+
+  it("rejette un tableau vide", () => {
+    expect(adminQuestTheorySchema.safeParse({ sections: [] }).success).toBe(false);
+  });
+
+  it("rejette plus de 12 sections", () => {
+    const many = Array.from({ length: 13 }, () => validSection);
+    expect(adminQuestTheorySchema.safeParse({ sections: many }).success).toBe(false);
+  });
+
+  it("rejette une section avec titre vide", () => {
+    expect(
+      adminQuestTheorySchema.safeParse({ sections: [{ title: "", body: "x" }] }).success,
+    ).toBe(false);
+  });
+
+  it("rejette une section avec body vide", () => {
+    expect(
+      adminQuestTheorySchema.safeParse({ sections: [{ title: "x", body: "" }] }).success,
+    ).toBe(false);
+  });
+
+  it("rejette plus de 20 keypoints dans une section", () => {
+    const section = { title: "x", body: "y", keypoints: Array.from({ length: 21 }, () => "k") };
+    expect(adminQuestTheorySchema.safeParse({ sections: [section] }).success).toBe(false);
+  });
+
+  it("rejette un payload qui dépasse 80 KB sérialisés", () => {
+    const bigBody = "x".repeat(9_999);
+    const sections = Array.from({ length: 12 }, () => ({ title: "t", body: bigBody, keypoints: [] }));
+    expect(adminQuestTheorySchema.safeParse({ sections }).success).toBe(false);
+  });
+
+  it("borne title à 200 et body à 10 000 caractères", () => {
+    expect(
+      adminQuestTheorySchema.safeParse({
+        sections: [{ title: "x".repeat(201), body: "ok" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      adminQuestTheorySchema.safeParse({
+        sections: [{ title: "ok", body: "x".repeat(10_001) }],
+      }).success,
+    ).toBe(false);
   });
 });
 
