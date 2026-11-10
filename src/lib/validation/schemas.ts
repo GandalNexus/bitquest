@@ -121,6 +121,52 @@ export const adminCourseUpdateSchema = z.object({
 
 export type AdminCourseUpdateBody = z.infer<typeof adminCourseUpdateSchema>;
 
+/* ---------- /api/admin/courses/[courseId]/chapters + /api/admin/chapters/[id] ---------- */
+
+export const adminChapterCreateSchema = z.object({
+  slug: slugSchema,
+  title: z.string().trim().min(2).max(120),
+  summary: z.string().trim().min(2).max(500),
+  order: z.number().int().nonnegative().default(0),
+});
+
+export type AdminChapterCreateBody = z.infer<typeof adminChapterCreateSchema>;
+
+export const adminChapterUpdateSchema = z.object({
+  slug: slugSchema.optional(),
+  title: z.string().trim().min(2).max(120).optional(),
+  summary: z.string().trim().min(2).max(500).optional(),
+  order: z.number().int().nonnegative().optional(),
+});
+
+export type AdminChapterUpdateBody = z.infer<typeof adminChapterUpdateSchema>;
+
+/* ---------- /api/admin/chapters/[chapterId]/lessons + /api/admin/lessons/[id] ---------- */
+
+export const adminLessonCreateSchema = z.object({
+  slug: slugSchema,
+  title: z.string().trim().min(2).max(120),
+  summary: z.string().trim().min(2).max(500),
+  content: z.string().trim().min(2).max(50_000), // Markdown
+  estimatedMinutes: z.number().int().positive().max(240).default(5),
+  order: z.number().int().nonnegative().default(0),
+  publishedAt: publishedAtSchema,
+});
+
+export type AdminLessonCreateBody = z.infer<typeof adminLessonCreateSchema>;
+
+export const adminLessonUpdateSchema = z.object({
+  slug: slugSchema.optional(),
+  title: z.string().trim().min(2).max(120).optional(),
+  summary: z.string().trim().min(2).max(500).optional(),
+  content: z.string().trim().min(2).max(50_000).optional(),
+  estimatedMinutes: z.number().int().positive().max(240).optional(),
+  order: z.number().int().nonnegative().optional(),
+  publishedAt: publishedAtSchema,
+});
+
+export type AdminLessonUpdateBody = z.infer<typeof adminLessonUpdateSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**

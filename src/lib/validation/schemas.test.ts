@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   adminChangeRoleSchema,
+  adminChapterCreateSchema,
+  adminChapterUpdateSchema,
   adminCourseCreateSchema,
   adminCourseUpdateSchema,
+  adminLessonCreateSchema,
+  adminLessonUpdateSchema,
   authBodySchema,
   parseJsonBody,
   questProgressBodySchema,
@@ -289,6 +293,98 @@ describe("adminCourseUpdateSchema", () => {
 
   it("accepte publishedAt null pour dépublier", () => {
     expect(adminCourseUpdateSchema.safeParse({ publishedAt: null }).success).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* adminChapterCreateSchema / adminChapterUpdateSchema                 */
+/* ------------------------------------------------------------------ */
+
+describe("adminChapterCreateSchema", () => {
+  const base = { slug: "propriete-numerique", title: "Propriété numérique", summary: "Court résumé" };
+
+  it("valide un payload minimal (order default 0)", () => {
+    const r = adminChapterCreateSchema.safeParse(base);
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.order).toBe(0);
+  });
+
+  it("rejette un slug mal formé", () => {
+    expect(adminChapterCreateSchema.safeParse({ ...base, slug: "bad_slug" }).success).toBe(false);
+  });
+
+  it("rejette un summary trop long", () => {
+    expect(adminChapterCreateSchema.safeParse({ ...base, summary: "x".repeat(501) }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("adminChapterUpdateSchema", () => {
+  it("accepte un patch vide", () => {
+    expect(adminChapterUpdateSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("valide un patch partiel", () => {
+    const r = adminChapterUpdateSchema.safeParse({ title: "Nouveau titre" });
+    expect(r.success).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* adminLessonCreateSchema / adminLessonUpdateSchema                   */
+/* ------------------------------------------------------------------ */
+
+describe("adminLessonCreateSchema", () => {
+  const base = {
+    slug: "pourquoi-bitcoin",
+    title: "Pourquoi Bitcoin ?",
+    summary: "Les motivations",
+    content: "## Intro\n\nContenu Markdown.",
+  };
+
+  it("valide un payload minimal (defaults appliqués)", () => {
+    const r = adminLessonCreateSchema.safeParse(base);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.estimatedMinutes).toBe(5);
+      expect(r.data.order).toBe(0);
+    }
+  });
+
+  it("accepte publishedAt null et ISO", () => {
+    expect(adminLessonCreateSchema.safeParse({ ...base, publishedAt: null }).success).toBe(true);
+    expect(
+      adminLessonCreateSchema.safeParse({ ...base, publishedAt: new Date().toISOString() }).success,
+    ).toBe(true);
+  });
+
+  it("rejette estimatedMinutes <= 0 ou > 240", () => {
+    expect(adminLessonCreateSchema.safeParse({ ...base, estimatedMinutes: 0 }).success).toBe(false);
+    expect(adminLessonCreateSchema.safeParse({ ...base, estimatedMinutes: 241 }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejette un content trop court ou trop long", () => {
+    expect(adminLessonCreateSchema.safeParse({ ...base, content: "x" }).success).toBe(false);
+    expect(adminLessonCreateSchema.safeParse({ ...base, content: "x".repeat(50_001) }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("adminLessonUpdateSchema", () => {
+  it("accepte un patch vide", () => {
+    expect(adminLessonUpdateSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("accepte publishedAt null pour dépublier", () => {
+    expect(adminLessonUpdateSchema.safeParse({ publishedAt: null }).success).toBe(true);
+  });
+
+  it("applique les contraintes du create sur les champs fournis", () => {
+    expect(adminLessonUpdateSchema.safeParse({ estimatedMinutes: 500 }).success).toBe(false);
   });
 });
 
