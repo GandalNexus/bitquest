@@ -1,0 +1,116 @@
+import Link from "next/link";
+import {
+  BookOpen,
+  LayoutDashboard,
+  Lock,
+  LogIn,
+  Map,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
+import { requireRoleSsr } from "@/lib/auth/server";
+import { Button } from "@/components/ui/button";
+
+export const metadata = {
+  title: "Admin — BitQuest",
+  description: "Console d'administration BitQuest",
+};
+
+/** Navigation admin : prête pour les CRUD à venir (Phase 2.4+). */
+const NAV = [
+  { href: "/admin", label: "Vue d'ensemble", icon: LayoutDashboard },
+  { href: "/admin/users", label: "Utilisateurs", icon: Users },
+  { href: "/admin/courses", label: "Cours", icon: BookOpen },
+  { href: "/admin/quests", label: "Quêtes", icon: Map },
+];
+
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const gate = await requireRoleSsr("ADMIN");
+
+  if (!gate.ok) {
+    return <AccessDenied reason={gate.reason} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Topbar */}
+      <header className="border-b bg-card">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
+          <Link href="/admin" className="flex items-center gap-2 font-display font-bold">
+            <span className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">ADMIN</span>
+            <span>
+              <span className="text-primary">BIT</span>QUEST
+            </span>
+          </Link>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <span className="hidden sm:inline">
+              Connecté·e : <strong>{gate.user.pseudo}</strong> · {gate.user.role}
+            </span>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/">Retour à l&apos;app</Link>
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Shell admin : sidebar + contenu */}
+      <div className="mx-auto flex w-full max-w-6xl gap-6 px-4 py-6">
+        <aside className="hidden w-56 shrink-0 md:block">
+          <nav aria-label="Navigation admin" className="space-y-1">
+            {NAV.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <item.icon className="h-4 w-4" aria-hidden />
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </aside>
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+function AccessDenied({ reason }: { reason: "unauthenticated" | "forbidden" }) {
+  const isUnauth = reason === "unauthenticated";
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-6">
+      <div className="max-w-md space-y-4 rounded-xl border bg-card p-8 text-center">
+        <div className="flex justify-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+            {isUnauth ? (
+              <Lock className="h-6 w-6" aria-hidden />
+            ) : (
+              <ShieldAlert className="h-6 w-6" aria-hidden />
+            )}
+          </div>
+        </div>
+        <h1 className="font-display text-2xl font-bold">
+          {isUnauth ? "Session requise" : "Accès refusé"}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {isUnauth
+            ? "Connecte-toi d'abord à BitQuest pour accéder à la console admin."
+            : "Cette zone est réservée aux administrateurs. Si tu penses que c'est une erreur, contacte un admin."}
+        </p>
+        <div className="flex justify-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/">Retour à l&apos;app</Link>
+          </Button>
+          {isUnauth && (
+            <Button asChild>
+              <Link href="/">
+                <LogIn className="h-4 w-4" aria-hidden />
+                Se connecter
+              </Link>
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
