@@ -7,6 +7,7 @@ import {
   adminCourseUpdateSchema,
   adminLessonCreateSchema,
   adminLessonUpdateSchema,
+  adminQuestMissionSchema,
   adminQuestQuizSchema,
   adminQuestTheorySchema,
   adminQuestUpdateSchema,
@@ -625,6 +626,89 @@ describe("adminQuestQuizSchema — wrapper", () => {
       adminQuestQuizSchema.safeParse({
         questions: [{ type: "OPEN_ENDED", question: "x", explanation: "e" }],
       }).success,
+    ).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* adminQuestMissionSchema                                             */
+/* ------------------------------------------------------------------ */
+
+describe("adminQuestMissionSchema", () => {
+  const base = {
+    missionType: "block_explorer" as const,
+    brief: "Trouve les 6 derniers caractères du hash du bloc.",
+  };
+
+  it("valide le payload minimal (hint default, config default)", () => {
+    const r = adminQuestMissionSchema.safeParse(base);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.hint).toBe("");
+      expect(r.data.config).toEqual({});
+    }
+  });
+
+  it("accepte les 8 missionType supportés", () => {
+    const types = [
+      "block_explorer",
+      "key_forge",
+      "tx_builder",
+      "mine_nonce",
+      "ln_channel",
+      "ln_invoice",
+      "multisig_sign",
+      "taproot_tweak",
+    ];
+    for (const t of types) {
+      expect(adminQuestMissionSchema.safeParse({ ...base, missionType: t }).success).toBe(true);
+    }
+  });
+
+  it("rejette un missionType inconnu", () => {
+    expect(
+      adminQuestMissionSchema.safeParse({ ...base, missionType: "quantum_hash" }).success,
+    ).toBe(false);
+  });
+
+  it("rejette un brief vide", () => {
+    expect(adminQuestMissionSchema.safeParse({ ...base, brief: "" }).success).toBe(false);
+  });
+
+  it("accepte un config JSON type-spécifique", () => {
+    const r = adminQuestMissionSchema.safeParse({
+      ...base,
+      missionType: "tx_builder",
+      config: { variant: "payment", target: 45_000, feeSats: { slow: 800, fast: 5000 } },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.config.variant).toBe("payment");
+    }
+  });
+
+  it("rejette un config qui n'est pas un objet (tableau, string)", () => {
+    expect(
+      adminQuestMissionSchema.safeParse({ ...base, config: [1, 2, 3] }).success,
+    ).toBe(false);
+    expect(
+      adminQuestMissionSchema.safeParse({ ...base, config: "nope" }).success,
+    ).toBe(false);
+  });
+
+  it("borne brief à 2000 et hint à 1000 caractères", () => {
+    expect(
+      adminQuestMissionSchema.safeParse({ ...base, brief: "x".repeat(2001) }).success,
+    ).toBe(false);
+    expect(
+      adminQuestMissionSchema.safeParse({ ...base, hint: "x".repeat(1001) }).success,
+    ).toBe(false);
+  });
+
+  it("rejette si la sérialisation dépasse 20 KB", () => {
+    const huge = "x".repeat(21_000);
+    expect(
+      adminQuestMissionSchema.safeParse({ ...base, config: { blob: huge } }).success,
     ).toBe(false);
   });
 });

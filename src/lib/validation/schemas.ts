@@ -255,6 +255,44 @@ export const adminQuestQuizSchema = z.object({
 export type AdminQuestQuizBody = z.infer<typeof adminQuestQuizSchema>;
 export type QuizQuestionInput = z.infer<typeof quizQuestionSchema>;
 
+/* ---------- /api/admin/quests/[code]/mission ---------- */
+
+export const MISSION_TYPES = [
+  "block_explorer",
+  "key_forge",
+  "tx_builder",
+  "mine_nonce",
+  "ln_channel",
+  "ln_invoice",
+  "multisig_sign",
+  "taproot_tweak",
+] as const;
+
+/**
+ * Configuration mission : type + texte (brief, hint) + bag JSON type-spécifique.
+ *
+ * - `missionType` : l'un des 8 générateurs supportés par missions.ts.
+ * - `brief` / `hint` : texte affiché à l'apprenant (champs standard de
+ *   l'enveloppe missionConfig telle que générée au seed).
+ * - `config` : objet libre que generateMission(type, config) consomme
+ *   (target, feeSats, policy, …). Le shape dépend du type mais reste
+ *   permissif ici — les builders dédiés par type pourront arriver plus
+ *   tard sans invalider les configs existantes.
+ */
+export const adminQuestMissionSchema = z
+  .object({
+    missionType: z.enum(MISSION_TYPES),
+    brief: z.string().trim().min(1, "Brief requis.").max(2000),
+    hint: z.string().trim().max(1000).default(""),
+    config: z.record(z.string(), z.unknown()).default({}),
+  })
+  .refine(
+    (v) => JSON.stringify({ ...v.config, brief: v.brief, hint: v.hint }).length <= 20_000,
+    { message: "La mission config sérialisée dépasse 20 KB." },
+  );
+
+export type AdminQuestMissionBody = z.infer<typeof adminQuestMissionSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**

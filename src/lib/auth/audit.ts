@@ -24,7 +24,8 @@ export type AuditAction =
   | "LESSON_DELETE"
   | "QUEST_UPDATE"
   | "QUEST_THEORY_UPDATE"
-  | "QUEST_QUIZ_UPDATE";
+  | "QUEST_QUIZ_UPDATE"
+  | "QUEST_MISSION_UPDATE";
 
 export async function logAdminAction(
   actorId: string,

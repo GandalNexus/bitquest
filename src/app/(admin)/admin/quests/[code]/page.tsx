@@ -116,15 +116,20 @@ export default async function EditQuestPage({
         </CardHeader>
       </Card>
 
-      {/* Mission — lecture seule (Phase 2.6b-3 à venir) */}
+      {/* Mission — éditable */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">
-            Mission : <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">{quest.missionType}</code>
-          </CardTitle>
-          <CardDescription>
-            Builder dédié à venir en Phase 2.6b-3 (8 types de missions BitLab).
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="text-sm">
+              Mission : <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">{quest.missionType}</code>
+            </CardTitle>
+            <CardDescription>
+              Type + brief/hint + config JSON type-spécifique.
+            </CardDescription>
+          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/admin/quests/${quest.code}/mission`}>Éditer</Link>
+          </Button>
         </CardHeader>
         <CardContent>
           <pre className="max-h-40 overflow-auto rounded-md border bg-muted/40 p-2 text-[10px] text-muted-foreground">
