@@ -70,6 +70,14 @@ export const questProgressBodySchema = z.discriminatedUnion("action", [
 
 export type QuestProgressBody = z.infer<typeof questProgressBodySchema>;
 
+/* ---------- /api/admin/users/[id]/role ---------- */
+
+export const adminChangeRoleSchema = z.object({
+  role: z.enum(["APPRENTICE", "EDITOR", "ADMIN"]),
+});
+
+export type AdminChangeRoleBody = z.infer<typeof adminChangeRoleSchema>;
+
 /* ---------- Helper générique ---------- */
 
 /**

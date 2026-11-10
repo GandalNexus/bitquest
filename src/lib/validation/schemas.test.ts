@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  adminChangeRoleSchema,
   authBodySchema,
   parseJsonBody,
   questProgressBodySchema,
@@ -151,6 +152,30 @@ describe("questProgressBodySchema", () => {
     if (r.success && r.data.action === "mission_submit") {
       expect(r.data.answer).toEqual({});
     }
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* adminChangeRoleSchema                                               */
+/* ------------------------------------------------------------------ */
+
+describe("adminChangeRoleSchema", () => {
+  it("accepte les trois rôles valides", () => {
+    for (const r of ["APPRENTICE", "EDITOR", "ADMIN"] as const) {
+      expect(adminChangeRoleSchema.safeParse({ role: r }).success).toBe(true);
+    }
+  });
+
+  it("rejette un rôle inconnu", () => {
+    expect(adminChangeRoleSchema.safeParse({ role: "GOD" }).success).toBe(false);
+  });
+
+  it("rejette un payload sans role", () => {
+    expect(adminChangeRoleSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("rejette un role non-string", () => {
+    expect(adminChangeRoleSchema.safeParse({ role: 1 }).success).toBe(false);
   });
 });
 
