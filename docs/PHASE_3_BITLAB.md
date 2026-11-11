@@ -92,17 +92,46 @@ via LND REST externe.
 ### UI quest-player
 - `BitLabProofStep` dans `src/components/bitquest/quest-player.tsx`
 - Affiché quand `quest.missionKind === "BITLAB_PROOF"` à l'étape mission
-- Champs : txid/hash + sélecteur réseau + lien externe vers BitLab
+- Champs : txid/hash + sélecteur réseau + lien deep-link vers BitLab
   (`NEXT_PUBLIC_BITLAB_URL`)
 - Bouton « Vérifier ma preuve » enchaîne :
   1. `/api/bitlab/challenge` → JWT
   2. `/api/bitlab/proof` → persiste la preuve
   3. `mission_submit` du parent → consomme la preuve, octroie les
      récompenses
+- Deep-link bidirectionnel : « Ouvrir dans BitLab » construit l'URL via
+  `buildBitlabDeepLink` (voir § *Protocole deep-link*) et navigue en
+  même onglet. Au retour avec `?bitlab_result=1`, `parseBitlabReturn`
+  pré-remplit le formulaire et nettoie l'URL via `router.replace`.
 - `missionKind` exposé dans `QuestState` (listing) et `QuestDetail.quest`
   (détail) + types `src/lib/bitquest/client.ts`
 - Helper `toBitlabKind(missionType)` dans `src/lib/bitlab/mission-kinds.ts`
   pour dériver le kind BitLab attendu depuis le missionType de la quête
+
+### Protocole deep-link BitQuest ↔ BitLab
+- `src/lib/bitlab/deep-link.ts` — helpers purs (11 tests)
+
+**Sender** (BitQuest → BitLab) : `GET ${NEXT_PUBLIC_BITLAB_URL}?` avec
+params :
+- `questCode` : code kebab-case de la quête BitQuest
+- `kind` : `TX | BLOCK | INVOICE | CHANNEL | ADDRESS`
+- `network` : `testnet4 | signet | regtest`
+- `returnTo` : URL absolue BitQuest où renvoyer l'apprenant
+- *extras* optionnels (ex. `target`, `feeSats`) tirés de `missionConfig`
+
+**Receiver** (BitLab → BitQuest) : redirige vers `${returnTo}?` avec :
+- `bitlab_result=1` (flag d'origine, obligatoire)
+- `kind`, `network` (échos sender)
+- `txid=<hex64>` pour kind=TX, ou `hash=<hex64>` pour kind=BLOCK
+
+BitQuest à la réception :
+1. Valide `bitlab_result=1`, `kind` connu, `network` non vide, txid/hash
+   bien formé (64 hex, insensible à la casse)
+2. Vérifie que `kind` correspond à la quête courante (évite collision
+   inter-quêtes)
+3. Pré-remplit le formulaire + nettoie l'URL. L'apprenant reste maître
+   du clic « Vérifier » (pas d'auto-submit, décision délibérée pour
+   maintenir le consentement explicite avant d'engager le JWT challenge)
 
 ## Ce qui N'est PAS livré (par choix)
 
@@ -208,12 +237,12 @@ Réponses attendues :
 
 ## Prochaines étapes (roadmap)
 
-1. **UI « Ouvrir dans BitLab » complète** — flow deep-link + callback
-   signé pour pré-remplir le txid au retour.
-2. **BITLAB_PROOF pour d'autres quêtes** — convertir progressivement
+1. **BITLAB_PROOF pour d'autres quêtes** — convertir progressivement
    les quêtes `tx_builder` / `block_explorer` / `lightning_pay` existantes.
-3. **Audit log séparé** pour toutes les soumissions de preuve (même
+2. **Audit log séparé** pour toutes les soumissions de preuve (même
    refusées) pour mesurer les attempts et taux de succès.
+3. **Signature HMAC sur le `returnTo`** (optionnel) pour que BitQuest
+   puisse refuser les retours non authentiques venant d'un tiers.
 
 ## Audit & logs
 

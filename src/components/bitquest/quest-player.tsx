@@ -47,6 +47,7 @@ import {
 } from "./ui-bits";
 import { MissionPanel } from "./mission-panel";
 import { useToast } from "@/hooks/use-toast";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toBitlabKind } from "@/lib/bitlab/mission-kinds";
+import { buildBitlabDeepLink, parseBitlabReturn } from "@/lib/bitlab/deep-link";
 
 /* ============ Types locaux ============ */
 
@@ -568,10 +570,37 @@ function BitLabProofStep({
   onSubmit: (answer: Record<string, unknown>) => void;
 }) {
   const { toast } = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const kind = toBitlabKind(quest.missionType);
-  const [txid, setTxid] = useState("");
-  const [network, setNetwork] = useState<"testnet4" | "signet" | "regtest">("testnet4");
+
+  /**
+   * Callback deep-link : si on arrive avec `?bitlab_result=1&txid=...&kind=...`,
+   * on pré-remplit le formulaire à l'initialisation. Le kind doit correspondre
+   * à la quête en cours sinon on ignore (évite une collision si l'apprenant
+   * revient d'une autre quête). L'URL est nettoyée via un effet one-shot.
+   */
+  const bitlabReturn = useMemo(() => {
+    const result = parseBitlabReturn(searchParams);
+    return result && result.kind === kind ? result : null;
+  }, [searchParams, kind]);
+
+  const [txid, setTxid] = useState(() => bitlabReturn?.value ?? "");
+  const [network, setNetwork] = useState<"testnet4" | "signet" | "regtest">(() => {
+    const n = bitlabReturn?.network;
+    return n === "testnet4" || n === "signet" || n === "regtest" ? n : "testnet4";
+  });
   const [localError, setLocalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!bitlabReturn) return;
+    toast({
+      title: "Preuve reçue depuis BitLab",
+      description: "Clique sur « Vérifier ma preuve » pour finaliser la quête.",
+    });
+    router.replace(pathname);
+  }, [bitlabReturn, toast, router, pathname]);
 
   const bitlabUrl =
     process.env.NEXT_PUBLIC_BITLAB_URL ?? "https://bitlab.example/mission";
@@ -633,13 +662,32 @@ function BitLabProofStep({
           </AlertDescription>
         </Alert>
 
-        <div>
-          <Button asChild variant="outline" className="h-10 gap-2">
-            <a href={bitlabUrl} target="_blank" rel="noreferrer noopener">
-              Ouvrir dans BitLab
-              <ExternalLink className="h-4 w-4" />
-            </a>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 gap-2"
+            onClick={() => {
+              const returnTo =
+                typeof window !== "undefined"
+                  ? `${window.location.origin}${pathname}`
+                  : pathname;
+              const link = buildBitlabDeepLink({
+                base: bitlabUrl,
+                questCode: quest.code,
+                kind,
+                network,
+                returnTo,
+              });
+              window.location.href = link;
+            }}
+          >
+            Ouvrir dans BitLab
+            <ExternalLink className="h-4 w-4" />
           </Button>
+          <span className="text-xs text-muted-foreground">
+            BitLab renverra automatiquement ta preuve sur cette page.
+          </span>
         </div>
 
         <div className="space-y-1.5">
