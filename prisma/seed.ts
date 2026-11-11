@@ -45,12 +45,20 @@ async function main() {
     // Les autres restent en SIMULATED (mission locale générée par
     // src/lib/bitquest/missions.ts) : key_forge (crypto locale pure),
     // multisig_sign et taproot_tweak (exercices cryptographiques sans
-    // broadcast), mine_nonce (impossible de réellement miner).
+    // broadcast), mine_nonce (impossible de réellement miner),
+    // block_explorer/genesis (introduction gentle).
+    //
+    // NB : `lightning` (kind=CHANNEL) requiert qu'un node LND testnet
+    // soit configuré côté serveur (LND_REST_URL + LND_MACAROON_HEX,
+    // cf. docs/DOCKER_LND.md). Sans LND, /api/bitlab/proof répond 501
+    // UNAVAILABLE — l'apprenant voit un message explicite et la quête
+    // reste en attente d'un ops avec un node LND opérationnel.
     const BITLAB_PROOF_QUESTS = new Set([
       "tx-basics",
       "utxo",
       "fees-mempool",
       "lightning-invoice",
+      "lightning",
     ]);
     const missionKind = BITLAB_PROOF_QUESTS.has(q.code) ? "BITLAB_PROOF" : "SIMULATED";
     const data = {

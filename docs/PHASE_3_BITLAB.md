@@ -2,10 +2,12 @@
 
 **Date de création** : 2026-11-10
 **Dernière mise à jour** : 2026-11-11
-**Statut** : chaîne bout-en-bout opérationnelle pour 4 quêtes
-(`tx-basics`, `utxo`, `fees-mempool`, `lightning-invoice`) ; `CHANNEL`
-supporté sur mainnet (mempool.space) et testnet/signet/regtest via LND
-REST externe. Audit log activé. Deep-link signé HMAC optionnel.
+**Statut** : chaîne bout-en-bout opérationnelle pour 5 quêtes
+(`tx-basics`, `utxo`, `fees-mempool`, `lightning-invoice`, `lightning`) ;
+`CHANNEL` supporté sur mainnet (mempool.space) et testnet/signet/regtest
+via LND REST externe (infra dédiée dans `docker-compose.dev.yml`, profile
+`lnd`). Audit log activé. Deep-link signé HMAC optionnel. Export CSV
+depuis la console admin.
 
 ## Ce qui est livré
 
@@ -84,13 +86,16 @@ REST externe. Audit log activé. Deep-link signé HMAC optionnel.
 - `payload` libre (chaque kind a ses champs attendus côté handler)
 - `challenge` requis (min 16 chars)
 
-### Wiring quête — 4 quêtes BITLAB_PROOF
+### Wiring quête — 5 quêtes BITLAB_PROOF
 - Champ `Quest.missionKind = "SIMULATED" | "BITLAB_PROOF"` dans Prisma
 - Seed (`prisma/seed.ts`) marque en `BITLAB_PROOF` :
   - `tx-basics` (kind=TX, pilote historique)
   - `utxo` (kind=TX, intermediaire — construction UTXO réelle testnet)
   - `fees-mempool` (kind=TX, intermediaire — tx avec frais calibrés)
   - `lightning-invoice` (kind=INVOICE, avancée — BOLT11 décodé serveur)
+  - `lightning` (kind=CHANNEL, avancée — SCID vérifié via LND testnet).
+    **Requiert** LND configuré (cf. `docs/DOCKER_LND.md`). Sans LND,
+    `/api/bitlab/proof` répond 501 UNAVAILABLE à chaque tentative.
 - Les autres restent `SIMULATED` : `key_forge` (crypto locale),
   `mine_nonce` (impossible de miner), `multisig_sign`/`taproot_tweak`
   (exercices cryptos sans broadcast), `block_explorer`/`genesis`
@@ -309,11 +314,14 @@ Réponses attendues :
 
 ## Prochaines étapes (roadmap)
 
-1. **Conversion `lightning-channel` (ln_channel)** — bascule la quête
-   `lightning` en `BITLAB_PROOF` maintenant que LND testnet est
-   disponible via `docker compose --profile lnd` (cf. DOCKER_LND.md).
-   Le test end-to-end dépend d'un wallet seedé et d'un channel ouvert
-   contre un pair de la testnet faucet.
+La roadmap Phase 3 est couverte. Suites possibles (hors scope immédiat) :
+
+1. **Test end-to-end LND** — ouvrir un channel testnet réel et exécuter
+   la quête `lightning` bout en bout pour valider le flux sur un node
+   LND fraîchement initialisé (cf. `docs/DOCKER_LND.md`).
+2. **Phase 4** — à définir : pédagogie Lightning avancée (routing,
+   backups, AMP), ou passage à régtest multi-nodes pour exercices de
+   channel management en réseau fermé.
 
 ## Audit & logs
 

@@ -789,9 +789,9 @@ export const questsSeed: QuestSeed[] = [
     missionType: "ln_channel",
     missionConfig: {},
     missionBrief:
-      "Ouvre un canal Lightning dans BitLab : choisis un pair parmi ceux proposés et détermine une capacité adaptée à tes futurs paiements, puis valide l'ouverture.",
+      "Ouvre un canal Lightning dans BitLab (testnet), copie le short channel ID (SCID) une fois le canal confirmé, puis colle-le ici pour que BitQuest vérifie son existence via LND.",
     missionHint:
-      "Un pair bien connecté t'apporte de la capacité entrante : tu pourras ainsi recevoir des paiements sans canal dédié.",
+      "Un pair bien connecté t'apporte de la capacité entrante. Le SCID se lit dans BitLab au format <block>x<tx>x<vout> dès que la funding transaction est confirmée.",
     theorySections: [
       {
         title: "Les canaux de paiement",
