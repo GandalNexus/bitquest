@@ -298,6 +298,11 @@ Réponses attendues :
   outcome badge coloré, latence, timestamp, reasonMessage
 - Tuile « BitLab preuves (24h) » ajoutée sur `/admin` (vue d'ensemble)
 - NAV admin : nouvelle entrée « BitLab preuves »
+- Export CSV : bouton « Exporter CSV » qui respecte les filtres courants.
+  `GET /admin/bitlab/attempts/export?outcome=…&quest=…` retourne jusqu'à
+  10 000 lignes (hard cap) UTF-8 avec BOM (compatibilité Excel). Colonnes :
+  id, createdAt, userId, pseudo, questCode, kind, network, outcome,
+  latencyMs, reasonMessage. Nom de fichier horodaté avec les filtres.
 
 ## Prochaines étapes (roadmap)
 
@@ -306,8 +311,6 @@ Réponses attendues :
 2. **Conversion `lightning-channel` (ln_channel)** — attend un node LND
    testnet opérationnel (actuellement simulé par manque d'explorateur
    public Lightning testnet).
-3. **Export CSV du journal** — bouton sur `/admin/bitlab/attempts`
-   pour exporter la sélection filtrée (utile pour analyse hors Postgres).
 
 ## Audit & logs
 

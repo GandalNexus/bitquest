@@ -1,6 +1,8 @@
-import { FlaskConical, Timer, CheckCircle2, XCircle } from "lucide-react";
+import Link from "next/link";
+import { Download, FlaskConical, Timer, CheckCircle2, XCircle } from "lucide-react";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
@@ -110,14 +112,28 @@ export default async function AdminBitlabAttemptsPage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-2xl font-bold tracking-tight">
-          BitLab · Journal de preuves
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Toutes les tentatives sur <code className="rounded bg-muted px-1">/api/bitlab/proof</code>{" "}
-          (acceptées et refusées). {totalCount > 100 && `${totalCount} entrées au total.`}
-        </p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">
+            BitLab · Journal de preuves
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Toutes les tentatives sur{" "}
+            <code className="rounded bg-muted px-1">/api/bitlab/proof</code> (acceptées et
+            refusées). {totalCount > 100 && `${totalCount} entrées au total.`}
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm" className="shrink-0 gap-2">
+          <Link
+            href={buildExportHref(outcome, questCode)}
+            prefetch={false}
+            // Reload={false} laisse Next gérer la navigation vers la route ; l'en-tête
+            // Content-Disposition déclenche le téléchargement côté navigateur.
+          >
+            <Download className="h-4 w-4" aria-hidden />
+            Exporter CSV
+          </Link>
+        </Button>
       </header>
 
       {/* Stats 24h */}
@@ -329,6 +345,16 @@ function buildHref(outcome: Outcome | null, quest: string | null): string {
   if (quest) params.set("quest", quest);
   const qs = params.toString();
   return qs ? `/admin/bitlab/attempts?${qs}` : "/admin/bitlab/attempts";
+}
+
+function buildExportHref(outcome: Outcome | null, quest: string | null): string {
+  const params = new URLSearchParams();
+  if (outcome) params.set("outcome", outcome);
+  if (quest) params.set("quest", quest);
+  const qs = params.toString();
+  return qs
+    ? `/admin/bitlab/attempts/export?${qs}`
+    : "/admin/bitlab/attempts/export";
 }
 
 function FilterChip({
