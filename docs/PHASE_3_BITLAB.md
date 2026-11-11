@@ -111,10 +111,7 @@ via LND REST externe.
 2. **Pas de UI deep-link callback** dans `mission-panel.tsx` : le bouton
    « Ouvrir dans BitLab » ouvre `NEXT_PUBLIC_BITLAB_URL` en nouvel onglet,
    sans round-trip JWT + callback encore (optionnel, roadmap).
-3. **Pas de certificat pinné pour LND** : support `LND_TLS_INSECURE=1`
-   pour dev. En prod, utiliser une CA de confiance ou prévoir un pinning
-   (TODO). Le code accepte un cert valide sans config spéciale.
-4. **ADDRESS non vérifié** : la dérivation d'une adresse depuis un xpub
+3. **ADDRESS non vérifié** : la dérivation d'une adresse depuis un xpub
    est purement cliente ; aucune lookup serveur actuellement.
 
 ## Config LND
@@ -125,17 +122,31 @@ sur testnet/signet/regtest :
 ```bash
 LND_REST_URL=https://my-lnd-node.local:8080
 LND_MACAROON_HEX=0201036c6e64...   # readonly.macaroon encodé en hex
-LND_TLS_INSECURE=1                 # dev uniquement : accepte un cert self-signed
+# Précédence TLS (une seule à utiliser) :
+LND_TLS_CERT_B64=LS0tLS1CRUdJTi...  # tls.cert PEM encodé en base64 (prod)
+LND_TLS_INSECURE=1                  # dev uniquement : accepte un cert self-signed
 ```
 
-Génération du macaroon hex depuis un node LND :
+Génération des valeurs depuis un node LND :
 
 ```bash
+# Macaroon → hex
 xxd -p -c 1000 ~/.lnd/data/chain/bitcoin/testnet/readonly.macaroon
+
+# Cert TLS → base64 (une seule ligne, portable Docker/CI)
+base64 -i ~/.lnd/tls.cert | tr -d '\n'
 ```
 
-Sans ces variables, les preuves `kind=CHANNEL` sur testnet reçoivent un
-`501 Not Implemented` avec un message explicatif.
+**Précédence TLS** (dans le client) :
+1. Si `LND_TLS_CERT_B64` est fourni : le cert est utilisé comme CA pinnée
+   (`rejectUnauthorized=true`). Toute autre CA est refusée, même valide
+   système.
+2. Sinon si `LND_TLS_INSECURE=1` : `rejectUnauthorized=false`. Dev seulement.
+3. Sinon : vérification stricte contre la CA system (suffit pour un cert
+   signé Let's Encrypt).
+
+Sans `LND_REST_URL` + `LND_MACAROON_HEX`, les preuves `kind=CHANNEL` sur
+testnet reçoivent un `501 Not Implemented` avec un message explicatif.
 
 ## API — exemples
 
@@ -199,11 +210,9 @@ Réponses attendues :
 
 1. **UI « Ouvrir dans BitLab » complète** — flow deep-link + callback
    signé pour pré-remplir le txid au retour.
-2. **TLS pinning LND** — accepter un certificat PEM via
-   `LND_TLS_CERT_PATH` ou `LND_TLS_CERT_B64`.
-3. **BITLAB_PROOF pour d'autres quêtes** — convertir progressivement
+2. **BITLAB_PROOF pour d'autres quêtes** — convertir progressivement
    les quêtes `tx_builder` / `block_explorer` / `lightning_pay` existantes.
-4. **Audit log séparé** pour toutes les soumissions de preuve (même
+3. **Audit log séparé** pour toutes les soumissions de preuve (même
    refusées) pour mesurer les attempts et taux de succès.
 
 ## Audit & logs

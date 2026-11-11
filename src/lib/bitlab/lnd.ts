@@ -23,6 +23,28 @@ export interface LndConfig {
   url: string;
   macaroonHex: string;
   tlsInsecure: boolean;
+  /** CA PEM décodé (Buffer) quand LND_TLS_CERT_B64 est fourni. */
+  tlsCa: Buffer | null;
+}
+
+/**
+ * Décode un certificat PEM encodé en base64. Retourne null si la variable
+ * est absente ou si le contenu ne contient pas un bloc BEGIN CERTIFICATE.
+ */
+export function decodeTlsCertB64(b64: string | undefined): Buffer | null {
+  const trimmed = b64?.trim();
+  if (!trimmed) return null;
+  let pem: string;
+  try {
+    pem = Buffer.from(trimmed, "base64").toString("utf8");
+  } catch {
+    return null;
+  }
+  if (!pem.includes("-----BEGIN CERTIFICATE-----")) {
+    log.warn({}, "LND_TLS_CERT_B64 ne contient pas un bloc PEM BEGIN CERTIFICATE");
+    return null;
+  }
+  return Buffer.from(pem, "utf8");
 }
 
 export function getLndConfig(): LndConfig | null {
@@ -33,6 +55,7 @@ export function getLndConfig(): LndConfig | null {
     url,
     macaroonHex,
     tlsInsecure: process.env.LND_TLS_INSECURE === "1",
+    tlsCa: decodeTlsCertB64(process.env.LND_TLS_CERT_B64),
   };
 }
 
@@ -114,6 +137,16 @@ function requestJson(
       return;
     }
     const isHttps = parsed.protocol === "https:";
+    // Précédence TLS : cert pinned > insecure > strict (défaut système).
+    const tlsOpts: Record<string, unknown> = {};
+    if (isHttps) {
+      if (cfg.tlsCa) {
+        tlsOpts.ca = cfg.tlsCa;
+        tlsOpts.rejectUnauthorized = true;
+      } else {
+        tlsOpts.rejectUnauthorized = !cfg.tlsInsecure;
+      }
+    }
     const req = (isHttps ? httpsRequest : httpRequest)(
       {
         hostname: parsed.hostname,
@@ -124,7 +157,7 @@ function requestJson(
           "Grpc-Metadata-macaroon": cfg.macaroonHex,
           Accept: "application/json",
         },
-        ...(isHttps ? { rejectUnauthorized: !cfg.tlsInsecure } : {}),
+        ...tlsOpts,
         timeout: timeoutMs,
       },
       (res) => {

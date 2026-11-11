@@ -1,12 +1,18 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
+  decodeTlsCertB64,
   getLndConfig,
   isChanId,
   mapLndChannel,
   scidToChanId,
 } from "./lnd";
 
-const ENV_KEYS = ["LND_REST_URL", "LND_MACAROON_HEX", "LND_TLS_INSECURE"] as const;
+const ENV_KEYS = [
+  "LND_REST_URL",
+  "LND_MACAROON_HEX",
+  "LND_TLS_INSECURE",
+  "LND_TLS_CERT_B64",
+] as const;
 const savedEnv: Record<string, string | undefined> = {};
 
 afterEach(() => {
@@ -131,10 +137,12 @@ describe("getLndConfig", () => {
     setEnv("LND_REST_URL", "https://lnd.local:8080");
     setEnv("LND_MACAROON_HEX", "cafe");
     setEnv("LND_TLS_INSECURE", undefined);
+    setEnv("LND_TLS_CERT_B64", undefined);
     expect(getLndConfig()).toEqual({
       url: "https://lnd.local:8080",
       macaroonHex: "cafe",
       tlsInsecure: false,
+      tlsCa: null,
     });
   });
 
@@ -143,5 +151,38 @@ describe("getLndConfig", () => {
     setEnv("LND_MACAROON_HEX", "cafe");
     setEnv("LND_TLS_INSECURE", "1");
     expect(getLndConfig()?.tlsInsecure).toBe(true);
+  });
+
+  it("charge tlsCa depuis LND_TLS_CERT_B64", () => {
+    const pem =
+      "-----BEGIN CERTIFICATE-----\nMIIBogus==\n-----END CERTIFICATE-----\n";
+    const b64 = Buffer.from(pem, "utf8").toString("base64");
+    setEnv("LND_REST_URL", "https://lnd.local:8080");
+    setEnv("LND_MACAROON_HEX", "cafe");
+    setEnv("LND_TLS_CERT_B64", b64);
+    const cfg = getLndConfig();
+    expect(cfg?.tlsCa).not.toBeNull();
+    expect(cfg?.tlsCa?.toString("utf8")).toContain("BEGIN CERTIFICATE");
+  });
+});
+
+describe("decodeTlsCertB64", () => {
+  it("retourne null si vide / undefined", () => {
+    expect(decodeTlsCertB64(undefined)).toBeNull();
+    expect(decodeTlsCertB64("")).toBeNull();
+    expect(decodeTlsCertB64("   ")).toBeNull();
+  });
+
+  it("retourne null si le contenu décodé n'est pas un PEM", () => {
+    const notPem = Buffer.from("hello world", "utf8").toString("base64");
+    expect(decodeTlsCertB64(notPem)).toBeNull();
+  });
+
+  it("retourne un Buffer PEM quand base64 valide", () => {
+    const pem =
+      "-----BEGIN CERTIFICATE-----\nMIIBogus==\n-----END CERTIFICATE-----\n";
+    const buf = decodeTlsCertB64(Buffer.from(pem, "utf8").toString("base64"));
+    expect(buf).not.toBeNull();
+    expect(buf?.toString("utf8")).toBe(pem);
   });
 });
