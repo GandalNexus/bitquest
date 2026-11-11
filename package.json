@@ -20,8 +20,11 @@
     "db:push": "prisma db push --accept-data-loss",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:backup": "bash scripts/backup-postgres.sh",
+    "db:restore": "bash scripts/restore-postgres.sh"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

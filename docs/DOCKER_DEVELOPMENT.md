@@ -1,15 +1,20 @@
 # Environnement de développement Docker — BitQuest
 
-> Ce document décrit l'environnement de développement reproductible pour BitQuest, basé sur Docker. Il **ne remplace pas** le `docker-compose.yml` existant (PostgreSQL, hors sujet pour la Phase 0 en cours).
+> Ce document décrit l'environnement de développement reproductible pour BitQuest,
+> basé sur Docker. Depuis la Phase 0.4, la base de données principale est
+> **PostgreSQL** (service `postgres` dans `docker-compose.dev.yml`). Le fichier
+> `db/custom.db` SQLite est un vestige historique conservé pour récupération
+> éventuelle mais plus utilisé par l'application. Pour les opérations prod
+> (migrations, backup/restore), voir [`POSTGRES_PROD.md`](POSTGRES_PROD.md).
 
 ---
 
 ## 1. Objectif
 
 - Isoler les dépendances Node.js du Mac host.
-- Rendre reproductible la toolchain (Node 20, Prisma 6, Next.js 16) pour tous les contributeurs.
-- Préserver la base SQLite existante (`db/custom.db`) sans la réinitialiser.
+- Rendre reproductible la toolchain (Node 20, Prisma 6, Next.js 16, Postgres 16, Redis 7).
 - Permettre le hot-reload (HMR) lors des modifications locales.
+- Fournir un Postgres local prêt à l'emploi (bind mount du volume `postgres_data`).
 
 ---
 
@@ -21,7 +26,8 @@
 | `docker-compose.dev.yml` | Orchestration : service unique, volumes nommés pour `node_modules` et `.next`, bind mount pour le code et la base SQLite |
 | `.dockerignore` | Contexte de build minimal (n'efface aucun fichier du dépôt) |
 
-Le fichier `docker-compose.yml` d'origine (PostgreSQL) est **conservé intact**. Il sera traité dans une phase ultérieure.
+Le fichier `docker-compose.yml` (PostgreSQL seul) est utilisable comme alternative
+minimale si on veut juste Postgres sans l'app.
 
 ---
 
@@ -29,7 +35,6 @@ Le fichier `docker-compose.yml` d'origine (PostgreSQL) est **conservé intact**.
 
 - Docker Desktop ≥ 20.10 (testé sous Docker 24).
 - Docker Compose v2.
-- Le fichier `db/custom.db` doit exister à la racine (c'est le cas par défaut dans ce dépôt).
 
 ---
 
@@ -40,9 +45,12 @@ Le fichier `docker-compose.yml` d'origine (PostgreSQL) est **conservé intact**.
 | `./` | `/app` | bind mount (cached) | Code source, édition live depuis macOS |
 | (volume nommé) | `/app/node_modules` | volume Docker `bitquest_node_modules` | Binaires natifs Linux, isolés du host |
 | (volume nommé) | `/app/.next` | volume Docker `bitquest_next_cache` | Cache Next.js persistant entre redémarrages |
-| `./db` | `/app/db` | bind mount | **Base SQLite** `custom.db`, visible et sauvegardable depuis le Mac |
+| (volume nommé) | `/var/lib/postgresql/data` (container `bitquest-db`) | volume Docker `bitquest_postgres_data` | **Données Postgres** persistantes |
+| `./db` | `/app/db` | bind mount | Vestige SQLite (`custom.db` + backups). Non lu par l'app. |
 
-**Garantie** : `db/custom.db` n'est jamais écrasé par l'image Docker. Si le fichier existe avant `docker compose up`, il est utilisé tel quel.
+**Garantie** : le volume `bitquest_postgres_data` est préservé entre
+`docker compose down` et `up`. Pour le supprimer explicitement :
+`docker compose down -v` (destructif).
 
 ---
 
@@ -51,7 +59,8 @@ Le fichier `docker-compose.yml` d'origine (PostgreSQL) est **conservé intact**.
 | Variable | Valeur | Raison |
 |---|---|---|
 | `NODE_ENV` | `development` | Standard Next.js |
-| `DATABASE_URL` | `file:/app/db/custom.db` | Chemin absolu : non ambigu dans le conteneur |
+| `DATABASE_URL` | `postgresql://bitquest:bitquest_dev_password@postgres:5432/bitquest?schema=public` | Postgres via le service compose |
+| `REDIS_URL` | `redis://redis:6379` | Rate-limit distribué (fallback in-memory si service down) |
 | `CHOKIDAR_USEPOLLING` | `true` | HMR fiable avec bind mount macOS |
 | `WATCHPACK_POLLING` | `true` | Webpack/Turbopack watch sur bind mount |
 | `NEXT_TELEMETRY_DISABLED` | `1` | Évite l'appel réseau Next télémétrie |
