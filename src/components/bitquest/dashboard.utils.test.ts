@@ -26,6 +26,7 @@ function makeQuest(overrides: Partial<QuestState> = {}): QuestState {
     xpReward: 115,
     satsReward: 1000,
     missionType: "block_explorer",
+    missionKind: "SIMULATED",
     totalSections: 3,
     totalQuiz: 4,
     status: "AVAILABLE",

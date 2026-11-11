@@ -62,6 +62,7 @@ export interface QuestState {
   xpReward: number;
   satsReward: number;
   missionType: string;
+  missionKind: string;
   totalSections: number;
   totalQuiz: number;
   status: string;
@@ -93,6 +94,7 @@ export interface QuestDetail {
     satsReward: number;
     requiredLevel: number;
     missionType: string;
+    missionKind: string;
   };
   quiz: { id: string; type: "MCQ" | "TRUE_FALSE"; question: string; options: string[] }[];
   progress: {
@@ -391,6 +393,22 @@ export const api = {
     request<{ ok: true; token: string }>("/api/me/password", { method: "POST", body }),
   deleteAccount: (body: { confirmation: "DELETE"; currentPassword?: string }) =>
     request<{ ok: true }>("/api/me/delete", { method: "POST", body }),
+  bitlabChallenge: (body: { questCode: string; kind: string }) =>
+    request<{ ok: true; token: string; nonce: string; expiresAt: string }>(
+      "/api/bitlab/challenge",
+      { method: "POST", body },
+    ),
+  bitlabProof: (body: {
+    questCode: string;
+    kind: string;
+    network: string;
+    payload: Record<string, unknown>;
+    challenge?: string;
+  }) =>
+    request<{
+      ok: true;
+      proof: { id: string; kind: string; network: string; verifiedAt: string; consumed: boolean };
+    }>("/api/bitlab/proof", { method: "POST", body }),
 };
 
 /* ============ Formats ============ */

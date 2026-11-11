@@ -51,9 +51,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { toBitlabKind } from "@/lib/bitlab/mission-kinds";
 
 /* ============ Types locaux ============ */
 
@@ -541,6 +543,179 @@ function QuizStep({
   );
 }
 
+/* ============ Étape 4bis : Mission BITLAB_PROOF ============ */
+
+/**
+ * Formulaire de soumission de preuve BitLab (Phase 3).
+ *
+ * Enchaîne 3 appels :
+ *   1. /api/bitlab/challenge  → JWT avec nonce
+ *   2. /api/bitlab/proof      → preuve persistée (lookup explorateur)
+ *   3. mission_submit         → consomme la preuve + octroie les récompenses
+ *
+ * Les erreurs des étapes 1-2 sont affichées localement ; la propagation à
+ * l'étape 3 utilise `onSubmit({})` pour réutiliser le flux rewards du parent.
+ */
+function BitLabProofStep({
+  quest,
+  missionMeta,
+  submitting,
+  onSubmit,
+}: {
+  quest: Quest;
+  missionMeta: QuestDetail["missionMeta"];
+  submitting: boolean;
+  onSubmit: (answer: Record<string, unknown>) => void;
+}) {
+  const { toast } = useToast();
+  const kind = toBitlabKind(quest.missionType);
+  const [txid, setTxid] = useState("");
+  const [network, setNetwork] = useState<"testnet4" | "signet" | "regtest">("testnet4");
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const bitlabUrl =
+    process.env.NEXT_PUBLIC_BITLAB_URL ?? "https://bitlab.example/mission";
+
+  const payloadField = kind === "BLOCK" ? "hash" : "txid";
+  const payloadLabel = kind === "BLOCK" ? "Hash du bloc" : "Identifiant de transaction (txid)";
+  const isHex64 = /^[0-9a-f]{64}$/i.test(txid.trim());
+
+  const verifyMutation = useMutation({
+    mutationFn: async () => {
+      const value = txid.trim();
+      const challenge = await api.bitlabChallenge({ questCode: quest.code, kind });
+      await api.bitlabProof({
+        questCode: quest.code,
+        kind,
+        network,
+        payload: { [payloadField]: value },
+        challenge: challenge.token,
+      });
+    },
+    onSuccess: () => {
+      setLocalError(null);
+      toast({ title: "Preuve vérifiée", description: "Le serveur enchaîne la mission." });
+      onSubmit({});
+    },
+    onError: (err) => {
+      setLocalError(errorMessage(err));
+    },
+  });
+
+  const canSubmit = isHex64 && !verifyMutation.isPending && !submitting;
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-4 sm:p-6">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <FlaskConical className="h-5 w-5" />
+          </span>
+          <div>
+            <div className="font-bold">Mission BitLab — preuve on-chain</div>
+            <div className="text-xs text-muted-foreground">
+              Soumets une preuve réelle ({kind}) depuis le réseau {network}
+            </div>
+          </div>
+        </div>
+
+        {missionMeta.brief && (
+          <p className="text-sm leading-relaxed text-muted-foreground">{missionMeta.brief}</p>
+        )}
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Mode : preuve on-chain</AlertTitle>
+          <AlertDescription>
+            Exécute la mission dans BitLab (testnet), récupère le{" "}
+            {kind === "BLOCK" ? "hash du bloc" : "txid"}, puis colle-le ci-dessous. Le serveur
+            vérifie la confirmation via mempool.space avant de valider la quête.
+          </AlertDescription>
+        </Alert>
+
+        <div>
+          <Button asChild variant="outline" className="h-10 gap-2">
+            <a href={bitlabUrl} target="_blank" rel="noreferrer noopener">
+              Ouvrir dans BitLab
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </Button>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="bq-bitlab-txid">{payloadLabel}</Label>
+          <Input
+            id="bq-bitlab-txid"
+            className="font-mono"
+            placeholder="64 caractères hexadécimaux"
+            value={txid}
+            onChange={(e) => {
+              setTxid(e.target.value);
+              setLocalError(null);
+            }}
+            disabled={verifyMutation.isPending || submitting}
+          />
+          {txid.length > 0 && !isHex64 && (
+            <p className="text-xs text-destructive">
+              Format attendu : 64 caractères hexadécimaux (0-9, a-f).
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="bq-bitlab-network">Réseau</Label>
+          <select
+            id="bq-bitlab-network"
+            value={network}
+            onChange={(e) => setNetwork(e.target.value as typeof network)}
+            disabled={verifyMutation.isPending || submitting}
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="testnet4">testnet4</option>
+            <option value="signet">signet</option>
+            <option value="regtest">regtest</option>
+          </select>
+        </div>
+
+        {localError && (
+          <Alert variant="destructive">
+            <XCircle className="h-4 w-4" />
+            <AlertTitle>Preuve refusée</AlertTitle>
+            <AlertDescription>{localError}</AlertDescription>
+          </Alert>
+        )}
+
+        <div>
+          <Button
+            type="button"
+            className="h-10"
+            disabled={!canSubmit}
+            onClick={() => verifyMutation.mutate()}
+          >
+            {verifyMutation.isPending || submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FlaskConical className="h-4 w-4" />
+            )}
+            {verifyMutation.isPending
+              ? "Vérification sur l'explorateur…"
+              : submitting
+                ? "Finalisation…"
+                : "Vérifier ma preuve"}
+          </Button>
+        </div>
+
+        {missionMeta.hint && (
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium">Indice : </span>
+            {missionMeta.hint}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 /* ============ Étape 4 : Mission BitLab ============ */
 
 function MissionStep({
@@ -591,6 +766,17 @@ function MissionStep({
           </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  if (quest.missionKind === "BITLAB_PROOF") {
+    return (
+      <BitLabProofStep
+        quest={quest}
+        missionMeta={missionMeta}
+        submitting={submitting}
+        onSubmit={onSubmit}
+      />
     );
   }
 

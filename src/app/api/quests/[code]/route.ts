@@ -34,6 +34,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ code: st
       satsReward: quest.satsReward,
       requiredLevel: quest.requiredLevel,
       missionType: quest.missionType,
+      missionKind: quest.missionKind,
     },
     quiz: quest.quizQuestions.map((q) => ({
       id: q.id,
