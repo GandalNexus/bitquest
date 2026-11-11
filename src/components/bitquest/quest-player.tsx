@@ -56,23 +56,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { toBitlabKind } from "@/lib/bitlab/mission-kinds";
+import { toBitlabKind, type BitlabKind } from "@/lib/bitlab/mission-kinds";
 import { parseBitlabReturn } from "@/lib/bitlab/deep-link";
+import { useT } from "@/i18n/locale-provider";
 
 /* ============ Types locaux ============ */
 
 type Step = "intro" | "theory" | "quiz" | "mission" | "rewards";
+type Translator = (key: string, vars?: Record<string, string | number>) => string;
 
 type Quest = QuestDetail["quest"];
 type QuestProgress = QuestDetail["progress"];
 type QuizQuestion = QuestDetail["quiz"][number];
 
-const STEPS: { key: Step; label: string }[] = [
-  { key: "intro", label: "Introduction" },
-  { key: "theory", label: "Théorie" },
-  { key: "quiz", label: "Quiz" },
-  { key: "mission", label: "Mission" },
-  { key: "rewards", label: "Récompenses" },
+const STEP_KEYS: { key: Step; labelKey: string }[] = [
+  { key: "intro", labelKey: "player.step.intro" },
+  { key: "theory", labelKey: "player.step.theory" },
+  { key: "quiz", labelKey: "player.step.quiz" },
+  { key: "mission", labelKey: "player.step.mission" },
+  { key: "rewards", labelKey: "player.step.rewards" },
 ];
 
 const QUIZ_PASS_THRESHOLD = 70;
@@ -89,15 +91,19 @@ function getTrackStyle(track: string) {
   );
 }
 
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : "Une erreur est survenue. Réessaie.";
+function errorMessage(err: unknown, t: Translator): string {
+  return err instanceof Error ? err.message : t("player.toast.error.unknown");
 }
 
-function notifyBadges(toast: ReturnType<typeof useToast>["toast"], badges: BadgeNotification[] | undefined) {
+function notifyBadges(
+  toast: ReturnType<typeof useToast>["toast"],
+  t: Translator,
+  badges: BadgeNotification[] | undefined,
+) {
   if (!badges) return;
   for (const b of badges) {
     toast({
-      title: `Badge débloqué : ${b.name}`,
+      title: t("player.toast.badge.title", { name: b.name }),
       description: (
         <span className="flex items-center gap-2">
           <BadgeIcon icon={b.icon} className="h-4 w-4 shrink-0 text-amber-500" />
@@ -108,21 +114,21 @@ function notifyBadges(toast: ReturnType<typeof useToast>["toast"], badges: Badge
   }
 }
 
-function userAnswerLabel(q: QuizQuestion, a: number | boolean | null): string {
+function userAnswerLabel(q: QuizQuestion, a: number | boolean | null, t: Translator): string {
   if (a === null || a === undefined) return "—";
-  if (q.type === "TRUE_FALSE") return a ? "Vrai" : "Faux";
+  if (q.type === "TRUE_FALSE") return a ? t("quiz.answer.true") : t("quiz.answer.false");
   if (typeof a === "boolean") return "—";
   return q.options[Number(a)] ?? "—";
 }
 
-function correctAnswerLabel(q: QuizQuestion, r: QuizResult): string {
-  if (q.type === "TRUE_FALSE") return r.correctBool ? "Vrai" : "Faux";
+function correctAnswerLabel(q: QuizQuestion, r: QuizResult, t: Translator): string {
+  if (q.type === "TRUE_FALSE") return r.correctBool ? t("quiz.answer.true") : t("quiz.answer.false");
   return q.options[r.correctIndex ?? -1] ?? "—";
 }
 
 /* ============ Étape 1 : Introduction ============ */
 
-function IntroStep({ quest, onStart }: { quest: Quest; onStart: () => void }) {
+function IntroStep({ quest, onStart, t }: { quest: Quest; onStart: () => void; t: Translator }) {
   const paragraphs = quest.intro.split("\n\n").filter(Boolean);
   const objectives = quest.theorySections.map((s) => s.title);
 
@@ -142,7 +148,7 @@ function IntroStep({ quest, onStart }: { quest: Quest; onStart: () => void }) {
         <CardContent className="space-y-3 p-4 sm:p-6">
           <h2 className="flex items-center gap-2 font-bold">
             <GraduationCap className="h-4 w-4 text-primary" />
-            Objectifs pédagogiques
+            {t("intro.objectives")}
           </h2>
           <ul className="space-y-2">
             {objectives.map((o) => (
@@ -157,7 +163,7 @@ function IntroStep({ quest, onStart }: { quest: Quest; onStart: () => void }) {
 
       <div className="flex justify-end">
         <Button className="h-10" onClick={onStart}>
-          Commencer l&apos;apprentissage
+          {t("intro.start")}
           <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
@@ -173,12 +179,14 @@ function TheoryStep({
   reading,
   onRead,
   onBack,
+  t,
 }: {
   quest: Quest;
   sectionIndex: number;
   reading: boolean;
   onRead: () => void;
   onBack: () => void;
+  t: Translator;
 }) {
   const sections = quest.theorySections;
   const section = sections[sectionIndex];
@@ -194,7 +202,7 @@ function TheoryStep({
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>
-                Section {sectionIndex + 1} sur {sections.length}
+                {t("theory.section.count", { current: sectionIndex + 1, total: sections.length })}
               </span>
               <span className="inline-flex items-center gap-1">
                 <BookOpen className="h-3.5 w-3.5" />
@@ -217,7 +225,7 @@ function TheoryStep({
           {section.keypoints.length > 0 && (
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
-                Points clés
+                {t("theory.keypoints")}
               </div>
               <ul className="space-y-2">
                 {section.keypoints.map((k) => (
@@ -235,11 +243,11 @@ function TheoryStep({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="ghost" className="h-10" onClick={onBack} disabled={sectionIndex === 0 || reading}>
           <ArrowLeft className="h-4 w-4" />
-          Section précédente
+          {t("theory.previous")}
         </Button>
         <Button className="h-10" onClick={onRead} disabled={reading}>
           {reading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-          {isLast ? "Passer au quiz" : "J'ai lu cette section"}
+          {isLast ? t("theory.goToQuiz") : t("theory.readConfirmed")}
         </Button>
       </div>
     </div>
@@ -255,6 +263,7 @@ function QuizQuestionCard({
   answer,
   onSelect,
   answeredCount,
+  t,
 }: {
   question: QuizQuestion;
   index: number;
@@ -262,24 +271,21 @@ function QuizQuestionCard({
   answer: number | boolean | null;
   onSelect: (value: number | boolean) => void;
   answeredCount: number;
+  t: Translator;
 }) {
   return (
     <Card>
       <CardContent className="space-y-4 p-4 sm:p-6">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>
-              Question {index + 1} sur {total}
-            </span>
-            <span>
-              {answeredCount}/{total} répondues
-            </span>
+            <span>{t("quiz.question.count", { current: index + 1, total })}</span>
+            <span>{t("quiz.answered.count", { answered: answeredCount, total })}</span>
           </div>
           <Progress value={(answeredCount / total) * 100} className="h-1.5" />
         </div>
 
         <Badge variant="outline" className="border-primary/40 text-primary">
-          {question.type === "TRUE_FALSE" ? "Vrai ou faux" : "QCM"}
+          {question.type === "TRUE_FALSE" ? t("quiz.type.trueFalse") : t("quiz.type.mcq")}
         </Badge>
 
         <h2 className="text-base font-semibold leading-relaxed sm:text-lg">{question.question}</h2>
@@ -297,7 +303,7 @@ function QuizQuestionCard({
                 )}
                 onClick={() => onSelect(v)}
               >
-                {v ? "Vrai" : "Faux"}
+                {v ? t("quiz.answer.true") : t("quiz.answer.false")}
               </Button>
             ))}
           </div>
@@ -332,12 +338,14 @@ function QuizResults({
   result,
   onRetry,
   onGoMission,
+  t,
 }: {
   quiz: QuizQuestion[];
   answers: (number | boolean | null)[];
   result: QuizSubmitResponse;
   onRetry: () => void;
   onGoMission: () => void;
+  t: Translator;
 }) {
   return (
     <div className="space-y-4">
@@ -367,32 +375,30 @@ function QuizResults({
                   : "border-transparent bg-rose-500 text-white"
               }
             >
-              {result.passed ? "Quiz réussi" : "Quiz échoué"}
+              {result.passed ? t("quiz.result.passed") : t("quiz.result.failed")}
             </Badge>
             {result.perfect && (
               <Badge className="gap-1 border-transparent bg-amber-500 text-white">
                 <Sparkles className="h-3 w-3" />
-                Score parfait
+                {t("quiz.result.perfect")}
               </Badge>
             )}
           </div>
 
           <p className="mx-auto max-w-md text-sm text-muted-foreground">
-            {result.passed
-              ? "Réussite minimale 70 % atteinte — la mission BitLab est débloquée."
-              : "Il te faut au moins 70 % pour débloquer la mission BitLab. Lis les corrections ci-dessous, puis retente ta chance."}
+            {result.passed ? t("quiz.result.passedHint") : t("quiz.result.failedHint")}
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-2">
             {result.passed ? (
               <Button className="h-10" onClick={onGoMission}>
                 <FlaskConical className="h-4 w-4" />
-                Aller à la mission
+                {t("quiz.result.goMission")}
               </Button>
             ) : (
               <Button variant="outline" className="h-10" onClick={onRetry}>
                 <RotateCcw className="h-4 w-4" />
-                Repasser le quiz
+                {t("quiz.result.retry")}
               </Button>
             )}
           </div>
@@ -401,7 +407,7 @@ function QuizResults({
 
       <Card>
         <CardContent className="space-y-3 p-4 sm:p-6">
-          <h3 className="font-bold">Correction détaillée</h3>
+          <h3 className="font-bold">{t("quiz.result.detail")}</h3>
           <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
             {result.results.map((r) => {
               const q = quiz[r.index];
@@ -425,19 +431,19 @@ function QuizResults({
                     <div className="min-w-0 space-y-1.5">
                       <p className="text-sm font-medium leading-snug">{q.question}</p>
                       <p className="text-xs text-muted-foreground">
-                        Ta réponse :{" "}
+                        {t("quiz.result.yourAnswer")}{" "}
                         <span
                           className={
                             r.isCorrect ? "font-semibold text-emerald-500" : "font-semibold text-rose-500"
                           }
                         >
-                          {userAnswerLabel(q, answers[r.index] ?? null)}
+                          {userAnswerLabel(q, answers[r.index] ?? null, t)}
                         </span>
                         {!r.isCorrect && (
                           <>
                             {" — "}
-                            Bonne réponse :{" "}
-                            <span className="font-semibold text-emerald-500">{correctAnswerLabel(q, r)}</span>
+                            {t("quiz.result.correctAnswer")}{" "}
+                            <span className="font-semibold text-emerald-500">{correctAnswerLabel(q, r, t)}</span>
                           </>
                         )}
                       </p>
@@ -467,6 +473,7 @@ function QuizStep({
   onSubmit,
   onRetry,
   onGoMission,
+  t,
 }: {
   quiz: QuizQuestion[];
   answers: (number | boolean | null)[] | null;
@@ -478,12 +485,13 @@ function QuizStep({
   onSubmit: () => void;
   onRetry: () => void;
   onGoMission: () => void;
+  t: Translator;
 }) {
   if (quiz.length === 0) {
     return (
       <Card>
         <CardContent className="p-6 text-center text-sm text-muted-foreground">
-          Aucun quiz disponible pour cette quête.
+          {t("quiz.empty")}
         </CardContent>
       </Card>
     );
@@ -497,6 +505,7 @@ function QuizStep({
         result={result}
         onRetry={onRetry}
         onGoMission={onGoMission}
+        t={t}
       />
     );
   }
@@ -516,29 +525,30 @@ function QuizStep({
         answer={answers ? (answers[index] ?? null) : null}
         onSelect={(v) => onSelect(index, v)}
         answeredCount={answeredCount}
+        t={t}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="ghost" className="h-10" onClick={() => setCurrent(index - 1)} disabled={index === 0}>
           <ArrowLeft className="h-4 w-4" />
-          Précédent
+          {t("quiz.previous")}
         </Button>
         {!isLast ? (
           <Button className="h-10" onClick={() => setCurrent(index + 1)} disabled={answers?.[index] == null}>
-            Suivant
+            {t("quiz.next")}
             <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
           <Button className="h-10" onClick={onSubmit} disabled={!allAnswered || submitting}>
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListChecks className="h-4 w-4" />}
-            Valider mes réponses
+            {t("quiz.submit")}
           </Button>
         )}
       </div>
 
       {!allAnswered && (
         <p className="text-center text-xs text-muted-foreground">
-          Réponds aux {quiz.length} questions pour valider le quiz.
+          {t("quiz.allAnswered", { count: quiz.length })}
         </p>
       )}
     </div>
@@ -547,27 +557,18 @@ function QuizStep({
 
 /* ============ Étape 4bis : Mission BITLAB_PROOF ============ */
 
-/**
- * Formulaire de soumission de preuve BitLab (Phase 3).
- *
- * Enchaîne 3 appels :
- *   1. /api/bitlab/challenge  → JWT avec nonce
- *   2. /api/bitlab/proof      → preuve persistée (lookup explorateur)
- *   3. mission_submit         → consomme la preuve + octroie les récompenses
- *
- * Les erreurs des étapes 1-2 sont affichées localement ; la propagation à
- * l'étape 3 utilise `onSubmit({})` pour réutiliser le flux rewards du parent.
- */
 function BitLabProofStep({
   quest,
   missionMeta,
   submitting,
   onSubmit,
+  t,
 }: {
   quest: Quest;
   missionMeta: QuestDetail["missionMeta"];
   submitting: boolean;
   onSubmit: (answer: Record<string, unknown>) => void;
+  t: Translator;
 }) {
   const { toast } = useToast();
   const router = useRouter();
@@ -575,12 +576,6 @@ function BitLabProofStep({
   const searchParams = useSearchParams();
   const kind = toBitlabKind(quest.missionType);
 
-  /**
-   * Callback deep-link : si on arrive avec `?bitlab_result=1&txid=...&kind=...`,
-   * on pré-remplit le formulaire à l'initialisation. Le kind doit correspondre
-   * à la quête en cours sinon on ignore (évite une collision si l'apprenant
-   * revient d'une autre quête). L'URL est nettoyée via un effet one-shot.
-   */
   const bitlabReturn = useMemo(() => {
     const result = parseBitlabReturn(searchParams);
     return result && result.kind === kind ? result : null;
@@ -595,9 +590,6 @@ function BitLabProofStep({
 
   useEffect(() => {
     if (!bitlabReturn) return;
-    // Si le returnTo est signé (sig+ts dans l'URL), on demande au serveur
-    // de vérifier avant d'afficher le toast de confirmation. Sinon, flux
-    // non enforced (comportement legacy).
     const ts = Number(searchParams.get("ts") ?? "");
     const sig = searchParams.get("sig") ?? "";
     const verify = async () => {
@@ -613,8 +605,8 @@ function BitLabProofStep({
           if (res.enforced && !res.ok) {
             toast({
               variant: "destructive",
-              title: "Retour BitLab non authentique",
-              description: "La signature du deep-link est invalide ou expirée.",
+              title: t("bitlabProof.toast.invalid.title"),
+              description: t("bitlabProof.toast.invalid.description"),
             });
             router.replace(pathname);
             return;
@@ -624,78 +616,47 @@ function BitLabProofStep({
         }
       }
       toast({
-        title: "Preuve reçue depuis BitLab",
-        description: "Clique sur « Vérifier ma preuve » pour finaliser la quête.",
+        title: t("bitlabProof.toast.received.title"),
+        description: t("bitlabProof.toast.received.description"),
       });
       router.replace(pathname);
     };
     void verify();
-  }, [bitlabReturn, toast, router, pathname, searchParams, quest.code, kind]);
+  }, [bitlabReturn, toast, router, pathname, searchParams, quest.code, kind, t]);
 
   const bitlabUrl =
     process.env.NEXT_PUBLIC_BITLAB_URL ?? "https://bitlab.example/mission";
 
-  /**
-   * Config d'input selon le kind : chaque kind de preuve BitLab a son champ
-   * et sa validation. L'UI reste un unique Input + un sélecteur de réseau,
-   * seules les contraintes changent.
-   */
   const inputConfig: {
     field: string;
     label: string;
     placeholder: string;
-    monospace: boolean;
     hint: string;
     validate: (s: string) => boolean;
   } = (() => {
+    const base = (k: BitlabKind, field: string, validate: (s: string) => boolean) => ({
+      field,
+      label: t(`bitlabProof.input.${k}.label`),
+      placeholder: t(`bitlabProof.input.${k}.placeholder`),
+      hint: t(`bitlabProof.input.${k}.hint`),
+      validate,
+    });
     switch (kind) {
       case "BLOCK":
-        return {
-          field: "hash",
-          label: "Hash du bloc",
-          placeholder: "64 caractères hexadécimaux",
-          monospace: true,
-          hint: "Format attendu : 64 caractères hexadécimaux (0-9, a-f).",
-          validate: (s) => /^[0-9a-f]{64}$/i.test(s.trim()),
-        };
+        return base("BLOCK", "hash", (s) => /^[0-9a-f]{64}$/i.test(s.trim()));
       case "INVOICE":
-        return {
-          field: "bolt11",
-          label: "Invoice BOLT11",
-          placeholder: "lntb… / lnbcrt…",
-          monospace: true,
-          hint: "Commence par ln (lntb pour testnet, lnbcrt pour regtest, lnbs pour signet).",
-          validate: (s) => /^ln[a-z0-9]{10,}$/i.test(s.trim()),
-        };
+        return base("INVOICE", "bolt11", (s) => /^ln[a-z0-9]{10,}$/i.test(s.trim()));
       case "CHANNEL":
-        return {
-          field: "scid",
-          label: "Short channel ID",
-          placeholder: "859100x1234x0 ou chan_id numérique",
-          monospace: true,
-          hint: "Format <block>x<tx>x<vout> ou chan_id uint64.",
-          validate: (s) =>
-            /^\d+x\d+x\d+$/.test(s.trim()) || /^\d{10,24}$/.test(s.trim()),
-        };
+        return base(
+          "CHANNEL",
+          "scid",
+          (s) => /^\d+x\d+x\d+$/.test(s.trim()) || /^\d{10,24}$/.test(s.trim()),
+        );
       case "ADDRESS":
-        return {
-          field: "address",
-          label: "Adresse Bitcoin",
-          placeholder: "tb1… / bcrt1… / 2…",
-          monospace: true,
-          hint: "La validation d'adresse est effectuée côté serveur.",
-          validate: (s) => /^[a-zA-Z0-9]{10,100}$/.test(s.trim()),
-        };
+        return base("ADDRESS", "address", (s) => /^[a-zA-Z0-9]{10,100}$/.test(s.trim()));
       case "TX":
       default:
-        return {
-          field: "txid",
-          label: "Identifiant de transaction (txid)",
-          placeholder: "64 caractères hexadécimaux",
-          monospace: true,
-          hint: "Format attendu : 64 caractères hexadécimaux (0-9, a-f).",
-          validate: (s) => /^[0-9a-f]{64}$/i.test(s.trim()),
-        };
+        return base("TX", "txid", (s) => /^[0-9a-f]{64}$/i.test(s.trim()));
     }
   })();
 
@@ -715,19 +676,17 @@ function BitLabProofStep({
     },
     onSuccess: () => {
       setLocalError(null);
-      toast({ title: "Preuve vérifiée", description: "Le serveur enchaîne la mission." });
+      toast({
+        title: t("bitlabProof.toast.verified.title"),
+        description: t("bitlabProof.toast.verified.description"),
+      });
       onSubmit({});
     },
     onError: (err) => {
-      setLocalError(errorMessage(err));
+      setLocalError(errorMessage(err, t));
     },
   });
 
-  /**
-   * Construit et ouvre l'URL deep-link via le serveur (qui signe si
-   * BITLAB_SIGN_SECRET est configuré). Navigation même onglet pour que
-   * BitLab puisse rediriger vers `returnTo` au retour.
-   */
   const openDeepLinkMutation = useMutation({
     mutationFn: async () => {
       const returnTo =
@@ -740,7 +699,7 @@ function BitLabProofStep({
       window.location.href = res.url;
     },
     onError: (err) => {
-      setLocalError(errorMessage(err));
+      setLocalError(errorMessage(err, t));
     },
   });
 
@@ -754,9 +713,9 @@ function BitLabProofStep({
             <FlaskConical className="h-5 w-5" />
           </span>
           <div>
-            <div className="font-bold">Mission BitLab — preuve on-chain</div>
+            <div className="font-bold">{t("bitlabProof.title")}</div>
             <div className="text-xs text-muted-foreground">
-              Soumets une preuve réelle ({kind}) depuis le réseau {network}
+              {t("bitlabProof.subtitle", { kind, network })}
             </div>
           </div>
         </div>
@@ -767,10 +726,9 @@ function BitLabProofStep({
 
         <Alert>
           <Info className="h-4 w-4" />
-          <AlertTitle>Mode : preuve on-chain</AlertTitle>
+          <AlertTitle>{t("bitlabProof.mode.title")}</AlertTitle>
           <AlertDescription>
-            Exécute la mission dans BitLab (testnet), récupère {inputConfig.label.toLowerCase()},
-            puis colle-le ci-dessous. Le serveur vérifie la preuve avant de valider la quête.
+            {t("bitlabProof.mode.description", { label: inputConfig.label.toLowerCase() })}
           </AlertDescription>
         </Alert>
 
@@ -787,18 +745,16 @@ function BitLabProofStep({
             ) : (
               <ExternalLink className="h-4 w-4" />
             )}
-            Ouvrir dans BitLab
+            {t("bitlabProof.open")}
           </Button>
-          <span className="text-xs text-muted-foreground">
-            BitLab renverra automatiquement ta preuve sur cette page.
-          </span>
+          <span className="text-xs text-muted-foreground">{t("bitlabProof.returnHint")}</span>
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="bq-bitlab-payload">{inputConfig.label}</Label>
           <Input
             id="bq-bitlab-payload"
-            className={inputConfig.monospace ? "font-mono" : undefined}
+            className="font-mono"
             placeholder={inputConfig.placeholder}
             value={txid}
             onChange={(e) => {
@@ -813,7 +769,7 @@ function BitLabProofStep({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="bq-bitlab-network">Réseau</Label>
+          <Label htmlFor="bq-bitlab-network">{t("bitlabProof.network")}</Label>
           <select
             id="bq-bitlab-network"
             value={network}
@@ -830,7 +786,7 @@ function BitLabProofStep({
         {localError && (
           <Alert variant="destructive">
             <XCircle className="h-4 w-4" />
-            <AlertTitle>Preuve refusée</AlertTitle>
+            <AlertTitle>{t("bitlabProof.rejected.title")}</AlertTitle>
             <AlertDescription>{localError}</AlertDescription>
           </Alert>
         )}
@@ -848,16 +804,16 @@ function BitLabProofStep({
               <FlaskConical className="h-4 w-4" />
             )}
             {verifyMutation.isPending
-              ? "Vérification sur l'explorateur…"
+              ? t("bitlabProof.verifying")
               : submitting
-                ? "Finalisation…"
-                : "Vérifier ma preuve"}
+                ? t("bitlabProof.finalizing")
+                : t("bitlabProof.verify")}
           </Button>
         </div>
 
         {missionMeta.hint && (
           <p className="text-xs text-muted-foreground">
-            <span className="font-medium">Indice : </span>
+            <span className="font-medium">{t("bitlabProof.hint.label")} </span>
             {missionMeta.hint}
           </p>
         )}
@@ -880,6 +836,7 @@ function MissionStep({
   onLaunch,
   onSubmit,
   onFinish,
+  t,
 }: {
   quest: Quest;
   missionMeta: QuestDetail["missionMeta"];
@@ -892,6 +849,7 @@ function MissionStep({
   onLaunch: () => void;
   onSubmit: (answer: Record<string, unknown>) => void;
   onFinish: () => void;
+  t: Translator;
 }) {
   const alreadyCompleted = progress?.status === "COMPLETED" && progress?.missionProof != null;
 
@@ -901,17 +859,15 @@ function MissionStep({
         <CardContent className="space-y-4 p-4 sm:p-6">
           <div className="flex items-center gap-2 text-emerald-500">
             <CheckCircle2 className="h-5 w-5" />
-            <span className="font-bold">Quête déjà complétée</span>
+            <span className="font-bold">{t("mission.alreadyCompleted.title")}</span>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Tu as déjà validé cette mission BitLab. Voici la preuve enregistrée :
-          </p>
+          <p className="text-sm text-muted-foreground">{t("mission.alreadyCompleted.body")}</p>
           <ProofChips proof={progress?.missionProof ?? null} />
-          <p className="text-xs text-muted-foreground">Preuve enregistrée côté serveur (BitLab).</p>
+          <p className="text-xs text-muted-foreground">{t("mission.alreadyCompleted.serverNote")}</p>
           <RewardChips xp={quest.xpReward} sats={quest.satsReward} />
           <div>
             <Button className="h-10" onClick={onFinish}>
-              Terminer
+              {t("mission.finish")}
             </Button>
           </div>
         </CardContent>
@@ -926,6 +882,7 @@ function MissionStep({
         missionMeta={missionMeta}
         submitting={submitting}
         onSubmit={onSubmit}
+        t={t}
       />
     );
   }
@@ -953,8 +910,8 @@ function MissionStep({
             <FlaskConical className="h-5 w-5" />
           </span>
           <div>
-            <div className="font-bold">Mission BitLab</div>
-            <div className="text-xs text-muted-foreground">Exercice pratique validé côté serveur</div>
+            <div className="font-bold">{t("mission.bitlab.title")}</div>
+            <div className="text-xs text-muted-foreground">{t("mission.bitlab.subtitle")}</div>
           </div>
         </div>
 
@@ -965,15 +922,12 @@ function MissionStep({
         <div>
           <Button className="h-10" onClick={onLaunch} disabled={starting}>
             {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-            Lancer la mission dans BitLab
+            {t("mission.bitlab.launch")}
             <ExternalLink className="h-4 w-4" />
           </Button>
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          Le défi est généré côté serveur : les réponses attendues ne quittent jamais BitLab. Les tentatives
-          sont limitées, prends ton temps.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("mission.bitlab.serverNote")}</p>
       </CardContent>
     </Card>
   );
@@ -986,11 +940,13 @@ function RewardsStep({
   rewards,
   onBackToMap,
   onDashboard,
+  t,
 }: {
   questTitle: string;
   rewards: MissionSubmitResponse;
   onBackToMap: () => void;
   onDashboard: () => void;
+  t: Translator;
 }) {
   const sats = rewards.sats;
 
@@ -1033,16 +989,18 @@ function RewardsStep({
             <PartyPopper className="mx-auto h-12 w-12 text-primary" />
           </motion.div>
           <h2 className="mt-3 font-display text-2xl font-black tracking-tight sm:text-3xl">
-            Quête complétée !
+            {t("rewards.title")}
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">{questTitle} — bravo, aventurier.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("rewards.subtitle", { title: questTitle })}
+          </p>
         </div>
       </motion.div>
 
       {rewards.feedback && (
         <Alert>
           <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-          <AlertTitle>Feedback de la mission</AlertTitle>
+          <AlertTitle>{t("rewards.feedback.title")}</AlertTitle>
           <AlertDescription>{rewards.feedback}</AlertDescription>
         </Alert>
       )}
@@ -1053,7 +1011,7 @@ function RewardsStep({
             <RewardChips xp={rewards.xp?.xpGained} />
             {rewards.bonusXp?.xpGained ? (
               <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">
-                +{rewards.bonusXp.xpGained} XP · bonus de complétion
+                {t("rewards.bonusXp", { xp: rewards.bonusXp.xpGained })}
               </Badge>
             ) : null}
           </div>
@@ -1063,11 +1021,14 @@ function RewardsStep({
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <Coins className="h-4 w-4 shrink-0 text-amber-500" />
                 <span>
-                  Tu reçois <span className="font-bold text-amber-500">{formatSats(sats.granted)} sats</span>
+                  {t("rewards.sats.receive")}{" "}
+                  <span className="font-bold text-amber-500">{formatSats(sats.granted)} sats</span>
                   {sats.streakBonus > 0 && (
                     <span className="text-muted-foreground">
-                      {" "}
-                      — dont {formatSats(sats.streakBonus)} de bonus streak (+{sats.streakBonusPct} %)
+                      {t("rewards.sats.streakBonus", {
+                        bonus: formatSats(sats.streakBonus),
+                        pct: sats.streakBonusPct,
+                      })}
                     </span>
                   )}
                 </span>
@@ -1075,10 +1036,8 @@ function RewardsStep({
               {sats.capped && (
                 <Alert>
                   <Info className="h-4 w-4" />
-                  <AlertTitle>Plafond journalier</AlertTitle>
-                  <AlertDescription>
-                    Plafond journalier de 10 000 sats atteint — le surplus sera de nouveau disponible demain.
-                  </AlertDescription>
+                  <AlertTitle>{t("rewards.sats.cap.title")}</AlertTitle>
+                  <AlertDescription>{t("rewards.sats.cap.description")}</AlertDescription>
                 </Alert>
               )}
             </div>
@@ -1086,14 +1045,14 @@ function RewardsStep({
 
           {rewards.proof && (
             <div className="space-y-1.5">
-              <div className="text-xs text-muted-foreground">Preuve enregistrée côté serveur (BitLab)</div>
+              <div className="text-xs text-muted-foreground">{t("rewards.proofLabel")}</div>
               <ProofChips proof={rewards.proof} />
             </div>
           )}
 
           {rewards.badges && rewards.badges.length > 0 && (
             <div className="space-y-2">
-              <div className="text-sm font-bold">Badges débloqués</div>
+              <div className="text-sm font-bold">{t("rewards.badges.title")}</div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {rewards.badges.map((b) => {
                   const rarity = rarityStyles[b.rarity] ?? { label: b.rarity, badge: "", glow: "" };
@@ -1108,7 +1067,7 @@ function RewardsStep({
                       <div className="min-w-0 space-y-0.5">
                         <div className="truncate text-sm font-semibold">{b.name}</div>
                         <Badge variant="outline" className={cn("text-[10px]", rarity.badge)}>
-                          {rarity.label}
+                          {t(`rarity.${b.rarity}`)}
                         </Badge>
                       </div>
                     </div>
@@ -1120,11 +1079,11 @@ function RewardsStep({
 
           <div className="flex flex-col gap-2 pt-2 sm:flex-row">
             <Button variant="outline" className="h-10 flex-1" onClick={onBackToMap}>
-              Retour à la carte
+              {t("rewards.backToMap")}
             </Button>
             <Button className="h-10 flex-1" onClick={onDashboard}>
               <Trophy className="h-4 w-4" />
-              Tableau de bord
+              {t("rewards.dashboard")}
             </Button>
           </div>
         </CardContent>
@@ -1147,6 +1106,7 @@ export function QuestPlayer({
   onGoToDashboard?: () => void;
 }) {
   const { toast } = useToast();
+  const t = useT();
   const invalidateAll = useInvalidateAll();
   const { data: detail, isLoading, isError, refetch } = useQuestDetail(code);
 
@@ -1165,9 +1125,6 @@ export function QuestPlayer({
   const startedRef = useRef(false);
   const [hydratedCode, setHydratedCode] = useState<string | null>(null);
 
-  /* Le composant est remonté via key={code} dans page.tsx — pas besoin de reset manuel */
-
-  /* Démarrage de la quête côté serveur (une seule fois, fire-and-forget) */
   useEffect(() => {
     if (!code || startedRef.current) return;
     startedRef.current = true;
@@ -1178,7 +1135,6 @@ export function QuestPlayer({
   const quiz = detail?.quiz ?? [];
   const progress = detail?.progress ?? null;
 
-  /* Hydratation de la progression locale depuis le serveur (render-phase update) */
   if (detail && hydratedCode !== code) {
     setHydratedCode(code);
     const p = detail.progress;
@@ -1191,7 +1147,6 @@ export function QuestPlayer({
     }
   }
 
-  /* Réponses du quiz initialisées au premier rendu disponible (render-phase update) */
   if (answers === null && quiz.length > 0) {
     setAnswers(Array(quiz.length).fill(null));
   }
@@ -1207,7 +1162,10 @@ export function QuestPlayer({
     onSuccess: (res, index) => {
       setSectionsRead((prev) => Math.max(prev, index + 1));
       if (res.xp) {
-        toast({ title: `+${res.xp.xpGained} XP`, description: "Section étudiée, continue comme ça." });
+        toast({
+          title: `+${res.xp.xpGained} XP`,
+          description: t("player.toast.section.description"),
+        });
       }
       const total = quest?.theorySections.length ?? 0;
       if (index + 1 >= total) {
@@ -1216,7 +1174,8 @@ export function QuestPlayer({
         setSectionIndex(index + 1);
       }
     },
-    onError: (err) => toast({ variant: "destructive", title: "Erreur", description: errorMessage(err) }),
+    onError: (err) =>
+      toast({ variant: "destructive", title: t("player.toast.error.title"), description: errorMessage(err, t) }),
   });
 
   const quizSubmitMutation = useMutation({
@@ -1225,12 +1184,13 @@ export function QuestPlayer({
       setQuizResult(res);
       setQuizBest((prev) => Math.max(prev, res.score));
       if (res.xp) {
-        toast({ title: `+${res.xp.xpGained} XP`, description: "Quiz validé, bien joué." });
+        toast({ title: `+${res.xp.xpGained} XP`, description: t("player.toast.quiz.description") });
       }
-      notifyBadges(toast, res.badges);
+      notifyBadges(toast, t, res.badges);
       invalidateAll();
     },
-    onError: (err) => toast({ variant: "destructive", title: "Erreur", description: errorMessage(err) }),
+    onError: (err) =>
+      toast({ variant: "destructive", title: t("player.toast.error.title"), description: errorMessage(err, t) }),
   });
 
   const missionStartMutation = useMutation({
@@ -1240,7 +1200,8 @@ export function QuestPlayer({
       setAttemptsLeft(res.attemptsLeft);
       setLastFeedback(null);
     },
-    onError: (err) => toast({ variant: "destructive", title: "Erreur", description: errorMessage(err) }),
+    onError: (err) =>
+      toast({ variant: "destructive", title: t("player.toast.error.title"), description: errorMessage(err, t) }),
   });
 
   const missionSubmitMutation = useMutation({
@@ -1253,20 +1214,26 @@ export function QuestPlayer({
         setStep("rewards");
         invalidateAll();
         if (res.xp?.xpGained) {
-          toast({ title: `+${res.xp.xpGained} XP`, description: "Mission BitLab réussie." });
+          toast({
+            title: `+${res.xp.xpGained} XP`,
+            description: t("player.toast.mission.description"),
+          });
         }
         if (res.bonusXp?.xpGained) {
-          toast({ title: `+${res.bonusXp.xpGained} XP`, description: "Bonus de complétion de quête." });
+          toast({
+            title: `+${res.bonusXp.xpGained} XP`,
+            description: t("player.toast.mission.bonus"),
+          });
         }
         if (res.sats && res.sats.granted > 0) {
           toast({
             title: `+${formatSats(res.sats.granted)} sats`,
             description: res.sats.capped
-              ? "Plafond journalier de 10 000 sats atteint."
-              : "Récompense versée dans ton wallet.",
+              ? t("player.toast.sats.capped")
+              : t("player.toast.sats.credited"),
           });
         }
-        notifyBadges(toast, res.badges);
+        notifyBadges(toast, t, res.badges);
       } else {
         setLastFeedback({ success: false, feedback: res.feedback });
         if (typeof res.attemptsLeft === "number") {
@@ -1276,7 +1243,8 @@ export function QuestPlayer({
         }
       }
     },
-    onError: (err) => toast({ variant: "destructive", title: "Erreur", description: errorMessage(err) }),
+    onError: (err) =>
+      toast({ variant: "destructive", title: t("player.toast.error.title"), description: errorMessage(err, t) }),
   });
 
   /* ---------- Handlers ---------- */
@@ -1317,18 +1285,18 @@ export function QuestPlayer({
   /* ---------- Rendu ---------- */
 
   if (isLoading) {
-    return <LoadingState label="Préparation du parcours…" />;
+    return <LoadingState label={t("player.loading")} />;
   }
 
   if (isError) {
-    return <ErrorState message="Impossible de charger cette quête." onRetry={() => refetch()} />;
+    return <ErrorState message={t("player.error")} onRetry={() => refetch()} />;
   }
 
   if (!quest) {
     return (
       <EmptyState
-        title="Quête introuvable"
-        sub="Retourne à la carte et sélectionne une quête disponible."
+        title={t("player.notFound.title")}
+        sub={t("player.notFound.sub")}
         icon={Map}
       />
     );
@@ -1338,21 +1306,19 @@ export function QuestPlayer({
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
-      {/* Retour */}
       <div>
         <Button variant="ghost" className="h-10 gap-2" onClick={onExit}>
           <ArrowLeft className="h-4 w-4" />
-          Carte des quêtes
+          {t("player.back")}
         </Button>
       </div>
 
-      {/* En-tête de quête */}
       <header className="space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="font-display text-xl font-extrabold tracking-tight sm:text-2xl">{quest.title}</h1>
           <Badge variant="outline" className={cn("gap-1.5", ts.badge)}>
             <span className={cn("h-1.5 w-1.5 rounded-full", ts.dot)} />
-            {ts.label}
+            {t(`tracks.${quest.track}`)}
           </Badge>
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1361,9 +1327,8 @@ export function QuestPlayer({
         </div>
       </header>
 
-      {/* Stepper */}
-      <ol className="flex items-center overflow-x-auto pb-1" aria-label="Étapes de la quête">
-        {STEPS.map((s, i) => {
+      <ol className="flex items-center overflow-x-auto pb-1" aria-label={t("player.stepper.aria")}>
+        {STEP_KEYS.map((s, i) => {
           const isCurrent = s.key === step;
           const isDone = doneFlags[s.key];
           const isUnlocked = unlocked[s.key];
@@ -1403,9 +1368,9 @@ export function QuestPlayer({
                     <Lock className="h-3 w-3" />
                   )}
                 </span>
-                <span className="whitespace-nowrap">{s.label}</span>
+                <span className="whitespace-nowrap">{t(s.labelKey)}</span>
               </button>
-              {i < STEPS.length - 1 && (
+              {i < STEP_KEYS.length - 1 && (
                 <span className="mx-1 h-px w-5 shrink-0 bg-border sm:w-8" aria-hidden="true" />
               )}
             </li>
@@ -1413,7 +1378,6 @@ export function QuestPlayer({
         })}
       </ol>
 
-      {/* Contenu de l'étape */}
       <AnimatePresence mode="wait">
         <motion.div
           key={step}
@@ -1422,7 +1386,7 @@ export function QuestPlayer({
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.18 }}
         >
-          {step === "intro" && <IntroStep quest={quest} onStart={() => setStep("theory")} />}
+          {step === "intro" && <IntroStep quest={quest} onStart={() => setStep("theory")} t={t} />}
 
           {step === "theory" && (
             <TheoryStep
@@ -1431,6 +1395,7 @@ export function QuestPlayer({
               reading={readSectionMutation.isPending}
               onRead={() => readSectionMutation.mutate(sectionIndex)}
               onBack={() => setSectionIndex((i) => Math.max(0, i - 1))}
+              t={t}
             />
           )}
 
@@ -1446,6 +1411,7 @@ export function QuestPlayer({
               onSubmit={submitQuiz}
               onRetry={retryQuiz}
               onGoMission={() => setStep("mission")}
+              t={t}
             />
           )}
 
@@ -1462,6 +1428,7 @@ export function QuestPlayer({
               onLaunch={() => missionStartMutation.mutate()}
               onSubmit={(answer) => missionSubmitMutation.mutate(answer)}
               onFinish={onCompleted}
+              t={t}
             />
           )}
 
@@ -1471,6 +1438,7 @@ export function QuestPlayer({
               rewards={rewards}
               onBackToMap={onCompleted}
               onDashboard={onGoToDashboard ?? onCompleted}
+              t={t}
             />
           )}
         </motion.div>
