@@ -37,6 +37,11 @@ export interface ChallengePayload {
   questCode: string;
   kind: string;
   nonce: string;
+  /**
+   * ID de la MissionAttempt associée (LOT 1 intégration unifiée).
+   * Optionnel pour compat avec les clients qui ne passent pas par /deep-link.
+   */
+  attemptId?: string;
 }
 
 export interface ChallengeClaims extends ChallengePayload {
@@ -73,7 +78,16 @@ export async function issueChallenge(
 ): Promise<{ token: string; expiresAt: Date }> {
   const now = Math.floor(Date.now() / 1000);
   const exp = now + ttlSeconds;
-  const token = await new SignJWT({ ...payload, v: PROTOCOL_VERSION })
+  // Omet explicitement attemptId du token si absent pour garder la taille minimale.
+  const tokenPayload: Record<string, unknown> = {
+    userId: payload.userId,
+    questCode: payload.questCode,
+    kind: payload.kind,
+    nonce: payload.nonce,
+    v: PROTOCOL_VERSION,
+  };
+  if (payload.attemptId) tokenPayload.attemptId = payload.attemptId;
+  const token = await new SignJWT(tokenPayload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuer("bitquest")
     .setAudience("bitlab")
@@ -86,6 +100,7 @@ export async function issueChallenge(
       userId: payload.userId,
       questCode: payload.questCode,
       kind: payload.kind,
+      attemptId: payload.attemptId,
       v: PROTOCOL_VERSION,
       exp,
     },

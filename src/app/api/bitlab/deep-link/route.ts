@@ -3,6 +3,7 @@ import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { bitlabDeepLinkSchema, parseJsonBody } from "@/lib/validation/schemas";
 import { buildBitlabDeepLink, signDeepLinkPayload } from "@/lib/bitlab/deep-link";
 import { PROTOCOL_VERSION } from "@/lib/bitlab/protocol";
+import { createAttempt } from "@/lib/bitlab/attempt";
 import { db } from "@/lib/db";
 
 function getSignSecret(): string | null {
@@ -70,19 +71,32 @@ export async function POST(req: Request) {
   if (!parsed.ok) return parsed.response;
   const { questCode, kind, network, returnTo } = parsed.data;
 
-  // Lookup quête pour enrichir le contexte mission (I2).
-  // Si la quête n'existe pas on continue sans hints — l'intégration
-  // fonctionnelle reste protégée côté serveur à la soumission de preuve.
+  // Lookup quête. Doit exister : sinon on refuse de créer une tentative
+  // orpheline (évite les rows pointant vers des quêtes fantômes).
   const quest = await db.quest.findUnique({
     where: { code: questCode },
-    select: { title: true, missionConfig: true },
+    select: { id: true, title: true, missionConfig: true },
+  });
+  if (!quest) {
+    return Response.json({ error: "Quête inconnue." }, { status: 404 });
+  }
+
+  // Crée la tentative durable AVANT de signer l'URL (survit aux
+  // interruptions navigateur). TTL par défaut 2h — géré par createAttempt.
+  const attempt = await createAttempt({
+    userId: user.id,
+    questId: quest.id,
+    questCode,
+    kind,
+    network,
+    returnTo,
   });
 
   const base =
     process.env.NEXT_PUBLIC_BITLAB_URL?.trim() || "https://bitlab.example/mission";
 
   const secret = getSignSecret();
-  const extra: Record<string, string | number> = {};
+  const extra: Record<string, string | number> = { attemptId: attempt.id };
   let signed = false;
   if (secret) {
     const ts = Math.floor(Date.now() / 1000);
@@ -102,11 +116,9 @@ export async function POST(req: Request) {
   }
 
   // Hints pédagogiques (non signés — purement UX).
-  if (quest) {
-    const { title, instructions } = extractMissionHints(quest);
-    if (title) extra.title = title;
-    if (instructions) extra.instructions = instructions;
-  }
+  const { title, instructions } = extractMissionHints(quest);
+  if (title) extra.title = title;
+  if (instructions) extra.instructions = instructions;
 
   const url = buildBitlabDeepLink({
     base,
@@ -117,5 +129,12 @@ export async function POST(req: Request) {
     extra,
   });
 
-  return Response.json({ ok: true, url, signed, protocolVersion: PROTOCOL_VERSION });
+  return Response.json({
+    ok: true,
+    url,
+    signed,
+    protocolVersion: PROTOCOL_VERSION,
+    attemptId: attempt.id,
+    expiresAt: attempt.expiresAt.toISOString(),
+  });
 }

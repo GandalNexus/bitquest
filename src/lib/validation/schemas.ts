@@ -440,6 +440,12 @@ export const bitlabChallengeSchema = z.object({
     .max(80)
     .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "questCode doit être en kebab-case."),
   kind: z.enum(BITLAB_PROOF_KINDS),
+  /**
+   * ID de MissionAttempt émis par /api/bitlab/deep-link. Optionnel : les
+   * clients qui appellent directement challenge (hors deep-link) peuvent
+   * l'omettre, mais la tentative ne sera pas tracée côté dashboard.
+   */
+  attemptId: z.string().trim().min(1).max(64).optional(),
 });
 
 export type BitlabChallengeBody = z.infer<typeof bitlabChallengeSchema>;
@@ -459,6 +465,17 @@ export const bitlabDeepLinkSchema = z.object({
 });
 
 export type BitlabDeepLinkBody = z.infer<typeof bitlabDeepLinkSchema>;
+
+/**
+ * Action sur une MissionAttempt (LOT 1). Pour l'instant, seul `abandon`
+ * est accepté : les transitions terminales serveur (COMPLETED, FAILED,
+ * EXPIRED) ne sont pas exposées au client.
+ */
+export const bitlabAttemptActionSchema = z.object({
+  action: z.literal("abandon"),
+});
+
+export type BitlabAttemptActionBody = z.infer<typeof bitlabAttemptActionSchema>;
 
 export const bitlabDeepLinkVerifySchema = z.object({
   questCode: z

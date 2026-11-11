@@ -28,6 +28,15 @@ const dbMock = vi.hoisted(() => ({
     updateMany: vi.fn(),
   },
   bitLabProofAttempt: { create: vi.fn().mockResolvedValue({ id: "a" }) },
+  // MissionAttempt (LOT 1) — par défaut, no-op silencieux : l'e2e historique
+  // n'utilise pas d'attemptId, le serveur bascule donc sur findLatestActiveAttempt
+  // qui doit pouvoir retourner null sans casser le flux.
+  missionAttempt: {
+    create: vi.fn().mockResolvedValue({ id: "attempt-mock", expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000) }),
+    findFirst: vi.fn().mockResolvedValue(null),
+    findMany: vi.fn().mockResolvedValue([]),
+    updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+  },
 }));
 
 vi.mock("@/lib/db", () => ({ db: dbMock }));
@@ -96,6 +105,17 @@ beforeEach(() => {
   dbMock.bitLabProof.updateMany.mockReset();
   dbMock.bitLabProofAttempt.create.mockReset();
   dbMock.bitLabProofAttempt.create.mockResolvedValue({ id: "a" });
+  dbMock.missionAttempt.create.mockReset();
+  dbMock.missionAttempt.create.mockResolvedValue({
+    id: "attempt-mock",
+    expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+  });
+  dbMock.missionAttempt.findFirst.mockReset();
+  dbMock.missionAttempt.findFirst.mockResolvedValue(null);
+  dbMock.missionAttempt.findMany.mockReset();
+  dbMock.missionAttempt.findMany.mockResolvedValue([]);
+  dbMock.missionAttempt.updateMany.mockReset();
+  dbMock.missionAttempt.updateMany.mockResolvedValue({ count: 1 });
   getRedisMock.mockReset();
   getRedisMock.mockResolvedValue(null);
   mockAuthedUser();
@@ -181,7 +201,7 @@ describe("e2e deep-link v1", () => {
     );
   });
 
-  it("omet title/instructions si la quête n'existe pas (backward compat)", async () => {
+  it("refuse 404 si la quête n'existe pas (LOT 1 : attempt nécessite une quête valide)", async () => {
     dbMock.quest.findUnique.mockResolvedValueOnce(null);
     const res = await deepLinkPOST(
       makeReq({
@@ -191,10 +211,11 @@ describe("e2e deep-link v1", () => {
         returnTo: "http://localhost/q",
       }),
     );
-    const body = (await res.json()) as { url: string };
-    const url = new URL(body.url);
-    expect(url.searchParams.has("title")).toBe(false);
-    expect(url.searchParams.has("instructions")).toBe(false);
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/Qu[eê]te inconnue/);
+    // Aucune tentative créée pour une quête fantôme.
+    expect(dbMock.missionAttempt.create).not.toHaveBeenCalled();
   });
 
   it("tronque le brief à 300 chars (défense contre missionConfig abusif)", async () => {
@@ -477,5 +498,163 @@ describe("e2e proof ADDRESS — niveau USED", () => {
     );
     expect(res.status).toBe(200);
     expect(fetchMock).not.toHaveBeenCalled(); // niveau FORMAT = pas d'appel réseau
+  });
+});
+
+/* ============================================================
+ * LOT 1 : cycle de vie MissionAttempt (intégration unifiée GandalNexus)
+ *
+ * Verrouille : l'ID d'attempt créé par /deep-link voyage dans les claims
+ * JWT du challenge et déclenche les bonnes transitions côté /proof. Un
+ * replay après COMPLETED renvoie un succès idempotent sans refaire les
+ * vérifs réseau.
+ * ============================================================ */
+
+describe("e2e MissionAttempt — cycle de vie", () => {
+  it("deep-link crée une tentative CREATED et l'expose dans la réponse", async () => {
+    mockAuthedUser();
+    mockQuest("tx-basics");
+    const attemptExpiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
+    dbMock.missionAttempt.create.mockResolvedValue({
+      id: "attempt-lot1",
+      expiresAt: attemptExpiresAt,
+    });
+
+    const res = await deepLinkPOST(
+      makeReq({
+        questCode: "tx-basics",
+        kind: "TX",
+        network: "testnet4",
+        returnTo: "http://localhost/q/tx-basics",
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      attemptId: string;
+      url: string;
+      expiresAt: string;
+    };
+    expect(body.attemptId).toBe("attempt-lot1");
+    expect(new URL(body.url).searchParams.get("attemptId")).toBe("attempt-lot1");
+    const createCall = dbMock.missionAttempt.create.mock.calls[0][0];
+    expect(createCall.data.state).toBe("CREATED");
+    expect(createCall.data.questCode).toBe("tx-basics");
+    expect(createCall.data.returnTo).toBe("http://localhost/q/tx-basics");
+  });
+
+  it("challenge propage attemptId dans les claims et transite CREATED → IN_PROGRESS", async () => {
+    mockAuthedUser();
+    mockQuest("tx-basics");
+    // attempt existe en CREATED → challenge doit transiter.
+    const attemptRow = {
+      id: "attempt-lot1",
+      userId: SESSION_USER_ID,
+      questId: "q1",
+      questCode: "tx-basics",
+      kind: "TX",
+      network: "testnet4",
+      state: "CREATED",
+      launchedAt: new Date(),
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      completedAt: null,
+      abandonedAt: null,
+      failedAt: null,
+      failReason: null,
+      proofId: null,
+      resultJson: null,
+      returnTo: null,
+    };
+    dbMock.missionAttempt.findFirst.mockResolvedValue(attemptRow);
+    dbMock.missionAttempt.updateMany.mockResolvedValue({ count: 1 });
+
+    const res = await challengePOST(
+      makeReq({ questCode: "tx-basics", kind: "TX", attemptId: "attempt-lot1" }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { token: string; attemptId: string };
+    expect(body.attemptId).toBe("attempt-lot1");
+
+    // La transition CREATED → IN_PROGRESS doit avoir eu lieu.
+    const transitionCall = dbMock.missionAttempt.updateMany.mock.calls.find(
+      (c) => (c[0] as { data: { state?: string } }).data.state === "IN_PROGRESS",
+    );
+    expect(transitionCall).toBeDefined();
+  });
+
+  it("proof : attempt non trouvé pour l'user → 404 + rien d'uploadé", async () => {
+    mockAuthedUser();
+    mockQuest("tx-basics");
+    dbMock.missionAttempt.findFirst.mockResolvedValue(null);
+
+    // Challenge avec attemptId inexistant → 404 (route challenge rejette).
+    const res = await challengePOST(
+      makeReq({ questCode: "tx-basics", kind: "TX", attemptId: "ghost" }),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("proof idempotent : attempt déjà COMPLETED → pas de re-verif + pas de re-crédit", async () => {
+    mockAuthedUser();
+    mockQuest("tx-basics");
+
+    // 1er appel : attempt CREATED → le challenge émet un JWT avec attemptId.
+    const attemptLive = {
+      id: "attempt-lot1",
+      userId: SESSION_USER_ID,
+      questId: "q1",
+      questCode: "tx-basics",
+      kind: "TX",
+      network: "testnet4",
+      state: "CREATED",
+      launchedAt: new Date(),
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      completedAt: null,
+      abandonedAt: null,
+      failedAt: null,
+      failReason: null,
+      proofId: null,
+      resultJson: null,
+      returnTo: null,
+    };
+    dbMock.missionAttempt.findFirst.mockResolvedValue(attemptLive);
+    dbMock.missionAttempt.updateMany.mockResolvedValue({ count: 1 });
+
+    const chRes = await challengePOST(
+      makeReq({ questCode: "tx-basics", kind: "TX", attemptId: "attempt-lot1" }),
+    );
+    const chBody = (await chRes.json()) as { token: string };
+
+    // 2e appel : au moment où /proof lit l'attempt, il est déjà COMPLETED
+    // (simulation d'un re-click sur le lien de retour). fetch ne doit PAS
+    // être appelé, bitLabProof.upsert ne doit PAS être appelé.
+    const completedRow = {
+      ...attemptLive,
+      state: "COMPLETED",
+      completedAt: new Date(),
+      proofId: "proof-prev",
+      resultJson: JSON.stringify({ xpEarned: 50 }),
+    };
+    dbMock.missionAttempt.findFirst.mockResolvedValue(completedRow);
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const proofRes = await proofPOST(
+      makeReq({
+        questCode: "tx-basics",
+        kind: "TX",
+        network: "testnet4",
+        payload: { txid: "a".repeat(64) },
+        challenge: chBody.token,
+      }),
+    );
+    expect(proofRes.status).toBe(200);
+    const proofBody = (await proofRes.json()) as {
+      idempotent: boolean;
+      attempt: { state: string };
+    };
+    expect(proofBody.idempotent).toBe(true);
+    expect(proofBody.attempt.state).toBe("COMPLETED");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(dbMock.bitLabProof.upsert).not.toHaveBeenCalled();
   });
 });

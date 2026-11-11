@@ -2,6 +2,11 @@ import { db } from "@/lib/db";
 import { authenticate, clientIp, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { freshNonce, issueChallenge, PROTOCOL_VERSION } from "@/lib/bitlab/jwt";
+import {
+  getAttemptForUser,
+  transitionAttempt,
+  findLatestActiveAttempt,
+} from "@/lib/bitlab/attempt";
 import { bitlabChallengeSchema, parseJsonBody } from "@/lib/validation/schemas";
 
 /**
@@ -29,12 +34,53 @@ export async function POST(req: Request) {
 
   const parsed = await parseJsonBody(req, bitlabChallengeSchema);
   if (!parsed.ok) return parsed.response;
-  const { questCode, kind } = parsed.data;
+  const { questCode, kind, attemptId: attemptIdInput } = parsed.data;
 
   // Vérifie que la quête existe (évite les JWT pour des quêtes fantômes).
   const quest = await db.quest.findUnique({ where: { code: questCode }, select: { id: true } });
   if (!quest) {
     return Response.json({ error: "Quête inconnue." }, { status: 404 });
+  }
+
+  // Résolution de l'attemptId : explicite via query, sinon dernière tentative
+  // active pour ce (user, quest, kind) — compat ascendante avec BitLab non
+  // encore patché. Si aucune tentative, le flux continue (traçabilité non
+  // enforced sur cette route, seule /deep-link crée une row).
+  let attemptId: string | undefined;
+  if (attemptIdInput) {
+    const row = await getAttemptForUser(attemptIdInput, user.id);
+    if (!row) {
+      return Response.json({ error: "Tentative BitLab introuvable." }, { status: 404 });
+    }
+    if (row.questCode !== questCode || row.kind !== kind) {
+      return Response.json(
+        { error: "Tentative BitLab : quête ou kind ne correspond pas." },
+        { status: 400 },
+      );
+    }
+    attemptId = row.id;
+    // Transition souple : si déjà IN_PROGRESS on ne retransite pas.
+    if (row.state === "CREATED") {
+      await transitionAttempt({
+        attemptId: row.id,
+        userId: user.id,
+        to: "IN_PROGRESS",
+        from: "CREATED",
+      });
+    }
+  } else {
+    const active = await findLatestActiveAttempt(user.id, questCode, kind);
+    if (active) {
+      attemptId = active.id;
+      if (active.state === "CREATED") {
+        await transitionAttempt({
+          attemptId: active.id,
+          userId: user.id,
+          to: "IN_PROGRESS",
+          from: "CREATED",
+        });
+      }
+    }
   }
 
   const nonce = freshNonce();
@@ -43,6 +89,7 @@ export async function POST(req: Request) {
     questCode,
     kind,
     nonce,
+    attemptId,
   });
 
   return Response.json({
@@ -51,5 +98,6 @@ export async function POST(req: Request) {
     nonce,
     expiresAt: expiresAt.toISOString(),
     protocolVersion: PROTOCOL_VERSION,
+    attemptId,
   });
 }

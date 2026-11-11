@@ -34,6 +34,7 @@ model User {
   adminAuditLogs AdminAuditLog[]
   dailyChallengeCompletions DailyChallengeCompletion[]
   bitLabProofs BitLabProof[]
+  missionAttempts MissionAttempt[]
 }
 
 model Quest {
@@ -280,6 +281,52 @@ model BitLabProof {
   @@unique([userId, questCode, kind])
   @@index([userId])
   @@index([questCode])
+}
+
+/**
+ * MissionAttempt — Phase 4 (intégration unifiée GandalNexus)
+ *
+ * Trace durable d'une tentative de mission BitLab lancée depuis BitQuest.
+ * Résout le problème : avant, une mission exécutée dans BitLab pouvait être
+ * perdue si l'utilisateur fermait le navigateur avant la redirection de retour.
+ * Désormais, chaque deep-link crée une row ici qui survit à toutes les
+ * interruptions et permet la reprise + le suivi côté dashboard.
+ *
+ * État = machine finie. Transitions contrôlées côté serveur :
+ *   CREATED → IN_PROGRESS (challenge JWT consommé)
+ *   IN_PROGRESS → PROOF_PENDING (preuve reçue, pré-validation OK)
+ *   PROOF_PENDING → VERIFYING (format OK, appel mempool/LND)
+ *   VERIFYING → COMPLETED (preuve validée + récompense attribuée)
+ *   VERIFYING → FAILED (preuve rejetée)
+ *   {CREATED,IN_PROGRESS,PROOF_PENDING} → ABANDONED (user clique "abandonner")
+ *   {CREATED,IN_PROGRESS,PROOF_PENDING} → EXPIRED (TTL dépassé, 2h par défaut)
+ *
+ * La récompense finale reste attribuée par `/api/quests/[code]/progress`
+ * (mission_submit) ; `resultJson` ici n'est qu'un snapshot pour l'UI.
+ */
+model MissionAttempt {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questId     String
+  questCode   String // dénormalisé : la row survit à la suppression de la quête
+  kind        String // TX | BLOCK | INVOICE | CHANNEL | ADDRESS
+  network     String // testnet4 | signet | regtest
+  state       String    @default("CREATED") // CREATED | IN_PROGRESS | PROOF_PENDING | VERIFYING | COMPLETED | FAILED | EXPIRED | ABANDONED
+  launchedAt  DateTime  @default(now())
+  expiresAt   DateTime
+  completedAt DateTime?
+  abandonedAt DateTime?
+  failedAt    DateTime?
+  failReason  String? // message court en FR (null si succès)
+  proofId     String? // FK logique vers BitLabProof si COMPLETED (pas de FK dure : BitLabProof peut être upserted plus tard)
+  resultJson  String? // JSON snapshot { xpEarned, satsEarned, badgesEarned, questStatus }
+  returnTo    String? // URL de retour BitQuest, pour reprise interface
+
+  @@index([userId, state])
+  @@index([userId, launchedAt])
+  @@index([questCode])
+  @@index([state, expiresAt])
 }
 
 /**
