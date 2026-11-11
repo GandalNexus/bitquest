@@ -4,6 +4,7 @@ import { bitlabDeepLinkSchema, parseJsonBody } from "@/lib/validation/schemas";
 import { buildBitlabDeepLink, signDeepLinkPayload } from "@/lib/bitlab/deep-link";
 import { PROTOCOL_VERSION } from "@/lib/bitlab/protocol";
 import { createAttempt } from "@/lib/bitlab/attempt";
+import { issueLaunchToken } from "@/lib/auth/launch-token";
 import { db } from "@/lib/db";
 
 function getSignSecret(): string | null {
@@ -120,6 +121,18 @@ export async function POST(req: Request) {
   if (title) extra.title = title;
   if (instructions) extra.instructions = instructions;
 
+  // Launch token GandalNexus (LOT 2 — SSO léger). Embarqué dans l'URL,
+  // consommé une seule fois par le serveur BitLab via
+  // /api/auth/verify-launch-token. TTL 60s (voir launch-token.ts).
+  const { token: launchToken } = await issueLaunchToken({
+    userId: user.id,
+    pseudo: user.pseudo,
+    role: user.role,
+    email: user.email,
+    emailVerifiedAt: user.emailVerifiedAt,
+  });
+  extra.launch_token = launchToken;
+
   const url = buildBitlabDeepLink({
     base,
     questCode,
@@ -136,5 +149,6 @@ export async function POST(req: Request) {
     protocolVersion: PROTOCOL_VERSION,
     attemptId: attempt.id,
     expiresAt: attempt.expiresAt.toISOString(),
+    hasLaunchToken: true,
   });
 }

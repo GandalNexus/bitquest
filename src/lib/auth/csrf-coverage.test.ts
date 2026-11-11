@@ -26,6 +26,8 @@ const ALLOWLIST: Record<string, string> = {
     "Login / register / guest : pas de session préalable, CSRF n'a rien à protéger. Rate-limit IP sur guest.",
   "auth/verify-email/route.ts":
     "Confirmation par token magique dans URL. L'utilisateur n'est pas authentifié. Rate-limit 20/60s par IP.",
+  "auth/verify-launch-token/route.ts":
+    "Appelé en server-to-server par BitLab (SSO léger GandalNexus). Pas de session BitQuest — l'identité vient du JWT signé + nonce Redis anti-replay. Rate-limit IP strict (60/60s) + consommation unique du nonce. Documenté dans le header du fichier.",
   "auth/logout/route.ts":
     "Idempotent, rote le token côté serveur. Un attaquant qui déconnecte n'exfiltre rien. Documenté dans le header du fichier.",
   "health/route.ts": "Health check en lecture seule (pas de mutation réelle).",

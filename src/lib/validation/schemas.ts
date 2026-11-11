@@ -401,6 +401,18 @@ export const deleteAccountSchema = z.object({
 
 export type DeleteAccountBody = z.infer<typeof deleteAccountSchema>;
 
+/* ---------- /api/auth/verify-launch-token ---------- */
+
+/**
+ * Vérification d'un launch token GandalNexus par BitLab (server-to-server).
+ * Body minimal : `{ token }`. Pas d'autre champ — tout vient du JWT.
+ */
+export const verifyLaunchTokenSchema = z.object({
+  token: z.string().min(32, "Launch token invalide.").max(4096),
+});
+
+export type VerifyLaunchTokenBody = z.infer<typeof verifyLaunchTokenSchema>;
+
 /* ---------- /api/bitlab/proof ---------- */
 
 export const BITLAB_NETWORKS = ["testnet4", "signet", "regtest"] as const;
