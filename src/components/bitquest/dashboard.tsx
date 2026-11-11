@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Coins,
   Flame,
+  FlaskConical,
   GraduationCap,
   Map,
   Sparkles,
@@ -21,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useMe, useQuests } from "@/lib/bitquest/hooks";
+import { useMe, useMyBitlabStats, useQuests } from "@/lib/bitquest/hooks";
 import { formatSats } from "@/lib/bitquest/client";
 import type { View } from "@/lib/bitquest/store";
 import {
@@ -135,6 +136,103 @@ function AcademyTeaser() {
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
           </Button>
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+/**
+ * I4 — Tuile "Missions pratiques" : rend visible l'activité BitLab
+ * (laboratoire pratique) directement dans le dashboard BitQuest pour
+ * matérialiser l'intégration GandalNexus unifiée. L'utilisateur voit
+ * son nombre de preuves vérifiées, sa dernière mission et un accès
+ * direct à BitLab.
+ *
+ * Silencieux en cas d'erreur réseau (ne doit pas casser le dashboard).
+ */
+function BitlabActivityTile() {
+  const titleId = "dashboard-bitlab-title";
+  const { data, isLoading, isError } = useMyBitlabStats();
+  const bitlabUrl = process.env.NEXT_PUBLIC_BITLAB_URL ?? null;
+
+  // En cas d'erreur, on masque la tuile — comportement non bloquant
+  // (c'est un ajout d'intégration, pas un module critique).
+  if (isError) return null;
+
+  const proofCount = data?.proofCount ?? 0;
+  const consumedCount = data?.consumedCount ?? 0;
+  const lastProof = data?.lastProof ?? null;
+  const hasActivity = proofCount > 0;
+
+  return (
+    <motion.section
+      {...fadeUp}
+      transition={{ duration: 0.35, delay: 0.22 }}
+      aria-labelledby={titleId}
+    >
+      <Card className="h-full rounded-xl">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div className="min-w-0">
+            <CardTitle
+              id={titleId}
+              className="flex items-center gap-2 text-base sm:text-lg"
+            >
+              <FlaskConical className="h-5 w-5 text-primary" aria-hidden />
+              Missions pratiques
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Laboratoire BitLab — tes expériences Bitcoin et Lightning validées côté serveur.
+            </CardDescription>
+          </div>
+          {hasActivity ? (
+            <Badge
+              variant="outline"
+              className="shrink-0 border-primary/40 bg-primary/10 text-primary"
+            >
+              {proofCount} preuve{proofCount > 1 ? "s" : ""}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="shrink-0 text-muted-foreground">
+              À démarrer
+            </Badge>
+          )}
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-1 text-sm">
+            {isLoading ? (
+              <p className="text-muted-foreground">Chargement…</p>
+            ) : hasActivity && lastProof ? (
+              <>
+                <p className="text-muted-foreground">
+                  Dernière mission :{" "}
+                  <span className="text-foreground font-medium">{lastProof.questTitle}</span>
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {lastProof.kind} · {lastProof.network} · {relativeTime(lastProof.verifiedAt)}
+                  {consumedCount > 0 && (
+                    <>
+                      {" · "}
+                      {consumedCount} récompensée{consumedCount > 1 ? "s" : ""}
+                    </>
+                  )}
+                </p>
+              </>
+            ) : (
+              <p className="text-muted-foreground">
+                Ouvre BitLab pour pratiquer : construis une transaction, génère une facture
+                Lightning ou explore la mempool. Chaque preuve vérifiée nourrit ta progression.
+              </p>
+            )}
+          </div>
+          {bitlabUrl && (
+            <Button asChild variant="outline" className="w-full shrink-0 sm:w-auto">
+              <a href={bitlabUrl} target="_blank" rel="noopener noreferrer">
+                Ouvrir BitLab
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </a>
+            </Button>
+          )}
         </CardContent>
       </Card>
     </motion.section>
@@ -485,6 +583,9 @@ export function Dashboard({
 
           {/* D2 — Tuile Académie "Bientôt disponible" */}
           <AcademyTeaser />
+
+          {/* I4 — Tuile Missions pratiques (intégration BitLab unifiée) */}
+          <BitlabActivityTile />
         </div>
 
         {/* --- Colonne droite --- */}

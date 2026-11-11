@@ -323,6 +323,19 @@ export const api = {
   auth: (body: { action: "register" | "login" | "guest" } & Record<string, unknown>) =>
     request<{ user: PublicUser; token: string }>("/api/auth", { method: "POST", body }),
   me: () => request<MeResponse>("/api/me"),
+  myBitlabStats: () =>
+    request<{
+      proofCount: number;
+      consumedCount: number;
+      lastProof: {
+        questCode: string;
+        questTitle: string;
+        kind: string;
+        network: string;
+        verifiedAt: string;
+        consumed: boolean;
+      } | null;
+    }>("/api/me/bitlab-stats"),
   quests: () => request<{ quests: QuestState[] }>("/api/quests"),
   quest: (code: string) => request<QuestDetail>(`/api/quests/${code}`),
   progress: (code: string, body: ProgressAction) =>

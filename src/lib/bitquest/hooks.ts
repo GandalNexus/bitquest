@@ -69,6 +69,21 @@ export function useWallet() {
   });
 }
 
+/**
+ * Stats d'activité BitLab de l'utilisateur courant (I4 — tuile
+ * "Missions pratiques" du dashboard). Rafraîchi quand une preuve
+ * vient d'être consommée via `useInvalidateAll`.
+ */
+export function useMyBitlabStats() {
+  const enabled = useHasSession();
+  return useQuery({
+    queryKey: ["me", "bitlab-stats"],
+    queryFn: api.myBitlabStats,
+    enabled,
+    retry: 1,
+  });
+}
+
 export function useLeaderboard() {
   const enabled = useHasSession();
   return useQuery({
@@ -87,6 +102,7 @@ export function useInvalidateAll() {
     qc.invalidateQueries({ queryKey: ["quests"] });
     qc.invalidateQueries({ queryKey: ["wallet"] });
     qc.invalidateQueries({ queryKey: ["leaderboard"] });
+    qc.invalidateQueries({ queryKey: ["me", "bitlab-stats"] });
   };
 }
 
