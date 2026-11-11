@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { authenticate, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
-import { freshNonce, issueChallenge } from "@/lib/bitlab/jwt";
+import { freshNonce, issueChallenge, PROTOCOL_VERSION } from "@/lib/bitlab/jwt";
 import { bitlabChallengeSchema, parseJsonBody } from "@/lib/validation/schemas";
 
 /**
@@ -45,5 +45,6 @@ export async function POST(req: Request) {
     token,
     nonce,
     expiresAt: expiresAt.toISOString(),
+    protocolVersion: PROTOCOL_VERSION,
   });
 }

@@ -31,14 +31,23 @@ depuis la console admin.
 - Extraction de `amountSats`, `network`, `paymentHash`, `expiry`
 - Appelé depuis `/api/bitlab/proof` pour `kind=INVOICE` (400 si invalide)
 
-### JWT challenge (anti-replay)
+### JWT challenge (anti-replay) — protocole versionné `v: 1`
 - `src/lib/bitlab/jwt.ts` — `jose` HS256
 - `POST /api/bitlab/challenge` émet un JWT contenant
-  `{ userId, questCode, kind, nonce, exp (1h) }`
-- `POST /api/bitlab/proof` **exige** maintenant ce JWT (`min 16 chars`,
-  plus optionnel). Vérification : signature, expiry, nonce consommé via
-  Redis `SET NX EX`, correspondance `(userId, questCode, kind)`
+  `{ v, userId, questCode, kind, nonce, exp (1h) }` et renvoie aussi
+  `protocolVersion` dans le corps JSON pour que le client puisse négocier.
+- `POST /api/bitlab/proof` **exige** ce JWT (`min 16 chars`). Vérifications :
+  signature, expiry, nonce consommé via Redis `SET NX EX`, correspondance
+  `(userId, questCode, kind)`, **version de protocole** (`v > PROTOCOL_VERSION` rejeté,
+  `v` absent toléré pour les tokens pré-versionnement pendant la fenêtre d'expiration).
+- Export `PROTOCOL_VERSION` depuis `jwt.ts` — bump uniquement si une évolution
+  casse les tokens existants (pas pour un simple ajout facultatif).
 - Secret : `BITLAB_JWT_SECRET` (fallback `CSRF_SECRET` en dev)
+- Rate-limit : `rateLimit("bitlab-challenge:<user>", 30, 60s)` sur l'émission,
+  `rateLimit("bitlab-proof:<user>", 20, 60s)` sur la soumission (backend Redis
+  si `REDIS_URL`, sinon in-memory).
+- Tests : `src/lib/bitlab/jwt.test.ts` (16 tests — émission, versionnement,
+  anti-replay via mock Redis, claims, signature, expiry).
 
 ### Service `LightningClient` (mempool)
 - `src/lib/bitlab/lightning.ts`

@@ -9,12 +9,13 @@ const log = logger("bitlab-jwt");
  *
  * Flow :
  *   1. POST /api/bitlab/challenge émet un JWT HS256 avec payload :
- *      { userId, questCode, kind, nonce, exp (1h) }
+ *      { v, userId, questCode, kind, nonce, exp (1h) }
  *   2. L'apprenant va résoudre la mission dans BitLab.
  *   3. POST /api/bitlab/proof présente le JWT + la preuve. Le serveur :
  *      - vérifie la signature + expiry
  *      - vérifie que le nonce n'a pas déjà été consommé (Redis SETEX)
  *      - vérifie que la paire (userId, questCode, kind) correspond au JWT
+ *      - vérifie que v ≤ PROTOCOL_VERSION (compat ascendante)
  *      - marque le nonce comme consommé
  *
  * Secret : BITLAB_JWT_SECRET en env (fallback CSRF_SECRET pour éviter
@@ -22,6 +23,23 @@ const log = logger("bitlab-jwt");
  * ============================================================ */
 
 const DEFAULT_TTL_SECONDS = 60 * 60; // 1 heure
+
+/**
+ * Version actuelle du protocole JWT BitQuest ↔ BitLab.
+ *
+ * - À l'émission : tout nouveau JWT embarque `v: PROTOCOL_VERSION`.
+ * - À la réception :
+ *   - `v` absent → accepté (JWT émis avant l'introduction du champ,
+ *     grâce temporaire jusqu'à l'expiration des tokens en circulation).
+ *   - `v === PROTOCOL_VERSION` → accepté.
+ *   - `v > PROTOCOL_VERSION` → rejeté (un client plus récent parle à un
+ *     serveur plus ancien — faille potentielle, on refuse explicitement).
+ *   - `v` invalide (non-entier, négatif) → rejeté.
+ *
+ * Bump cette constante quand une évolution du format rend les anciens
+ * tokens incompatibles (pas pour un simple ajout de champ facultatif).
+ */
+export const PROTOCOL_VERSION = 1;
 
 export interface ChallengePayload {
   userId: string;
@@ -33,6 +51,8 @@ export interface ChallengePayload {
 export interface ChallengeClaims extends ChallengePayload {
   iat: number;
   exp: number;
+  /** Version du protocole. Absent sur les tokens pré-versionnement. */
+  v?: number;
 }
 
 function getSecretBytes(): Uint8Array {
@@ -62,7 +82,7 @@ export async function issueChallenge(
 ): Promise<{ token: string; expiresAt: Date }> {
   const now = Math.floor(Date.now() / 1000);
   const exp = now + ttlSeconds;
-  const token = await new SignJWT({ ...payload })
+  const token = await new SignJWT({ ...payload, v: PROTOCOL_VERSION })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuer("bitquest")
     .setAudience("bitlab")
@@ -71,7 +91,13 @@ export async function issueChallenge(
     .sign(getSecretBytes());
 
   log.info(
-    { userId: payload.userId, questCode: payload.questCode, kind: payload.kind, exp },
+    {
+      userId: payload.userId,
+      questCode: payload.questCode,
+      kind: payload.kind,
+      v: PROTOCOL_VERSION,
+      exp,
+    },
     "bitlab challenge issued",
   );
   return { token, expiresAt: new Date(exp * 1000) };
@@ -93,6 +119,19 @@ export async function verifyChallenge(token: string): Promise<ChallengeClaims> {
   const claims = payload as unknown as ChallengeClaims;
   if (!claims.userId || !claims.questCode || !claims.kind || !claims.nonce) {
     throw new Error("JWT bitlab : claims incomplètes.");
+  }
+
+  // Vérification de version. Les tokens pré-versionnement (v absent) sont
+  // tolérés pendant la fenêtre d'expiration naturelle (1h max).
+  if (claims.v !== undefined) {
+    if (!Number.isInteger(claims.v) || claims.v < 1) {
+      throw new Error("JWT bitlab : version de protocole invalide.");
+    }
+    if (claims.v > PROTOCOL_VERSION) {
+      throw new Error(
+        `JWT bitlab : version de protocole non supportée (serveur: ${PROTOCOL_VERSION}, token: ${claims.v}).`,
+      );
+    }
   }
 
   const redis = await getRedis();
