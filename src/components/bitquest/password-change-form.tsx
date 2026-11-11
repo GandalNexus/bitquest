@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { api, storeSession } from "@/lib/bitquest/client";
 import { useBitQuest } from "@/lib/bitquest/store";
 import { useToast } from "@/hooks/use-toast";
+import { useT } from "@/i18n/locale-provider";
 
 /**
  * Formulaire de changement de mot de passe (compte enregistré uniquement).
@@ -17,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
  */
 export function PasswordChangeForm({ userId }: { userId: string }) {
   const { toast } = useToast();
+  const t = useT();
   const setSession = useBitQuest((s) => s.setSession);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,25 +30,27 @@ export function PasswordChangeForm({ userId }: { userId: string }) {
     e.preventDefault();
     setError(null);
     if (next !== confirm) {
-      setError("Les deux nouveaux mots de passe ne correspondent pas.");
+      setError(t("account.password.error.mismatch"));
       return;
     }
     if (next.length < 6) {
-      setError("Le nouveau mot de passe doit contenir au moins 6 caractères.");
+      setError(t("account.password.error.tooShort"));
       return;
     }
     setPending(true);
     try {
       const res = await api.changePassword({ currentPassword: current, newPassword: next });
-      // Persiste le nouveau token pour la session header-legacy
       storeSession(userId, res.token);
       setSession(userId, res.token);
       setCurrent("");
       setNext("");
       setConfirm("");
-      toast({ title: "Mot de passe modifié", description: "Tes autres sessions ont été déconnectées." });
+      toast({
+        title: t("account.password.toast.title"),
+        description: t("account.password.toast.description"),
+      });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur inconnue.");
+      setError(e instanceof Error ? e.message : t("common.unknownError"));
     } finally {
       setPending(false);
     }
@@ -56,7 +60,7 @@ export function PasswordChangeForm({ userId }: { userId: string }) {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="pwd-current" className="text-sm font-medium">
-          Mot de passe actuel
+          {t("account.password.current")}
         </Label>
         <Input
           id="pwd-current"
@@ -70,7 +74,7 @@ export function PasswordChangeForm({ userId }: { userId: string }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="pwd-new" className="text-sm font-medium">
-            Nouveau mot de passe
+            {t("account.password.new")}
           </Label>
           <Input
             id="pwd-new"
@@ -84,7 +88,7 @@ export function PasswordChangeForm({ userId }: { userId: string }) {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="pwd-confirm" className="text-sm font-medium">
-            Confirmer
+            {t("account.password.confirm")}
           </Label>
           <Input
             id="pwd-confirm"
@@ -107,12 +111,12 @@ export function PasswordChangeForm({ userId }: { userId: string }) {
           {pending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Mise à jour…
+              {t("account.password.submitting")}
             </>
           ) : (
             <>
               <KeyRound className="h-4 w-4" aria-hidden />
-              Changer le mot de passe
+              {t("account.password.submit")}
             </>
           )}
         </Button>

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { api, formatSats } from "@/lib/bitquest/client";
 import { useInvalidateAll } from "@/lib/bitquest/hooks";
 import { useToast } from "@/hooks/use-toast";
+import { useT } from "@/i18n/locale-provider";
 
 /**
  * Tuile « Défi du jour » (Phase 2.8).
@@ -20,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
  */
 export function DailyChallengeTile() {
   const { toast } = useToast();
+  const t = useT();
   const qc = useQueryClient();
   const invalidateAll = useInvalidateAll();
 
@@ -33,17 +35,20 @@ export function DailyChallengeTile() {
     mutationFn: api.completeChallenge,
     onSuccess: (res) => {
       if (res.alreadyCompleted) {
-        toast({ title: "Déjà validé aujourd'hui.", description: "Reviens demain pour un nouveau défi." });
+        toast({
+          title: t("dailyChallenge.toast.already.title"),
+          description: t("dailyChallenge.toast.already.description"),
+        });
       } else {
         const bits: string[] = [];
         if (res.xpGained > 0) bits.push(`+${res.xpGained} XP`);
         if (res.satsGranted > 0) bits.push(`+${formatSats(res.satsGranted)} sats`);
         toast({
-          title: "Défi validé !",
+          title: t("dailyChallenge.toast.success.title"),
           description:
             bits.length > 0
-              ? bits.join(" · ") + (res.satsCapped ? " (plafond journalier atteint)" : "")
-              : "Bravo.",
+              ? bits.join(" · ") + (res.satsCapped ? t("dailyChallenge.toast.success.capped") : "")
+              : t("dailyChallenge.toast.success.fallback"),
         });
       }
       qc.invalidateQueries({ queryKey: ["challenges"] });
@@ -52,8 +57,8 @@ export function DailyChallengeTile() {
     onError: (err) => {
       toast({
         variant: "destructive",
-        title: "Erreur",
-        description: err instanceof Error ? err.message : "Impossible de valider.",
+        title: t("dailyChallenge.toast.error.title"),
+        description: err instanceof Error ? err.message : t("dailyChallenge.toast.error.fallback"),
       });
     },
   });
@@ -68,7 +73,7 @@ export function DailyChallengeTile() {
         <Card className="rounded-xl">
           <CardContent className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            Chargement du défi du jour…
+            {t("dailyChallenge.loading")}
           </CardContent>
         </Card>
       </motion.section>
@@ -90,17 +95,17 @@ export function DailyChallengeTile() {
           <div className="flex items-center justify-between gap-2">
             <CardTitle id="dashboard-challenge-title" className="flex items-center gap-2 text-base">
               <Flame className="h-5 w-5 text-amber-500" aria-hidden />
-              Défi du jour
+              {t("dailyChallenge.title")}
             </CardTitle>
             {challenge.completed ? (
               <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-500">
                 <CheckCircle2 className="h-3 w-3" aria-hidden />
-                Déjà validé
+                {t("dailyChallenge.badge.done")}
               </Badge>
             ) : (
               <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-500">
                 <Sparkles className="h-3 w-3" aria-hidden />
-                Nouveau
+                {t("dailyChallenge.badge.new")}
               </Badge>
             )}
           </div>
@@ -129,14 +134,14 @@ export function DailyChallengeTile() {
               {mutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  Validation…
+                  {t("dailyChallenge.cta.validating")}
                 </>
               ) : challenge.completed ? (
-                "Déjà validé"
+                t("dailyChallenge.cta.done")
               ) : (
                 <>
                   <CheckCircle2 className="h-4 w-4" aria-hidden />
-                  Valider le défi
+                  {t("dailyChallenge.cta.validate")}
                 </>
               )}
             </Button>

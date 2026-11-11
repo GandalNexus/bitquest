@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, clearStoredSession } from "@/lib/bitquest/client";
 import { useBitQuest } from "@/lib/bitquest/store";
+import { useT } from "@/i18n/locale-provider";
 
 /**
  * Suppression RGPD. Collapsable (hidden par défaut) pour éviter les clics
  * accidentels. Confirmation par string "DELETE" + password si registered.
  */
 export function AccountDeleteForm({ isGuest }: { isGuest: boolean }) {
+  const t = useT();
   const logout = useBitQuest((s) => s.logout);
   const [opened, setOpened] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -24,7 +26,7 @@ export function AccountDeleteForm({ isGuest }: { isGuest: boolean }) {
     e.preventDefault();
     setError(null);
     if (confirmation !== "DELETE") {
-      setError('Tape exactement "DELETE" pour confirmer.');
+      setError(t("account.delete.error.confirmation"));
       return;
     }
     setPending(true);
@@ -35,10 +37,9 @@ export function AccountDeleteForm({ isGuest }: { isGuest: boolean }) {
       });
       clearStoredSession();
       logout();
-      // Reload pour remettre l'AuthScreen propre.
       window.location.reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur inconnue.");
+      setError(e instanceof Error ? e.message : t("common.unknownError"));
       setPending(false);
     }
   };
@@ -52,7 +53,7 @@ export function AccountDeleteForm({ isGuest }: { isGuest: boolean }) {
         className="border-destructive/40 bg-destructive/5 text-destructive hover:bg-destructive/10"
       >
         <Trash2 className="h-4 w-4" aria-hidden />
-        Supprimer mon compte
+        {t("account.delete.cta.open")}
       </Button>
     );
   }
@@ -60,18 +61,14 @@ export function AccountDeleteForm({ isGuest }: { isGuest: boolean }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded-md border border-destructive/30 bg-destructive/5 p-4">
       <div>
-        <h3 className="text-sm font-semibold text-destructive">Supprimer définitivement ce compte</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Ton pseudo et ton email seront anonymisés, ton mot de passe effacé, tes sessions
-          invalidées. Les statistiques globales (classement, badges d&apos;autres utilisateurs)
-          conservent leur cohérence. Cette action est irréversible côté interface.
-        </p>
+        <h3 className="text-sm font-semibold text-destructive">{t("account.delete.title")}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">{t("account.delete.description")}</p>
       </div>
 
       {!isGuest && (
         <div className="space-y-1.5">
           <Label htmlFor="delete-password" className="text-sm font-medium">
-            Mot de passe actuel
+            {t("account.delete.password.label")}
           </Label>
           <Input
             id="delete-password"
@@ -86,7 +83,9 @@ export function AccountDeleteForm({ isGuest }: { isGuest: boolean }) {
 
       <div className="space-y-1.5">
         <Label htmlFor="delete-confirm" className="text-sm font-medium">
-          Tape <code className="rounded bg-destructive/10 px-1 font-mono text-destructive">DELETE</code> pour confirmer
+          {t("account.delete.confirm.label.before")}{" "}
+          <code className="rounded bg-destructive/10 px-1 font-mono text-destructive">DELETE</code>{" "}
+          {t("account.delete.confirm.label.after")}
         </Label>
         <Input
           id="delete-confirm"
@@ -116,7 +115,7 @@ export function AccountDeleteForm({ isGuest }: { isGuest: boolean }) {
             setError(null);
           }}
         >
-          Annuler
+          {t("common.cancel")}
         </Button>
         <Button
           type="submit"
@@ -127,12 +126,12 @@ export function AccountDeleteForm({ isGuest }: { isGuest: boolean }) {
           {pending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Suppression…
+              {t("account.delete.submitting")}
             </>
           ) : (
             <>
               <Trash2 className="h-4 w-4" aria-hidden />
-              Supprimer définitivement
+              {t("account.delete.submit")}
             </>
           )}
         </Button>
