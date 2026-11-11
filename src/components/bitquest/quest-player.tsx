@@ -1117,6 +1117,12 @@ export function QuestPlayer({
   const [answers, setAnswers] = useState<(number | boolean | null)[] | null>(null);
   const [quizQuestion, setQuizQuestion] = useState(0);
   const [quizResult, setQuizResult] = useState<QuizSubmitResponse | null>(null);
+  // Flag pour ne reprendre le state local (sessionStorage) qu'une seule fois
+  // par mount de quête. Évite d'écraser l'input utilisateur pendant la session.
+  // On stocke le code hydraté plutôt qu'un bool : la navigation entre quêtes
+  // re-déclenche naturellement l'hydratation sans useEffect reset dédié.
+  const [localHydratedCode, setLocalHydratedCode] = useState<string | null>(null);
+  const localHydrated = localHydratedCode === code;
   const [challenge, setChallenge] = useState<Record<string, unknown> | null>(null);
   const [attemptsLeft, setAttemptsLeft] = useState(0);
   const [lastFeedback, setLastFeedback] = useState<{ success: boolean; feedback: string } | null>(null);
@@ -1150,6 +1156,89 @@ export function QuestPlayer({
   if (answers === null && quiz.length > 0) {
     setAnswers(Array(quiz.length).fill(null));
   }
+
+  // Hydratation sessionStorage : reprend step/sectionIndex/quizQuestion/answers
+  // là où l'utilisateur en était avant un refresh ou un changement de page.
+  // Clé scope par questCode uniquement — sessionStorage est déjà scope par onglet
+  // (donc par navigateur + session + onglet, ce qui matche implicitement l'user).
+  // On ne reprend qu'une fois : les écritures ultérieures en session rôdent les
+  // données utilisateur sans jamais être écrasées par cette logique.
+  //
+  // Les setState() dans cet effet sont des hydratations initiales (one-shot
+  // gated by `localHydrated`) — pattern légitime pour synchroniser un state
+  // React avec un storage externe au premier render.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (localHydrated || hydratedCode !== code || !detail) return;
+    try {
+      const raw = typeof window !== "undefined"
+        ? window.sessionStorage.getItem(`bq.quest.${code}`)
+        : null;
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          step?: Step;
+          sectionIndex?: number;
+          quizQuestion?: number;
+          answers?: (number | boolean | null)[];
+        };
+        // Garde-fou : taille answers doit matcher le quiz courant, sinon stale.
+        if (saved.answers && saved.answers.length === quiz.length) {
+          setAnswers(saved.answers);
+        }
+        if (typeof saved.quizQuestion === "number") {
+          setQuizQuestion(Math.max(0, Math.min(saved.quizQuestion, quiz.length - 1)));
+        }
+        if (typeof saved.sectionIndex === "number") {
+          setSectionIndex(
+            Math.max(0, Math.min(saved.sectionIndex, detail.quest.theorySections.length - 1)),
+          );
+        }
+        if (
+          saved.step === "intro" ||
+          saved.step === "theory" ||
+          saved.step === "quiz" ||
+          saved.step === "mission" ||
+          saved.step === "rewards"
+        ) {
+          setStep(saved.step);
+        }
+      } else if (detail.progress) {
+        // Pas de sauvegarde locale : reprends au bon endroit depuis le serveur.
+        const p = detail.progress;
+        const theoryTotal = detail.quest.theorySections.length;
+        const theoryDoneServer = p.sectionsRead >= theoryTotal;
+        const quizPassedServer = p.quizBestScore >= QUIZ_PASS_THRESHOLD;
+        if (p.status === "COMPLETED") {
+          setStep("rewards");
+        } else if (quizPassedServer) {
+          setStep("mission");
+        } else if (theoryDoneServer) {
+          setStep("quiz");
+        } else if (p.sectionsRead > 0) {
+          setStep("theory");
+        }
+      }
+    } catch {
+      // sessionStorage inaccessible (SSR / mode privé / corruption) : no-op silencieux.
+    }
+    setLocalHydratedCode(code);
+  }, [localHydrated, hydratedCode, code, detail, quiz.length]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Persistance : écrit l'état courant dans sessionStorage à chaque changement
+  // significatif. Débouncé implicitement par React batching ; la sérialisation
+  // JSON + setItem est bon marché pour ces volumes.
+  useEffect(() => {
+    if (!localHydrated || typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(
+        `bq.quest.${code}`,
+        JSON.stringify({ step, sectionIndex, quizQuestion, answers }),
+      );
+    } catch {
+      // quota exceeded / disabled : on ignore, l'app continue à fonctionner en RAM.
+    }
+  }, [localHydrated, code, step, sectionIndex, quizQuestion, answers]);
 
   const theoryDone = quest ? sectionsRead >= quest.theorySections.length : false;
   const quizPassed = quizBest >= QUIZ_PASS_THRESHOLD;
