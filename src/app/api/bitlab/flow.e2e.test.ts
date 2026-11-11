@@ -154,6 +154,69 @@ describe("e2e deep-link v1", () => {
     expect(verifyBody).toEqual({ ok: true, enforced: true });
   });
 
+  it("propage title + instructions au deep-link quand la quête a brief/title (I2)", async () => {
+    dbMock.quest.findUnique.mockResolvedValueOnce({
+      id: "q1",
+      code: "tx-basics",
+      title: "Anatomie d'une transaction",
+      missionConfig: JSON.stringify({
+        variant: "payment",
+        target: 45000,
+        brief: "Construis un paiement de 45000 sats dans l'atelier.",
+      }),
+    });
+    const res = await deepLinkPOST(
+      makeReq({
+        questCode: "tx-basics",
+        kind: "TX",
+        network: "testnet4",
+        returnTo: "http://localhost/q",
+      }),
+    );
+    const body = (await res.json()) as { url: string };
+    const url = new URL(body.url);
+    expect(url.searchParams.get("title")).toBe("Anatomie d'une transaction");
+    expect(url.searchParams.get("instructions")).toBe(
+      "Construis un paiement de 45000 sats dans l'atelier.",
+    );
+  });
+
+  it("omet title/instructions si la quête n'existe pas (backward compat)", async () => {
+    dbMock.quest.findUnique.mockResolvedValueOnce(null);
+    const res = await deepLinkPOST(
+      makeReq({
+        questCode: "unknown-quest",
+        kind: "TX",
+        network: "testnet4",
+        returnTo: "http://localhost/q",
+      }),
+    );
+    const body = (await res.json()) as { url: string };
+    const url = new URL(body.url);
+    expect(url.searchParams.has("title")).toBe(false);
+    expect(url.searchParams.has("instructions")).toBe(false);
+  });
+
+  it("tronque le brief à 300 chars (défense contre missionConfig abusif)", async () => {
+    dbMock.quest.findUnique.mockResolvedValueOnce({
+      id: "q1",
+      code: "tx-basics",
+      title: "T",
+      missionConfig: JSON.stringify({ brief: "x".repeat(500) }),
+    });
+    const res = await deepLinkPOST(
+      makeReq({
+        questCode: "tx-basics",
+        kind: "TX",
+        network: "testnet4",
+        returnTo: "http://localhost/q",
+      }),
+    );
+    const body = (await res.json()) as { url: string };
+    const url = new URL(body.url);
+    expect(url.searchParams.get("instructions")).toHaveLength(300);
+  });
+
   it("rejette la vérification quand v > PROTOCOL_VERSION", async () => {
     mockQuest("tx-basics");
     const buildBody = (await (
