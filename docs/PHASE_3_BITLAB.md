@@ -21,10 +21,28 @@ depuis la console admin.
 
 ### Service `MempoolClient`
 - `src/lib/bitlab/mempool.ts`
-- `getTransaction(network, txid)` et `getBlock(network, hash)`
+- `getTransaction(network, txid)`, `getBlock(network, hash)`,
+  `getAddressStats(network, address)` (P0.4)
 - Fallback automatique `mempool.space` → `blockstream.info`
 - Timeout 5s + `AbortController`
 - Logs structurés via `logger("mempool")`
+
+### Vérification des adresses (P0.4) — deux niveaux
+- `src/lib/bitlab/address.ts`
+- `validateAddressFormat(network, address)` : préfixe + charset + longueur
+  par réseau (tb1 bech32 / m/n/2 base58 pour testnet4+signet ; bcrt1 pour
+  regtest ; mainnet refusé). Pas de checksum full (déporté sur niveau USED).
+- `parseAddressVerifyLevel(missionConfig)` : lit `addressVerifyLevel` depuis
+  la config de mission (default `FORMAT`).
+- Deux niveaux déclarés par la quête :
+  - `FORMAT` (default) : validation locale uniquement, pas de requête réseau.
+  - `USED` : `FORMAT` + check mempool (adresse doit avoir `fundedTxoCount ≥ 1`).
+- Route `/api/bitlab/proof` branche `kind: ADDRESS` :
+  - 400 si `payload.address` manquant ou format invalide.
+  - 404 si niveau `USED` et l'explorateur ne connaît pas l'adresse.
+  - 409 si niveau `USED` et l'adresse n'a jamais été créditée.
+  - Succès : enrichit `payload.format`, `payload.verifyLevel`, et pour
+    `USED` ajoute `fundedTxoCount`, `fundedTxoSumSats`, `txCount`.
 
 ### Décodage BOLT11
 - `src/lib/bitlab/bolt11.ts` (lib `bolt11` npm)

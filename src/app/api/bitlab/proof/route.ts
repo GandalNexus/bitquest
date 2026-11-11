@@ -1,9 +1,14 @@
 import { db } from "@/lib/db";
 import { authenticate, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
-import { getTransaction, getBlock, type Network } from "@/lib/bitlab/mempool";
+import { getTransaction, getBlock, getAddressStats, type Network } from "@/lib/bitlab/mempool";
 import { decodeInvoice } from "@/lib/bitlab/bolt11";
 import { resolveChannel, isValidChannelIdentifier } from "@/lib/bitlab/lightning";
+import {
+  parseAddressVerifyLevel,
+  validateAddressFormat,
+  type AddressVerifyLevel,
+} from "@/lib/bitlab/address";
 import { verifyChallengeOrRespond } from "@/lib/bitlab/jwt";
 import { fireProofAttempt, type ProofOutcome } from "@/lib/bitlab/audit";
 import { bitlabProofSchema, parseJsonBody } from "@/lib/validation/schemas";
@@ -64,7 +69,10 @@ export async function POST(req: Request) {
     });
 
   // Vérifie que la quête existe (pas de FK Prisma mais on refuse les quêtes inconnues).
-  const quest = await db.quest.findUnique({ where: { code: questCode }, select: { id: true } });
+  const quest = await db.quest.findUnique({
+    where: { code: questCode },
+    select: { id: true, missionConfig: true },
+  });
   if (!quest) {
     audit("BAD_REQUEST", "quest inconnue");
     return Response.json({ error: "Quête inconnue." }, { status: 404 });
@@ -176,7 +184,53 @@ export async function POST(req: Request) {
     payload.transactionId = channel.transactionId;
     payload.source = source;
   }
-  // ADDRESS : accepté en l'état (dérivation locale non vérifiable côté serveur sans xpub).
+  if (kind === "ADDRESS") {
+    const addressRaw = typeof payload.address === "string" ? payload.address : null;
+    if (!addressRaw) {
+      audit("BAD_REQUEST", "address manquante");
+      return Response.json(
+        { error: "payload.address manquant." },
+        { status: 400 },
+      );
+    }
+    const format = validateAddressFormat(network as Network, addressRaw);
+    if (!format.valid) {
+      audit("BAD_REQUEST", format.reason);
+      return Response.json(
+        { error: format.reason ?? "Adresse invalide." },
+        { status: 400 },
+      );
+    }
+
+    const level: AddressVerifyLevel = parseAddressVerifyLevel(quest.missionConfig);
+    payload.address = addressRaw.trim();
+    payload.format = format.format;
+    payload.verifyLevel = level;
+
+    if (level === "USED") {
+      const stats = await getAddressStats(network as Network, payload.address as string);
+      if (!stats) {
+        audit("NOT_FOUND", "address introuvable sur l'explorateur");
+        return Response.json(
+          { error: "Adresse introuvable sur l'explorateur." },
+          { status: 404 },
+        );
+      }
+      if (stats.fundedTxoCount === 0) {
+        audit("REJECTED", "address jamais utilisée (funded_txo_count=0)");
+        return Response.json(
+          {
+            error: "Adresse jamais créditée on-chain. Reçois au moins 1 sat avant de valider.",
+            fundedTxoCount: 0,
+          },
+          { status: 409 },
+        );
+      }
+      payload.fundedTxoCount = stats.fundedTxoCount;
+      payload.fundedTxoSumSats = stats.fundedTxoSumSats;
+      payload.txCount = stats.txCount;
+    }
+  }
 
   // Upsert idempotent sur (user, questCode, kind).
   const proof = await db.bitLabProof.upsert({

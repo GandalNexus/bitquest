@@ -104,3 +104,56 @@ describe("MempoolClient.getBlock", () => {
     await expect(getBlock("mainnet", "h")).rejects.toThrow("mainnet");
   });
 });
+
+describe("MempoolClient.getAddressStats", () => {
+  const sampleResponse = {
+    address: "tb1q...",
+    chain_stats: {
+      funded_txo_count: 2,
+      funded_txo_sum: 150_000,
+      spent_txo_count: 1,
+      spent_txo_sum: 50_000,
+      tx_count: 3,
+    },
+    mempool_stats: { tx_count: 1 },
+  };
+
+  it("retourne les stats normalisées quand mempool.space répond", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(sampleResponse), { status: 200 }));
+    const { getAddressStats } = await loadWithFetch(fetchMock as unknown as typeof fetch);
+    const stats = await getAddressStats("testnet4", "tb1q...");
+    expect(stats).toEqual({
+      address: "tb1q...",
+      fundedTxoCount: 2,
+      fundedTxoSumSats: 150_000,
+      spentTxoCount: 1,
+      spentTxoSumSats: 50_000,
+      txCount: 4, // chain 3 + mempool 1
+    });
+  });
+
+  it("retourne null si l'explorateur renvoie une erreur", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("not found", { status: 404 }));
+    const { getAddressStats } = await loadWithFetch(fetchMock as unknown as typeof fetch);
+    const stats = await getAddressStats("testnet4", "tb1qbad");
+    expect(stats).toBeNull();
+  });
+
+  it("URL-encode l'adresse", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(sampleResponse), { status: 200 }));
+    const { getAddressStats } = await loadWithFetch(fetchMock as unknown as typeof fetch);
+    await getAddressStats("testnet4", "tb1q+address");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain(encodeURIComponent("tb1q+address"));
+  });
+
+  it("refuse mainnet", async () => {
+    const { getAddressStats } = await loadWithFetch(vi.fn() as unknown as typeof fetch);
+    await expect(getAddressStats("mainnet", "addr")).rejects.toThrow("mainnet");
+  });
+});

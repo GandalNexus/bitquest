@@ -118,6 +118,68 @@ export async function getTransaction(network: Network, txid: string): Promise<Tx
   }
 }
 
+export interface AddressStats {
+  address: string;
+  /** Nombre total de UTXOs qui ont déjà crédité l'adresse (confirmés). */
+  fundedTxoCount: number;
+  /** Somme en sats des UTXOs reçus (confirmés). */
+  fundedTxoSumSats: number;
+  /** UTXOs dépensés depuis cette adresse. */
+  spentTxoCount: number;
+  spentTxoSumSats: number;
+  /** Nombre de transactions touchant cette adresse (conf + mempool). */
+  txCount: number;
+}
+
+/**
+ * Récupère les statistiques on-chain d'une adresse.
+ *
+ * - `null` si l'adresse est introuvable ou si l'explorateur a retourné 404.
+ * - Les deux explorateurs (mempool.space / blockstream.info) renvoient la
+ *   même forme sous `/address/<addr>` : un objet avec `chain_stats` et
+ *   `mempool_stats`. On agrège les deux pour `txCount` et ne prend que
+ *   chain_stats confirmé pour `fundedTxoSumSats`.
+ */
+export async function getAddressStats(
+  network: Network,
+  address: string,
+): Promise<AddressStats | null> {
+  if (network === "mainnet") {
+    throw new Error("mainnet is intentionally unsupported in BitQuest v1");
+  }
+  const { mempool, blockstream } = BASES[network];
+  const encoded = encodeURIComponent(address);
+  try {
+    const raw = await tryGet<{
+      address: string;
+      chain_stats: {
+        funded_txo_count: number;
+        funded_txo_sum: number;
+        spent_txo_count: number;
+        spent_txo_sum: number;
+        tx_count: number;
+      };
+      mempool_stats: {
+        tx_count: number;
+      };
+    }>(`${mempool}/address/${encoded}`, `${blockstream}/address/${encoded}`);
+    return {
+      address: raw.address,
+      fundedTxoCount: raw.chain_stats.funded_txo_count,
+      fundedTxoSumSats: raw.chain_stats.funded_txo_sum,
+      spentTxoCount: raw.chain_stats.spent_txo_count,
+      spentTxoSumSats: raw.chain_stats.spent_txo_sum,
+      txCount: raw.chain_stats.tx_count + raw.mempool_stats.tx_count,
+    };
+  } catch (err) {
+    log.warn(
+      { err: err instanceof Error ? err.message : String(err), address },
+      "address lookup failed",
+    );
+    return null;
+  }
+}
+
 /** Récupère les infos d'un bloc par hash. Retourne null si introuvable. */
 export async function getBlock(network: Network, hash: string): Promise<BlockInfo | null> {
   if (network === "mainnet") {
