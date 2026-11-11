@@ -409,6 +409,27 @@ export const api = {
       ok: true;
       proof: { id: string; kind: string; network: string; verifiedAt: string; consumed: boolean };
     }>("/api/bitlab/proof", { method: "POST", body }),
+  bitlabDeepLink: (body: {
+    questCode: string;
+    kind: string;
+    network: string;
+    returnTo: string;
+  }) =>
+    request<{ ok: true; url: string; signed: boolean }>("/api/bitlab/deep-link", {
+      method: "POST",
+      body,
+    }),
+  bitlabDeepLinkVerifyReturn: (body: {
+    questCode: string;
+    kind: string;
+    network: string;
+    ts: number;
+    sig: string;
+  }) =>
+    request<{ ok: boolean; enforced: boolean }>(
+      "/api/bitlab/deep-link/verify-return",
+      { method: "POST", body },
+    ),
 };
 
 /* ============ Formats ============ */

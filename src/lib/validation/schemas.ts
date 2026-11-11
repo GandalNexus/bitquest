@@ -444,6 +444,37 @@ export const bitlabChallengeSchema = z.object({
 
 export type BitlabChallengeBody = z.infer<typeof bitlabChallengeSchema>;
 
+/* ---------- /api/bitlab/deep-link ---------- */
+
+export const bitlabDeepLinkSchema = z.object({
+  questCode: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "questCode doit être en kebab-case."),
+  kind: z.enum(BITLAB_PROOF_KINDS),
+  network: z.enum(BITLAB_NETWORKS),
+  returnTo: z.string().url("returnTo doit être une URL absolue."),
+});
+
+export type BitlabDeepLinkBody = z.infer<typeof bitlabDeepLinkSchema>;
+
+export const bitlabDeepLinkVerifySchema = z.object({
+  questCode: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "questCode doit être en kebab-case."),
+  kind: z.enum(BITLAB_PROOF_KINDS),
+  network: z.enum(BITLAB_NETWORKS),
+  ts: z.number().int().positive(),
+  sig: z.string().min(16).max(128),
+});
+
+export type BitlabDeepLinkVerifyBody = z.infer<typeof bitlabDeepLinkVerifySchema>;
+
 /* ---------- /api/auth/verify-email ---------- */
 
 export const verifyEmailSchema = z.object({
