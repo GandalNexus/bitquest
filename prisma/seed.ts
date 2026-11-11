@@ -41,10 +41,18 @@ async function main() {
       brief: q.missionBrief,
       hint: q.missionHint,
     });
-    // Phase 3 : la quête pilote tx-basics bascule sur BITLAB_PROOF.
-    // Les autres quêtes restent en SIMULATED (mission locale générée par
-    // src/lib/bitquest/missions.ts) jusqu'à conversion au cas-par-cas.
-    const missionKind = q.code === "tx-basics" ? "BITLAB_PROOF" : "SIMULATED";
+    // Phase 3 : quêtes dont la mission admet une preuve on-chain réelle.
+    // Les autres restent en SIMULATED (mission locale générée par
+    // src/lib/bitquest/missions.ts) : key_forge (crypto locale pure),
+    // multisig_sign et taproot_tweak (exercices cryptographiques sans
+    // broadcast), mine_nonce (impossible de réellement miner).
+    const BITLAB_PROOF_QUESTS = new Set([
+      "tx-basics",
+      "utxo",
+      "fees-mempool",
+      "lightning-invoice",
+    ]);
+    const missionKind = BITLAB_PROOF_QUESTS.has(q.code) ? "BITLAB_PROOF" : "SIMULATED";
     const data = {
       track: q.track,
       order: q.order,

@@ -57,7 +57,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toBitlabKind } from "@/lib/bitlab/mission-kinds";
-import { buildBitlabDeepLink, parseBitlabReturn } from "@/lib/bitlab/deep-link";
+import { parseBitlabReturn } from "@/lib/bitlab/deep-link";
 
 /* ============ Types locaux ============ */
 
@@ -595,19 +595,111 @@ function BitLabProofStep({
 
   useEffect(() => {
     if (!bitlabReturn) return;
-    toast({
-      title: "Preuve reçue depuis BitLab",
-      description: "Clique sur « Vérifier ma preuve » pour finaliser la quête.",
-    });
-    router.replace(pathname);
-  }, [bitlabReturn, toast, router, pathname]);
+    // Si le returnTo est signé (sig+ts dans l'URL), on demande au serveur
+    // de vérifier avant d'afficher le toast de confirmation. Sinon, flux
+    // non enforced (comportement legacy).
+    const ts = Number(searchParams.get("ts") ?? "");
+    const sig = searchParams.get("sig") ?? "";
+    const verify = async () => {
+      if (ts && sig) {
+        try {
+          const res = await api.bitlabDeepLinkVerifyReturn({
+            questCode: quest.code,
+            kind,
+            network: bitlabReturn.network,
+            ts,
+            sig,
+          });
+          if (res.enforced && !res.ok) {
+            toast({
+              variant: "destructive",
+              title: "Retour BitLab non authentique",
+              description: "La signature du deep-link est invalide ou expirée.",
+            });
+            router.replace(pathname);
+            return;
+          }
+        } catch {
+          // Si l'endpoint échoue, on laisse passer (defense-in-depth optionnel)
+        }
+      }
+      toast({
+        title: "Preuve reçue depuis BitLab",
+        description: "Clique sur « Vérifier ma preuve » pour finaliser la quête.",
+      });
+      router.replace(pathname);
+    };
+    void verify();
+  }, [bitlabReturn, toast, router, pathname, searchParams, quest.code, kind]);
 
   const bitlabUrl =
     process.env.NEXT_PUBLIC_BITLAB_URL ?? "https://bitlab.example/mission";
 
-  const payloadField = kind === "BLOCK" ? "hash" : "txid";
-  const payloadLabel = kind === "BLOCK" ? "Hash du bloc" : "Identifiant de transaction (txid)";
-  const isHex64 = /^[0-9a-f]{64}$/i.test(txid.trim());
+  /**
+   * Config d'input selon le kind : chaque kind de preuve BitLab a son champ
+   * et sa validation. L'UI reste un unique Input + un sélecteur de réseau,
+   * seules les contraintes changent.
+   */
+  const inputConfig: {
+    field: string;
+    label: string;
+    placeholder: string;
+    monospace: boolean;
+    hint: string;
+    validate: (s: string) => boolean;
+  } = (() => {
+    switch (kind) {
+      case "BLOCK":
+        return {
+          field: "hash",
+          label: "Hash du bloc",
+          placeholder: "64 caractères hexadécimaux",
+          monospace: true,
+          hint: "Format attendu : 64 caractères hexadécimaux (0-9, a-f).",
+          validate: (s) => /^[0-9a-f]{64}$/i.test(s.trim()),
+        };
+      case "INVOICE":
+        return {
+          field: "bolt11",
+          label: "Invoice BOLT11",
+          placeholder: "lntb… / lnbcrt…",
+          monospace: true,
+          hint: "Commence par ln (lntb pour testnet, lnbcrt pour regtest, lnbs pour signet).",
+          validate: (s) => /^ln[a-z0-9]{10,}$/i.test(s.trim()),
+        };
+      case "CHANNEL":
+        return {
+          field: "scid",
+          label: "Short channel ID",
+          placeholder: "859100x1234x0 ou chan_id numérique",
+          monospace: true,
+          hint: "Format <block>x<tx>x<vout> ou chan_id uint64.",
+          validate: (s) =>
+            /^\d+x\d+x\d+$/.test(s.trim()) || /^\d{10,24}$/.test(s.trim()),
+        };
+      case "ADDRESS":
+        return {
+          field: "address",
+          label: "Adresse Bitcoin",
+          placeholder: "tb1… / bcrt1… / 2…",
+          monospace: true,
+          hint: "La validation d'adresse est effectuée côté serveur.",
+          validate: (s) => /^[a-zA-Z0-9]{10,100}$/.test(s.trim()),
+        };
+      case "TX":
+      default:
+        return {
+          field: "txid",
+          label: "Identifiant de transaction (txid)",
+          placeholder: "64 caractères hexadécimaux",
+          monospace: true,
+          hint: "Format attendu : 64 caractères hexadécimaux (0-9, a-f).",
+          validate: (s) => /^[0-9a-f]{64}$/i.test(s.trim()),
+        };
+    }
+  })();
+
+  const isValid = inputConfig.validate(txid);
 
   const verifyMutation = useMutation({
     mutationFn: async () => {
@@ -617,7 +709,7 @@ function BitLabProofStep({
         questCode: quest.code,
         kind,
         network,
-        payload: { [payloadField]: value },
+        payload: { [inputConfig.field]: value },
         challenge: challenge.token,
       });
     },
@@ -631,7 +723,28 @@ function BitLabProofStep({
     },
   });
 
-  const canSubmit = isHex64 && !verifyMutation.isPending && !submitting;
+  /**
+   * Construit et ouvre l'URL deep-link via le serveur (qui signe si
+   * BITLAB_SIGN_SECRET est configuré). Navigation même onglet pour que
+   * BitLab puisse rediriger vers `returnTo` au retour.
+   */
+  const openDeepLinkMutation = useMutation({
+    mutationFn: async () => {
+      const returnTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}${pathname}`
+          : pathname;
+      return api.bitlabDeepLink({ questCode: quest.code, kind, network, returnTo });
+    },
+    onSuccess: (res) => {
+      window.location.href = res.url;
+    },
+    onError: (err) => {
+      setLocalError(errorMessage(err));
+    },
+  });
+
+  const canSubmit = isValid && !verifyMutation.isPending && !submitting;
 
   return (
     <Card>
@@ -656,9 +769,8 @@ function BitLabProofStep({
           <Info className="h-4 w-4" />
           <AlertTitle>Mode : preuve on-chain</AlertTitle>
           <AlertDescription>
-            Exécute la mission dans BitLab (testnet), récupère le{" "}
-            {kind === "BLOCK" ? "hash du bloc" : "txid"}, puis colle-le ci-dessous. Le serveur
-            vérifie la confirmation via mempool.space avant de valider la quête.
+            Exécute la mission dans BitLab (testnet), récupère {inputConfig.label.toLowerCase()},
+            puis colle-le ci-dessous. Le serveur vérifie la preuve avant de valider la quête.
           </AlertDescription>
         </Alert>
 
@@ -667,23 +779,15 @@ function BitLabProofStep({
             type="button"
             variant="outline"
             className="h-10 gap-2"
-            onClick={() => {
-              const returnTo =
-                typeof window !== "undefined"
-                  ? `${window.location.origin}${pathname}`
-                  : pathname;
-              const link = buildBitlabDeepLink({
-                base: bitlabUrl,
-                questCode: quest.code,
-                kind,
-                network,
-                returnTo,
-              });
-              window.location.href = link;
-            }}
+            disabled={openDeepLinkMutation.isPending}
+            onClick={() => openDeepLinkMutation.mutate()}
           >
+            {openDeepLinkMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ExternalLink className="h-4 w-4" />
+            )}
             Ouvrir dans BitLab
-            <ExternalLink className="h-4 w-4" />
           </Button>
           <span className="text-xs text-muted-foreground">
             BitLab renverra automatiquement ta preuve sur cette page.
@@ -691,11 +795,11 @@ function BitLabProofStep({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="bq-bitlab-txid">{payloadLabel}</Label>
+          <Label htmlFor="bq-bitlab-payload">{inputConfig.label}</Label>
           <Input
-            id="bq-bitlab-txid"
-            className="font-mono"
-            placeholder="64 caractères hexadécimaux"
+            id="bq-bitlab-payload"
+            className={inputConfig.monospace ? "font-mono" : undefined}
+            placeholder={inputConfig.placeholder}
             value={txid}
             onChange={(e) => {
               setTxid(e.target.value);
@@ -703,10 +807,8 @@ function BitLabProofStep({
             }}
             disabled={verifyMutation.isPending || submitting}
           />
-          {txid.length > 0 && !isHex64 && (
-            <p className="text-xs text-destructive">
-              Format attendu : 64 caractères hexadécimaux (0-9, a-f).
-            </p>
+          {txid.length > 0 && !isValid && (
+            <p className="text-xs text-destructive">{inputConfig.hint}</p>
           )}
         </div>
 

@@ -22,6 +22,12 @@ describe("toBitlabKind", () => {
     expect(toBitlabKind("address_derive")).toBe("ADDRESS");
   });
 
+  it("mappe les alias de mission (ln_invoice, ln_channel, mine_nonce)", () => {
+    expect(toBitlabKind("ln_invoice")).toBe("INVOICE");
+    expect(toBitlabKind("ln_channel")).toBe("CHANNEL");
+    expect(toBitlabKind("mine_nonce")).toBe("BLOCK");
+  });
+
   it("retombe sur TX pour un missionType inconnu", () => {
     expect(toBitlabKind("unknown_type")).toBe("TX");
     expect(toBitlabKind("")).toBe("TX");

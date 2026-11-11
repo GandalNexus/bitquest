@@ -11,8 +11,11 @@ export type BitlabKind = "TX" | "BLOCK" | "INVOICE" | "CHANNEL" | "ADDRESS";
 const MISSION_TO_KIND: Record<string, BitlabKind> = {
   tx_builder: "TX",
   block_explorer: "BLOCK",
+  mine_nonce: "BLOCK",
   lightning_pay: "INVOICE",
+  ln_invoice: "INVOICE",
   channel_open: "CHANNEL",
+  ln_channel: "CHANNEL",
   address_derive: "ADDRESS",
 };
 
