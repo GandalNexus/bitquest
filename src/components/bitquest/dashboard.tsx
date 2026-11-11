@@ -32,7 +32,6 @@ import {
   RewardChips,
   StatCard,
   rarityStyles,
-  statusLabels,
   trackStyles,
 } from "./ui-bits";
 import {
@@ -377,10 +376,10 @@ export function Dashboard({
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className={trackStyles[nextQuest.track]?.badge}>
-                        {trackStyles[nextQuest.track]?.label ?? nextQuest.track}
+                        {t(`tracks.${nextQuest.track}`)}
                       </Badge>
                       <Badge variant="outline" className="text-muted-foreground">
-                        {statusLabels[nextQuest.status] ?? nextQuest.status}
+                        {t(`status.${nextQuest.status}`)}
                       </Badge>
                     </div>
                     <div>
@@ -450,6 +449,7 @@ export function Dashboard({
               <CardContent className="space-y-4">
                 {TRACK_ORDER.map((track) => {
                   const style = trackStyles[track];
+                  const trackLabel = t(`tracks.${track}`);
                   const trackQuests = quests.filter((q) => q.track === track);
                   const done = trackQuests.filter((q) => q.status === "COMPLETED").length;
                   const total = trackQuests.length;
@@ -460,12 +460,15 @@ export function Dashboard({
                         variant="outline"
                         className={`w-28 justify-center shrink-0 ${style?.badge ?? ""}`}
                       >
-                        {style?.label ?? track}
+                        {trackLabel}
                       </Badge>
                       <Progress
                         value={pct}
                         className="h-2 flex-1"
-                        aria-label={`Progression ${style?.label ?? track} : ${pct} %`}
+                        aria-label={t("dashboard.tracks.progress.aria", {
+                          track: trackLabel,
+                          pct,
+                        })}
                       />
                       <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
                         {done}/{total}
@@ -474,7 +477,7 @@ export function Dashboard({
                   );
                 })}
                 {quests.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Les quêtes se chargent…</p>
+                  <p className="text-sm text-muted-foreground">{t("dashboard.tracks.loading")}</p>
                 )}
               </CardContent>
             </Card>
@@ -514,7 +517,7 @@ export function Dashboard({
                             variant="outline"
                             className={`shrink-0 ${rarity?.badge ?? rarityStyles.COMMON.badge}`}
                           >
-                            {rarity?.label ?? "Commun"}
+                            {t(`rarity.${badge.rarity}`)}
                           </Badge>
                         </li>
                       );

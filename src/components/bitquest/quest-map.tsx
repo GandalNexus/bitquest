@@ -15,11 +15,11 @@ import {
   LoadingState,
   RewardChips,
   StatCard,
-  statusLabels,
   trackStyles,
 } from "./ui-bits";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { useT } from "@/i18n/locale-provider";
 
 const TRACK_ORDER = ["INITIATION", "INTERMEDIATE", "ADVANCED", "SPECIAL"] as const;
 
@@ -34,6 +34,8 @@ function getTrackStyle(track: string) {
     }
   );
 }
+
+type Translator = (key: string, vars?: Record<string, string | number>) => string;
 
 function StatusIcon({ quest }: { quest: QuestState }) {
   if (quest.locked) {
@@ -69,10 +71,12 @@ function QuestCard({
   quest,
   index,
   onOpenQuest,
+  t,
 }: {
   quest: QuestState;
   index: number;
   onOpenQuest?: (code: string) => void;
+  t: Translator;
 }) {
   const ts = getTrackStyle(quest.track);
   const locked = quest.locked;
@@ -102,7 +106,7 @@ function QuestCard({
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           <RewardChips xp={quest.xpReward} sats={quest.satsReward} />
           <Badge variant="outline" className={cn(completed && "border-emerald-500/40 text-emerald-500")}>
-            {statusLabels[quest.status] ?? quest.status}
+            {t(`status.${quest.status}`)}
           </Badge>
         </div>
 
@@ -118,12 +122,15 @@ function QuestCard({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <BookOpen className="h-3 w-3" />
-                Sections lues {quest.sectionsRead}/{quest.totalSections}
+                {t("questMap.quest.sections", {
+                  read: quest.sectionsRead,
+                  total: quest.totalSections,
+                })}
               </span>
               {quest.quizBestScore > 0 && (
                 <span className="inline-flex items-center gap-1">
                   <Target className="h-3 w-3" />
-                  Quiz : {quest.quizBestScore} %
+                  {t("questMap.quest.quiz", { score: quest.quizBestScore })}
                 </span>
               )}
             </div>
@@ -134,6 +141,8 @@ function QuestCard({
       {!locked && <ChevronRight className="mt-1 hidden h-4 w-4 shrink-0 text-muted-foreground sm:block" />}
     </div>
   );
+
+  const openLabel = t("questMap.quest.open", { title: quest.title });
 
   return (
     <motion.div
@@ -148,7 +157,7 @@ function QuestCard({
         <button
           type="button"
           onClick={() => onOpenQuest(quest.code)}
-          aria-label={`Ouvrir la quête ${quest.title}`}
+          aria-label={openLabel}
           className="w-full text-left"
         >
           {card}
@@ -156,7 +165,7 @@ function QuestCard({
       ) : (
         <Link
           href={`/quests/${quest.code}`}
-          aria-label={`Ouvrir la quête ${quest.title}`}
+          aria-label={openLabel}
           className="block w-full text-left"
         >
           {card}
@@ -170,23 +179,28 @@ function TrackSection({
   track,
   quests,
   onOpenQuest,
+  t,
 }: {
   track: string;
   quests: QuestState[];
   onOpenQuest?: (code: string) => void;
+  t: Translator;
 }) {
   const ts = getTrackStyle(track);
+  const trackLabel = t(`tracks.${track}`);
   const doneCount = quests.filter((q) => q.status === "COMPLETED").length;
+  const countKey =
+    doneCount > 1 ? "questMap.track.completedCount.many" : "questMap.track.completedCount.one";
 
   return (
-    <section aria-label={`Parcours ${ts.label}`}>
+    <section aria-label={t("questMap.track.aria", { label: trackLabel })}>
       <div className="flex items-center gap-3">
         <Badge variant="outline" className={cn("gap-1.5 px-3 py-1 text-xs font-bold", ts.badge)}>
           <span className={cn("h-1.5 w-1.5 rounded-full", ts.dot)} />
-          {ts.label}
+          {trackLabel}
         </Badge>
         <span className="shrink-0 text-xs text-muted-foreground">
-          {doneCount}/{quests.length} terminée{doneCount > 1 ? "s" : ""}
+          {t(countKey, { done: doneCount, total: quests.length })}
         </span>
         <div className="h-px flex-1 bg-border" aria-hidden="true" />
       </div>
@@ -194,7 +208,7 @@ function TrackSection({
       <div className="mt-4 flex flex-col">
         {quests.map((quest, i) => (
           <Fragment key={quest.id}>
-            <QuestCard quest={quest} index={i} onOpenQuest={onOpenQuest} />
+            <QuestCard quest={quest} index={i} onOpenQuest={onOpenQuest} t={t} />
             {i < quests.length - 1 && (
               <div className="mx-auto h-8 w-px shrink-0 bg-border" aria-hidden="true" />
             )}
@@ -206,14 +220,15 @@ function TrackSection({
 }
 
 export function QuestMap({ onOpenQuest }: { onOpenQuest?: (code: string) => void } = {}) {
+  const t = useT();
   const { data, isLoading, isError, refetch } = useQuests();
 
   if (isLoading) {
-    return <LoadingState label="Dépliage de la carte des quêtes…" />;
+    return <LoadingState label={t("questMap.loading")} />;
   }
 
   if (isError) {
-    return <ErrorState message="Impossible de charger la carte des quêtes." onRetry={() => refetch()} />;
+    return <ErrorState message={t("questMap.error")} onRetry={() => refetch()} />;
   }
 
   const quests = data?.quests ?? [];
@@ -221,8 +236,8 @@ export function QuestMap({ onOpenQuest }: { onOpenQuest?: (code: string) => void
   if (quests.length === 0) {
     return (
       <EmptyState
-        title="Aucune quête sur la carte"
-        sub="Reviens plus tard : de nouveaux parcours seront tracés pour toi."
+        title={t("questMap.empty.title")}
+        sub={t("questMap.empty.sub")}
         icon={Map}
       />
     );
@@ -240,7 +255,6 @@ export function QuestMap({ onOpenQuest }: { onOpenQuest?: (code: string) => void
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-8">
-      {/* En-tête + récap */}
       <motion.header
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -249,40 +263,37 @@ export function QuestMap({ onOpenQuest }: { onOpenQuest?: (code: string) => void
       >
         <div>
           <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
-            Carte des Quêtes
+            {t("questMap.title")}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Débloque les parcours en progressant. Chaque piste se franchit étape par étape.
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{t("questMap.subtitle")}</p>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <StatCard
             icon={CheckCircle2}
-            label="Quêtes terminées"
+            label={t("questMap.stat.completed")}
             value={
               <span>
                 {completed.length} <span className="text-muted-foreground">/ {quests.length}</span>
               </span>
             }
-            sub={`${completionPct} % de la carte explorée`}
+            sub={t("questMap.stat.completed.sub", { pct: completionPct })}
           />
           <StatCard
             icon={Zap}
-            label="XP des quêtes"
+            label={t("questMap.stat.xp")}
             value={
               <span>
                 {formatSats(gainedXp)} <span className="text-muted-foreground">/ {formatSats(totalXp)}</span>
               </span>
             }
-            sub="XP cumulés des quêtes terminées"
+            sub={t("questMap.stat.xp.sub")}
           />
         </div>
 
-        <Progress value={completionPct} className="h-2" aria-label="Progression globale de la carte" />
+        <Progress value={completionPct} className="h-2" aria-label={t("questMap.ariaProgress")} />
       </motion.header>
 
-      {/* Pistes (trails) */}
       <div className="space-y-8">
         {grouped.map((group) => (
           <TrackSection
@@ -290,6 +301,7 @@ export function QuestMap({ onOpenQuest }: { onOpenQuest?: (code: string) => void
             track={group.track}
             quests={group.quests}
             onOpenQuest={onOpenQuest}
+            t={t}
           />
         ))}
       </div>

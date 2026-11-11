@@ -266,7 +266,7 @@ export function ProfileView() {
                       <div className="flex items-center gap-2">
                         <span className="truncate text-sm font-semibold">{badge.name}</span>
                         <Badge variant="outline" className={`shrink-0 ${rarity.badge}`}>
-                          {rarity.label}
+                          {t(`rarity.${badge.rarity}`)}
                         </Badge>
                       </div>
                       <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{badge.description}</p>
@@ -346,7 +346,7 @@ export function ProfileView() {
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
                       <span className="min-w-0 flex-1 truncate text-sm font-medium">{quest.title}</span>
                       <Badge variant="outline" className={cn("hidden shrink-0 sm:inline-flex", style?.badge)}>
-                        {style?.label ?? quest.track}
+                        {t(`tracks.${quest.track}`)}
                       </Badge>
                       <span className="w-24 shrink-0 text-right text-xs text-muted-foreground">
                         {formatDate(quest.completedAt)}
