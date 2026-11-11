@@ -18,6 +18,7 @@ import { generateMission, validateMission } from "@/lib/bitquest/missions";
 import { parseJsonBody, questProgressBodySchema } from "@/lib/validation/schemas";
 import { consumeBitlabProof } from "@/lib/bitlab/consume";
 import { fireProofAttempt } from "@/lib/bitlab/audit";
+import { snapshotAttemptResult } from "@/lib/bitlab/attempt";
 
 type XpResult = Awaited<ReturnType<typeof awardXp>>;
 
@@ -381,6 +382,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       const newBadges = await evaluateBadges(user.id);
       const finalUser = await db.user.findUniqueOrThrow({ where: { id: user.id } });
       const finalProgress = await db.userQuestProgress.findUniqueOrThrow({ where: { id: p.id } });
+
+      // LOT 4A — snapshot des récompenses dans la MissionAttempt active (si une
+      // existe). Permet à la liste "Mes missions" (dashboard + bitlab) d'afficher
+      // les gains sans refaire un join progress ↔ attempt. No-op silencieux si
+      // pas d'attempt en cours (compat ascendante : les anciens flux sans
+      // deep-link n'en créent pas).
+      if (justCompleted) {
+        await snapshotAttemptResult({
+          userId: user.id,
+          questCode: quest.code,
+          result: {
+            questStatus: "COMPLETED",
+            xpEarned: (xp?.xpGained ?? 0) + (bonusXp?.xpGained ?? 0),
+            satsEarned: satsResult.granted,
+            satsCapped: satsResult.capped,
+            streakBonusPct: satsResult.streakBonusPct,
+            badges: newBadges.map((b) => ({ code: b.code, name: b.name })),
+            completedAt: new Date().toISOString(),
+          },
+        });
+      }
 
       return Response.json({
         success: true,

@@ -336,6 +336,25 @@ export const api = {
         consumed: boolean;
       } | null;
     }>("/api/me/bitlab-stats"),
+  myBitlabAttempts: (state: "active" | "all" = "all", limit = 20) =>
+    request<{
+      attempts: Array<{
+        id: string;
+        questCode: string;
+        questTitle: string;
+        kind: string;
+        network: string;
+        state: string;
+        launchedAt: string;
+        expiresAt: string;
+        completedAt: string | null;
+        failedAt: string | null;
+        failReason: string | null;
+        proofId: string | null;
+        result: Record<string, unknown> | null;
+        returnTo: string | null;
+      }>;
+    }>(`/api/me/bitlab-attempts?state=${state}&limit=${limit}`),
   quests: () => request<{ quests: QuestState[] }>("/api/quests"),
   quest: (code: string) => request<QuestDetail>(`/api/quests/${code}`),
   progress: (code: string, body: ProgressAction) =>

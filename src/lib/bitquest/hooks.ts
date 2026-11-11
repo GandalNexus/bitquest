@@ -84,6 +84,24 @@ export function useMyBitlabStats() {
   });
 }
 
+/**
+ * Liste des tentatives BitLab de l'utilisateur (LOT 4). `state` filtre
+ * sur les tentatives actives (reprise de mission) ou toutes (historique).
+ * Variants cache-indépendants via inclusion de `state` + `limit` dans la clé.
+ */
+export function useMyBitlabAttempts(
+  state: "active" | "all" = "all",
+  limit = 20,
+) {
+  const enabled = useHasSession();
+  return useQuery({
+    queryKey: ["me", "bitlab-attempts", state, limit],
+    queryFn: () => api.myBitlabAttempts(state, limit),
+    enabled,
+    retry: 1,
+  });
+}
+
 export function useLeaderboard() {
   const enabled = useHasSession();
   return useQuery({

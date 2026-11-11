@@ -269,6 +269,50 @@ export async function findLatestActiveAttempt(
 }
 
 /**
+ * Enregistre un snapshot du résultat dans la tentative active la plus
+ * récente pour un couple (userId, questCode). No-op silencieux si aucune
+ * tentative active (ex. flux hérité sans deep-link).
+ *
+ * N'ECRASE PAS `resultJson` s'il est déjà non-null (idempotence : un
+ * double mission_submit après COMPLETED n'altère pas le snapshot original).
+ * N'exécute AUCUNE transition d'état — c'est à /api/bitlab/proof de
+ * transiter vers COMPLETED. Ici on ne fait qu'enrichir la ligne.
+ */
+export async function snapshotAttemptResult(input: {
+  userId: string;
+  questCode: string;
+  result: Record<string, unknown>;
+}): Promise<number> {
+  const serialized = JSON.stringify(input.result);
+  // Filtre strict : state COMPLETED (chemin normal après /proof) ET
+  // resultJson null (anti-override). On ne cible qu'UNE row (la plus
+  // récente) via findFirst — updateMany sans limit poserait un risque
+  // si plusieurs attempts COMPLETED anciens existaient par erreur.
+  const target = await db.missionAttempt.findFirst({
+    where: {
+      userId: input.userId,
+      questCode: input.questCode,
+      state: "COMPLETED",
+      resultJson: null,
+    },
+    orderBy: { launchedAt: "desc" },
+    select: { id: true },
+  });
+  if (!target) return 0;
+  const res = await db.missionAttempt.updateMany({
+    where: { id: target.id, resultJson: null },
+    data: { resultJson: serialized },
+  });
+  if (res.count > 0) {
+    log.info(
+      { attemptId: target.id, userId: input.userId, questCode: input.questCode },
+      "mission attempt resultJson snapshotted",
+    );
+  }
+  return res.count;
+}
+
+/**
  * Batch "expire les tentatives périmées" : utilisable depuis un cron ou
  * un endpoint admin. Idempotent.
  */

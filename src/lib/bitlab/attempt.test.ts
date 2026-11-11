@@ -27,6 +27,7 @@ import {
   transitionAttempt,
   findLatestActiveAttempt,
   expireStaleAttempts,
+  snapshotAttemptResult,
   ACTIVE_STATES,
   TERMINAL_STATES,
   DEFAULT_TTL_MS,
@@ -278,6 +279,51 @@ describe("findLatestActiveAttempt", () => {
     await findLatestActiveAttempt("u1", "tx-basics");
     const call = dbMock.missionAttempt.findFirst.mock.calls[0][0];
     expect(call.where.kind).toBeUndefined();
+  });
+});
+
+describe("snapshotAttemptResult — LOT 4A", () => {
+  it("écrit le resultJson sur la tentative COMPLETED la plus récente sans resultJson", async () => {
+    dbMock.missionAttempt.findFirst.mockResolvedValue(
+      baseRow({ state: "COMPLETED", resultJson: null }),
+    );
+    dbMock.missionAttempt.updateMany.mockResolvedValue({ count: 1 });
+    const n = await snapshotAttemptResult({
+      userId: "u1",
+      questCode: "tx-basics",
+      result: { xpEarned: 50, satsEarned: 100, questStatus: "COMPLETED" },
+    });
+    expect(n).toBe(1);
+    const call = dbMock.missionAttempt.updateMany.mock.calls[0][0];
+    const serialized = JSON.parse(call.data.resultJson);
+    expect(serialized).toEqual({ xpEarned: 50, satsEarned: 100, questStatus: "COMPLETED" });
+    expect(call.where.resultJson).toBeNull();
+  });
+
+  it("no-op silencieux si aucune tentative COMPLETED sans resultJson (pas d'attempt actif)", async () => {
+    dbMock.missionAttempt.findFirst.mockResolvedValue(null);
+    const n = await snapshotAttemptResult({
+      userId: "u1",
+      questCode: "tx-basics",
+      result: { xpEarned: 50 },
+    });
+    expect(n).toBe(0);
+    expect(dbMock.missionAttempt.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("filtre strict : ne trouve pas une attempt avec resultJson déjà rempli (anti-override)", async () => {
+    dbMock.missionAttempt.findFirst.mockImplementation(({ where }: { where: { resultJson?: unknown } }) => {
+      // Simule le filtre Prisma `resultJson: null` — si on fournit non-null → aucun match.
+      if (where.resultJson === null) return Promise.resolve(null); // déjà rempli
+      return Promise.resolve(baseRow({ state: "COMPLETED" }));
+    });
+    const n = await snapshotAttemptResult({
+      userId: "u1",
+      questCode: "tx-basics",
+      result: { xpEarned: 50 },
+    });
+    expect(n).toBe(0);
+    expect(dbMock.missionAttempt.updateMany).not.toHaveBeenCalled();
   });
 });
 

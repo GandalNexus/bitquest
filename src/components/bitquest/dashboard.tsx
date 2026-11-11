@@ -2,18 +2,22 @@
 
 import { motion } from "framer-motion";
 import {
+  AlertCircle,
   ArrowRight,
   CheckCircle2,
+  Clock,
   Coins,
   Flame,
   FlaskConical,
   GraduationCap,
   Map,
+  Play,
   Sparkles,
   Star,
   Target,
   TrendingUp,
   Trophy,
+  XCircle,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -22,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useMe, useMyBitlabStats, useQuests } from "@/lib/bitquest/hooks";
+import { useMe, useMyBitlabAttempts, useMyBitlabStats, useQuests } from "@/lib/bitquest/hooks";
 import { formatSats } from "@/lib/bitquest/client";
 import type { View } from "@/lib/bitquest/store";
 import {
@@ -232,6 +236,168 @@ function BitlabActivityTile() {
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </a>
             </Button>
+          )}
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+/* ============================================================
+ * LOT 4B — Tuile "Missions en cours"
+ *
+ * Affiche jusqu'à 3 tentatives actives (CREATED, IN_PROGRESS,
+ * PROOF_PENDING, VERIFYING) avec un bouton "Reprendre dans BitLab".
+ * Si aucune active, retombe sur les 3 dernières terminées pour nourrir
+ * la vue "historique récent".
+ *
+ * Non bloquant : erreur réseau → tuile masquée (comme BitlabActivityTile).
+ * ============================================================ */
+
+/** Métadonnées d'affichage par état d'attempt. */
+const ATTEMPT_STATE_META: Record<
+  string,
+  { label: string; icon: LucideIcon; classes: string }
+> = {
+  CREATED: { label: "Lancée", icon: Play, classes: "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+  IN_PROGRESS: { label: "En cours", icon: Play, classes: "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+  PROOF_PENDING: { label: "Preuve en attente", icon: Clock, classes: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  VERIFYING: { label: "Vérification", icon: Clock, classes: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  COMPLETED: { label: "Terminée", icon: CheckCircle2, classes: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+  FAILED: { label: "Échouée", icon: XCircle, classes: "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400" },
+  EXPIRED: { label: "Expirée", icon: AlertCircle, classes: "border-muted-foreground/30 text-muted-foreground" },
+  ABANDONED: { label: "Abandonnée", icon: AlertCircle, classes: "border-muted-foreground/30 text-muted-foreground" },
+};
+
+function AttemptStateBadge({ state }: { state: string }) {
+  const meta = ATTEMPT_STATE_META[state] ?? ATTEMPT_STATE_META.ABANDONED;
+  const Icon = meta.icon;
+  return (
+    <Badge variant="outline" className={`gap-1 ${meta.classes}`}>
+      <Icon className="h-3 w-3" aria-hidden />
+      {meta.label}
+    </Badge>
+  );
+}
+
+function ActiveMissionsTile() {
+  const titleId = "dashboard-active-missions-title";
+  const { data: active, isLoading } = useMyBitlabAttempts("active", 5);
+  const { data: all } = useMyBitlabAttempts("all", 10);
+  const bitlabUrl = process.env.NEXT_PUBLIC_BITLAB_URL ?? null;
+
+  const activeAttempts = active?.attempts ?? [];
+  const recentCompleted = (all?.attempts ?? [])
+    .filter((a) => ["COMPLETED", "FAILED", "EXPIRED", "ABANDONED"].includes(a.state))
+    .slice(0, 3);
+
+  // Masque la tuile si rien à montrer ET pas en cours de chargement
+  // (évite une tuile fantôme sur un compte sans activité BitLab).
+  if (!isLoading && activeAttempts.length === 0 && recentCompleted.length === 0) {
+    return null;
+  }
+
+  return (
+    <motion.section
+      {...fadeUp}
+      transition={{ duration: 0.35, delay: 0.24 }}
+      aria-labelledby={titleId}
+    >
+      <Card className="h-full rounded-xl">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div className="min-w-0">
+            <CardTitle
+              id={titleId}
+              className="flex items-center gap-2 text-base sm:text-lg"
+            >
+              <Target className="h-5 w-5 text-primary" aria-hidden />
+              Missions en cours
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Reprends là où tu t&apos;étais arrêté, ou consulte tes dernières tentatives.
+            </CardDescription>
+          </div>
+          {activeAttempts.length > 0 && (
+            <Badge variant="outline" className="shrink-0 border-primary/40 bg-primary/10 text-primary">
+              {activeAttempts.length} active{activeAttempts.length > 1 ? "s" : ""}
+            </Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLoading ? (
+            <p className="text-muted-foreground text-sm">Chargement…</p>
+          ) : (
+            <>
+              {activeAttempts.length > 0 && (
+                <ul className="space-y-2" aria-label="Tentatives actives">
+                  {activeAttempts.slice(0, 3).map((a) => (
+                    <li
+                      key={a.id}
+                      className="flex flex-col gap-2 rounded-md border bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-sm">{a.questTitle}</span>
+                          <AttemptStateBadge state={a.state} />
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                          {a.kind} · {a.network} · lancée {relativeTime(a.launchedAt)}
+                        </p>
+                      </div>
+                      {bitlabUrl && (
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0"
+                        >
+                          <a
+                            href={a.returnTo ? `/quests/${a.questCode}` : bitlabUrl}
+                            rel="noopener noreferrer"
+                          >
+                            Reprendre
+                            <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                          </a>
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {recentCompleted.length > 0 && (
+                <div className="space-y-2">
+                  {activeAttempts.length > 0 && (
+                    <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                      Récentes
+                    </p>
+                  )}
+                  <ul className="space-y-2" aria-label="Tentatives récentes">
+                    {recentCompleted.map((a) => (
+                      <li
+                        key={a.id}
+                        className="flex flex-col gap-1 rounded-md border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium">{a.questTitle}</span>
+                            <AttemptStateBadge state={a.state} />
+                          </div>
+                          <p className="text-muted-foreground text-xs">
+                            {a.kind} · {a.network} ·{" "}
+                            {relativeTime(a.completedAt ?? a.failedAt ?? a.launchedAt)}
+                            {a.result && typeof (a.result as { xpEarned?: number }).xpEarned === "number" && (
+                              <>
+                                {" · "}+{(a.result as { xpEarned: number }).xpEarned} XP
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -586,6 +752,9 @@ export function Dashboard({
 
           {/* I4 — Tuile Missions pratiques (intégration BitLab unifiée) */}
           <BitlabActivityTile />
+
+          {/* LOT 4B — Tuile Missions en cours (reprise + historique) */}
+          <ActiveMissionsTile />
         </div>
 
         {/* --- Colonne droite --- */}
