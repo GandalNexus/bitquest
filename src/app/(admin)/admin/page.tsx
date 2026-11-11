@@ -1,4 +1,4 @@
-import { BookOpen, GraduationCap, Map, Sparkles, Trophy, Users } from "lucide-react";
+import { BookOpen, FlaskConical, GraduationCap, Map, Sparkles, Trophy, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ interface StatRow {
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  const last24h = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
   const [
     totalUsers,
     guestUsers,
@@ -27,6 +28,8 @@ export default async function AdminDashboardPage() {
     totalChapters,
     totalLessons,
     totalLessonProgress,
+    bitlabAttempts24h,
+    bitlabAccepted24h,
   ] = await Promise.all([
     db.user.count({ where: { deletedAt: null } }),
     db.user.count({ where: { deletedAt: null, isGuest: true } }),
@@ -41,7 +44,13 @@ export default async function AdminDashboardPage() {
     db.chapter.count(),
     db.lesson.count({ where: { publishedAt: { not: null } } }),
     db.lessonProgress.count(),
+    db.bitLabProofAttempt.count({ where: { createdAt: { gte: last24h } } }),
+    db.bitLabProofAttempt.count({
+      where: { createdAt: { gte: last24h }, outcome: "ACCEPTED" },
+    }),
   ]);
+  const bitlabAcceptedPct =
+    bitlabAttempts24h > 0 ? Math.round((bitlabAccepted24h / bitlabAttempts24h) * 100) : 0;
 
   const stats: StatRow[] = [
     {
@@ -73,6 +82,15 @@ export default async function AdminDashboardPage() {
       value: totalBadges,
       icon: Trophy,
       hint: `${userBadges} débloqués par les utilisateurs`,
+    },
+    {
+      label: "BitLab preuves (24h)",
+      value: bitlabAttempts24h,
+      icon: FlaskConical,
+      hint:
+        bitlabAttempts24h > 0
+          ? `${bitlabAccepted24h} acceptées · ${bitlabAcceptedPct}% de succès`
+          : "Aucune tentative sur les dernières 24h",
     },
   ];
 

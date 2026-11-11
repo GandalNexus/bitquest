@@ -287,15 +287,27 @@ Réponses attendues :
 - `501 { error }` — testnet/signet/regtest sans config LND
 - `400 { error }` — scid mal formé ou JWT invalide
 
+### UI admin du journal d'audit
+- `/admin/bitlab/attempts` — page SSR gated par rôle ADMIN (via layout)
+- Stats 24h en header : tentatives totales, % acceptation, latence
+  moyenne pondérée
+- Ventilation par outcome avec latence moyenne/outcome
+- Filtres combinables : outcome (8 chips) + questCode (chips dynamiques
+  depuis les codes présents)
+- Table paginée (100 max) avec pseudo, questCode, kind, network,
+  outcome badge coloré, latence, timestamp, reasonMessage
+- Tuile « BitLab preuves (24h) » ajoutée sur `/admin` (vue d'ensemble)
+- NAV admin : nouvelle entrée « BitLab preuves »
+
 ## Prochaines étapes (roadmap)
 
-1. **UI admin du journal d'audit** — page `/admin/bitlab/attempts`
-   filtre par outcome/user/quest, graphiques simples.
-2. **CHANNEL sur testnet via LND** — câbler un node LND testnet dans
+1. **CHANNEL sur testnet via LND** — câbler un node LND testnet dans
    docker-compose.dev.yml pour tests d'intégration end-to-end.
-3. **Conversion `lightning-channel` (ln_channel)** — attend un node LND
+2. **Conversion `lightning-channel` (ln_channel)** — attend un node LND
    testnet opérationnel (actuellement simulé par manque d'explorateur
    public Lightning testnet).
+3. **Export CSV du journal** — bouton sur `/admin/bitlab/attempts`
+   pour exporter la sélection filtrée (utile pour analyse hors Postgres).
 
 ## Audit & logs
 

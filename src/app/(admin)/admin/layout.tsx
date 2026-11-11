@@ -4,6 +4,7 @@ import {
   BookOpen,
   ClipboardList,
   Flame,
+  FlaskConical,
   LayoutDashboard,
   Lock,
   LogIn,
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/admin/quests", label: "Quêtes", icon: Map },
   { href: "/admin/badges", label: "Badges", icon: Trophy },
   { href: "/admin/challenges", label: "Défis", icon: Flame },
+  { href: "/admin/bitlab/attempts", label: "BitLab preuves", icon: FlaskConical },
   { href: "/admin/audit", label: "Audit log", icon: ClipboardList },
   { href: "/admin/health", label: "État service", icon: Activity },
 ];
