@@ -422,11 +422,10 @@ export const bitlabProofSchema = z.object({
   network: z.enum(BITLAB_NETWORKS),
   payload: z.record(z.string(), z.unknown()).default({}),
   /**
-   * JWT challenge optionnel. Si fourni, il est vérifié + le nonce est consommé.
-   * Phase 3 : foundation — on accepte encore les preuves sans JWT pour ne
-   * pas casser les tests. Un sprint ultérieur pourra rendre le JWT obligatoire.
+   * JWT challenge obligatoire (Phase 3 hardening). Émis par
+   * /api/bitlab/challenge, vérifié + nonce consommé (Redis).
    */
-  challenge: z.string().optional(),
+  challenge: z.string().min(16, "JWT challenge requis."),
 });
 
 export type BitlabProofBody = z.infer<typeof bitlabProofSchema>;

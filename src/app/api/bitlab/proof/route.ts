@@ -3,6 +3,7 @@ import { authenticate, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { getTransaction, getBlock, type Network } from "@/lib/bitlab/mempool";
 import { decodeInvoice } from "@/lib/bitlab/bolt11";
+import { getChannel, isValidChannelIdentifier } from "@/lib/bitlab/lightning";
 import { verifyChallengeOrRespond } from "@/lib/bitlab/jwt";
 import { bitlabProofSchema, parseJsonBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/log";
@@ -45,17 +46,15 @@ export async function POST(req: Request) {
     return Response.json({ error: "Quête inconnue." }, { status: 404 });
   }
 
-  // Si un JWT challenge est fourni, le vérifier et consommer le nonce.
-  if (challenge) {
-    const chk = await verifyChallengeOrRespond(challenge);
-    if (!chk.ok) return chk.response;
-    const claims = chk.claims;
-    if (claims.userId !== user.id || claims.questCode !== questCode || claims.kind !== kind) {
-      return Response.json(
-        { error: "JWT bitlab : paire (user, quest, kind) ne correspond pas." },
-        { status: 400 },
-      );
-    }
+  // JWT challenge obligatoire : vérifie signature + expiry + consomme le nonce.
+  const chk = await verifyChallengeOrRespond(challenge);
+  if (!chk.ok) return chk.response;
+  const claims = chk.claims;
+  if (claims.userId !== user.id || claims.questCode !== questCode || claims.kind !== kind) {
+    return Response.json(
+      { error: "JWT bitlab : paire (user, quest, kind) ne correspond pas." },
+      { status: 400 },
+    );
   }
 
   // Vérif explorateur selon le kind.
@@ -108,7 +107,30 @@ export async function POST(req: Request) {
       );
     }
   }
-  // CHANNEL / ADDRESS : acceptés en l'état pour l'instant.
+  if (kind === "CHANNEL") {
+    const scid = typeof payload.scid === "string" ? payload.scid : null;
+    if (!scid || !isValidChannelIdentifier(scid)) {
+      return Response.json(
+        { error: "payload.scid doit être <block>x<tx>x<vout> ou un chan_id numérique." },
+        { status: 400 },
+      );
+    }
+    const channel = await getChannel(scid);
+    if (!channel) {
+      return Response.json(
+        { error: "Channel Lightning introuvable sur l'explorateur." },
+        { status: 404 },
+      );
+    }
+    payload.scid = channel.shortId ?? scid;
+    payload.channelId = channel.id;
+    payload.capacity = channel.capacity;
+    payload.status = channel.status;
+    payload.nodeLeftPub = channel.nodeLeftPub;
+    payload.nodeRightPub = channel.nodeRightPub;
+    payload.transactionId = channel.transactionId;
+  }
+  // ADDRESS : accepté en l'état (dérivation locale non vérifiable côté serveur sans xpub).
 
   // Upsert idempotent sur (user, questCode, kind).
   const proof = await db.bitLabProof.upsert({
