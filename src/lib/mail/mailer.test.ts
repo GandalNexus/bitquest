@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const ENV_KEYS = ["MAIL_PROVIDER", "MAIL_FROM", "RESEND_API_KEY", "NODE_ENV"] as const;
+const ENV_KEYS = ["MAIL_PROVIDER", "MAIL_FROM", "RESEND_API_KEY"] as const;
 const savedEnv: Record<string, string | undefined> = {};
 const originalFetch = globalThis.fetch;
 
