@@ -2,9 +2,10 @@
 
 **Date de création** : 2026-11-10
 **Dernière mise à jour** : 2026-11-11
-**Statut** : chaîne bout-en-bout opérationnelle pour `tx-basics` ;
-`CHANNEL` supporté sur mainnet (mempool.space) et sur testnet/signet/regtest
-via LND REST externe.
+**Statut** : chaîne bout-en-bout opérationnelle pour 4 quêtes
+(`tx-basics`, `utxo`, `fees-mempool`, `lightning-invoice`) ; `CHANNEL`
+supporté sur mainnet (mempool.space) et testnet/signet/regtest via LND
+REST externe. Audit log activé. Deep-link signé HMAC optionnel.
 
 ## Ce qui est livré
 
@@ -80,14 +81,35 @@ via LND REST externe.
 - `payload` libre (chaque kind a ses champs attendus côté handler)
 - `challenge` requis (min 16 chars)
 
-### Wiring quête (pilote `tx-basics`)
+### Wiring quête — 4 quêtes BITLAB_PROOF
 - Champ `Quest.missionKind = "SIMULATED" | "BITLAB_PROOF"` dans Prisma
-- Seed met `tx-basics` en `BITLAB_PROOF` (voir `prisma/seed.ts:47`)
+- Seed (`prisma/seed.ts`) marque en `BITLAB_PROOF` :
+  - `tx-basics` (kind=TX, pilote historique)
+  - `utxo` (kind=TX, intermediaire — construction UTXO réelle testnet)
+  - `fees-mempool` (kind=TX, intermediaire — tx avec frais calibrés)
+  - `lightning-invoice` (kind=INVOICE, avancée — BOLT11 décodé serveur)
+- Les autres restent `SIMULATED` : `key_forge` (crypto locale),
+  `mine_nonce` (impossible de miner), `multisig_sign`/`taproot_tweak`
+  (exercices cryptos sans broadcast), `block_explorer`/`genesis`
+  (introduction gentle pour les débutants)
 - `/api/quests/[code]/progress` action `mission_submit` branche :
   - `missionKind === "BITLAB_PROOF"` → cherche une `BitLabProof`
     `consumed=false` pour `(user, quest)`, la marque consommée et
     enchaîne les récompenses (XP, sats, badges, bonus streak)
   - `missionKind === "SIMULATED"` → flux historique inchangé
+
+### Audit log — BitLabProofAttempt
+- Prisma model `BitLabProofAttempt` : `userId`, `questCode`, `kind`,
+  `network`, `outcome`, `reasonMessage?`, `latencyMs`, `createdAt`
+- Outcomes : `ACCEPTED | REJECTED | NOT_FOUND | UNAVAILABLE |
+  INVALID_JWT | MEMPOOL | BAD_REQUEST | RATE_LIMITED`
+- Helper `recordProofAttempt` + `fireProofAttempt` (fire-and-forget)
+  dans `src/lib/bitlab/audit.ts`
+- Appelé depuis chaque path de sortie de `/api/bitlab/proof` (succès
+  et refus). Latence mesurée côté serveur, utile pour détecter
+  dégradation mempool/LND
+- Indexes `(userId, createdAt)`, `(questCode, createdAt)`,
+  `(outcome, createdAt)` pour requêtes admin ultérieures
 
 ### UI quest-player
 - `BitLabProofStep` dans `src/components/bitquest/quest-player.tsx`
@@ -109,7 +131,9 @@ via LND REST externe.
   pour dériver le kind BitLab attendu depuis le missionType de la quête
 
 ### Protocole deep-link BitQuest ↔ BitLab
-- `src/lib/bitlab/deep-link.ts` — helpers purs (11 tests)
+- `src/lib/bitlab/deep-link.ts` — helpers purs (24 tests)
+- Endpoints serveur : `POST /api/bitlab/deep-link` (sender signé) et
+  `POST /api/bitlab/deep-link/verify-return` (vérif au retour)
 
 **Sender** (BitQuest → BitLab) : `GET ${NEXT_PUBLIC_BITLAB_URL}?` avec
 params :
@@ -118,20 +142,48 @@ params :
 - `network` : `testnet4 | signet | regtest`
 - `returnTo` : URL absolue BitQuest où renvoyer l'apprenant
 - *extras* optionnels (ex. `target`, `feeSats`) tirés de `missionConfig`
+- `ts` et `sig` (**si** `BITLAB_SIGN_SECRET` configuré) : horodatage
+  unix + HMAC-SHA256 base64url. BitLab doit les échoer intacts à la
+  redirection de retour.
 
 **Receiver** (BitLab → BitQuest) : redirige vers `${returnTo}?` avec :
 - `bitlab_result=1` (flag d'origine, obligatoire)
 - `kind`, `network` (échos sender)
-- `txid=<hex64>` pour kind=TX, ou `hash=<hex64>` pour kind=BLOCK
+- Un des champs suivants selon kind :
+  - `txid=<hex64>` pour TX
+  - `hash=<hex64>` pour BLOCK
+  - `bolt11=<lnXXX>` pour INVOICE
+  - `scid=<block>x<tx>x<vout>` ou chan_id pour CHANNEL
+  - `address=<base58/bech32>` pour ADDRESS
+- `ts` et `sig` échoés (si sender les a envoyés)
 
 BitQuest à la réception :
-1. Valide `bitlab_result=1`, `kind` connu, `network` non vide, txid/hash
-   bien formé (64 hex, insensible à la casse)
+1. Valide `bitlab_result=1`, `kind` connu, `network` non vide, valeur
+   bien formée (regex par kind — hex64 pour TX/BLOCK, `ln…` pour
+   INVOICE, scid ou chan_id pour CHANNEL, bech32/base58 pour ADDRESS)
 2. Vérifie que `kind` correspond à la quête courante (évite collision
    inter-quêtes)
-3. Pré-remplit le formulaire + nettoie l'URL. L'apprenant reste maître
-   du clic « Vérifier » (pas d'auto-submit, décision délibérée pour
-   maintenir le consentement explicite avant d'engager le JWT challenge)
+3. Si `ts+sig` présents, appelle `/api/bitlab/deep-link/verify-return`
+   → serveur recompute HMAC et compare (timing-safe). Si enforced et
+   invalide : toast d'erreur et nettoyage URL sans pré-remplir
+4. Sinon : pré-remplit le formulaire + nettoie l'URL. L'apprenant reste
+   maître du clic « Vérifier » (pas d'auto-submit, décision délibérée
+   pour maintenir le consentement explicite avant d'engager le JWT
+   challenge)
+
+### Signature HMAC du deep-link (optionnelle)
+- Variable d'env `BITLAB_SIGN_SECRET` : HMAC key secrète (au moins
+  16 bytes). Si absente, les deep-links ne sont pas signés et
+  `/api/bitlab/deep-link/verify-return` répond `{ ok: true, enforced:
+  false }`
+- Payload canonique signé : `${userId}|${questCode}|${kind}|${network}|${ts}`
+- Algorithme : HMAC-SHA256, encodage base64url, max âge 1h
+- `signDeepLinkPayload` + `verifyDeepLinkPayload` dans
+  `src/lib/bitlab/deep-link.ts` (timing-safe via `crypto.timingSafeEqual`)
+- Threat model couvert : un tiers qui a intercepté un lien de retour
+  ne peut pas forger un retour BitLab pour la quête (binding au
+  `userId`), ni rejouer après 1h, ni l'utiliser pour une autre quête
+  (binding au `questCode`)
 
 ## Ce qui N'est PAS livré (par choix)
 
@@ -237,12 +289,13 @@ Réponses attendues :
 
 ## Prochaines étapes (roadmap)
 
-1. **BITLAB_PROOF pour d'autres quêtes** — convertir progressivement
-   les quêtes `tx_builder` / `block_explorer` / `lightning_pay` existantes.
-2. **Audit log séparé** pour toutes les soumissions de preuve (même
-   refusées) pour mesurer les attempts et taux de succès.
-3. **Signature HMAC sur le `returnTo`** (optionnel) pour que BitQuest
-   puisse refuser les retours non authentiques venant d'un tiers.
+1. **UI admin du journal d'audit** — page `/admin/bitlab/attempts`
+   filtre par outcome/user/quest, graphiques simples.
+2. **CHANNEL sur testnet via LND** — câbler un node LND testnet dans
+   docker-compose.dev.yml pour tests d'intégration end-to-end.
+3. **Conversion `lightning-channel` (ln_channel)** — attend un node LND
+   testnet opérationnel (actuellement simulé par manque d'explorateur
+   public Lightning testnet).
 
 ## Audit & logs
 
