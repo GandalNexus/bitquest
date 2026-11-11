@@ -27,6 +27,15 @@ depuis la console admin.
 - Timeout 5s + `AbortController`
 - Logs structurés via `logger("mempool")`
 
+### Vérification CHANNEL (P2.4) — deux niveaux
+- `src/lib/bitlab/channel.ts`
+- `ONCHAIN` (default) : lookup via LND REST (testnet/signet/regtest) ou
+  mempool.space (mainnet). Vérification forte.
+- `DECLARATIVE` : regex scid uniquement, pas d'appel réseau. Réservé aux
+  quêtes pédagogiques sans récompense sats réelle.
+- Déclaration par quête via `missionConfig.channelVerifyLevel`.
+- Payload enrichi : `verifyLevel: "ONCHAIN" | "DECLARATIVE"` + `source` associée.
+
 ### Vérification des adresses (P0.4) — deux niveaux
 - `src/lib/bitlab/address.ts`
 - `validateAddressFormat(network, address)` : préfixe + charset + longueur

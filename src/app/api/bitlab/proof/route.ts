@@ -4,6 +4,7 @@ import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { getTransaction, getBlock, getAddressStats, type Network } from "@/lib/bitlab/mempool";
 import { decodeInvoice } from "@/lib/bitlab/bolt11";
 import { resolveChannel, isValidChannelIdentifier } from "@/lib/bitlab/lightning";
+import { parseChannelVerifyLevel } from "@/lib/bitlab/channel";
 import {
   parseAddressVerifyLevel,
   validateAddressFormat,
@@ -161,6 +162,15 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+
+    // Niveau DECLARATIVE : format valide = preuve acceptée, pas d'appel réseau.
+    // À réserver aux quêtes pédagogiques sans récompense sats réelle (P2.4).
+    const channelLevel = parseChannelVerifyLevel(quest.missionConfig);
+    if (channelLevel === "DECLARATIVE") {
+      payload.scid = scid.trim();
+      payload.verifyLevel = "DECLARATIVE";
+      payload.source = "declarative";
+    } else {
     const { channel, source } = await resolveChannel(network as Network, scid);
     if (source === "unavailable") {
       audit("UNAVAILABLE", "LND non configuré");
@@ -187,6 +197,8 @@ export async function POST(req: Request) {
     payload.nodeRightPub = channel.nodeRightPub;
     payload.transactionId = channel.transactionId;
     payload.source = source;
+    payload.verifyLevel = "ONCHAIN";
+    }
   }
   if (kind === "ADDRESS") {
     const addressRaw = typeof payload.address === "string" ? payload.address : null;
