@@ -21,7 +21,11 @@ import {
   issueLaunchToken,
   verifyLaunchToken,
   verifyLaunchTokenOrRespond,
+  issueSessionToken,
+  verifySessionToken,
+  verifySessionFromRequest,
   LAUNCH_TOKEN_TTL_SECONDS,
+  SESSION_TOKEN_TTL,
 } from "./launch-token";
 import { PROTOCOL_VERSION } from "@/lib/bitlab/protocol";
 
@@ -170,6 +174,89 @@ describe("verifyLaunchToken — anti-downgrade / anti-mistake-aud", () => {
       .setExpirationTime(Math.floor(Date.now() / 1000) + 60)
       .sign(new TextEncoder().encode("WRONG-SECRET"));
     await expect(verifyLaunchToken(forged)).rejects.toThrow();
+  });
+});
+
+describe("issueSessionToken / verifySessionToken — LOT final", () => {
+  it("émet un JWT HS256 avec TTL 2h par défaut", async () => {
+    const before = Math.floor(Date.now() / 1000);
+    const { token, expiresAt } = await issueSessionToken({
+      userId: "u1",
+      pseudo: "alice",
+      role: "APPRENTICE",
+    });
+    expect(token.split(".")).toHaveLength(3);
+    const delta = Math.floor(expiresAt.getTime() / 1000) - before;
+    expect(delta).toBeGreaterThanOrEqual(SESSION_TOKEN_TTL - 2);
+    expect(delta).toBeLessThanOrEqual(SESSION_TOKEN_TTL + 2);
+  });
+
+  it("verify retourne les claims (pas de nonce check, usage multiple)", async () => {
+    const { token } = await issueSessionToken({
+      userId: "u1",
+      pseudo: "alice",
+      role: "APPRENTICE",
+    });
+    const a = await verifySessionToken(token);
+    expect(a.userId).toBe("u1");
+    // Deuxième appel OK aussi (vs launch_token single-use).
+    const b = await verifySessionToken(token);
+    expect(b.userId).toBe("u1");
+  });
+
+  it("rejette un launch token (aud=bitlab-user) comme session (aud=bitlab-user)", async () => {
+    const { token } = await issueLaunchToken({
+      userId: "u1",
+      pseudo: "alice",
+      role: "APPRENTICE",
+      email: null,
+      emailVerifiedAt: null,
+    });
+    await expect(verifySessionToken(token)).rejects.toThrow();
+  });
+
+  it("rejette version v > PROTOCOL_VERSION", async () => {
+    const forged = await new SignJWT({
+      v: PROTOCOL_VERSION + 1,
+      userId: "u1",
+      pseudo: "alice",
+      role: "APPRENTICE",
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuer("bitquest")
+      .setAudience("bitlab-session")
+      .setIssuedAt()
+      .setExpirationTime(Math.floor(Date.now() / 1000) + 7200)
+      .sign(new TextEncoder().encode(SECRET));
+    await expect(verifySessionToken(forged)).rejects.toThrow(/version/i);
+  });
+
+  it("verifySessionFromRequest extrait le Bearer et vérifie", async () => {
+    const { token } = await issueSessionToken({
+      userId: "u1",
+      pseudo: "alice",
+      role: "APPRENTICE",
+    });
+    const req = new Request("http://localhost/x", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const claims = await verifySessionFromRequest(req);
+    expect(claims?.userId).toBe("u1");
+  });
+
+  it("verifySessionFromRequest retourne null sans header / avec header mal formé", async () => {
+    expect(await verifySessionFromRequest(new Request("http://localhost/x"))).toBeNull();
+    const req = new Request("http://localhost/x", {
+      headers: { authorization: "Basic abc" },
+    });
+    expect(await verifySessionFromRequest(req)).toBeNull();
+  });
+
+  it("verifySessionFromRequest retourne null sur token invalide", async () => {
+    const req = new Request("http://localhost/x", {
+      headers: { authorization: "Bearer bogus.not.a-jwt" },
+    });
+    expect(await verifySessionFromRequest(req)).toBeNull();
   });
 });
 

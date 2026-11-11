@@ -190,3 +190,111 @@ export async function verifyLaunchTokenOrRespond(
 
 /** Rend un `exp` serveur côté caller pour header-based TTL. */
 export const LAUNCH_TOKEN_TTL_SECONDS = DEFAULT_TTL_SECONDS;
+
+/* ============================================================
+ * SESSION TOKEN GandalNexus (LOT final).
+ *
+ * Après consommation d'un launch_token (single-use, 60s), BitLab reçoit
+ * un `sessionToken` longue durée (2h) qu'il stocke en sessionStorage et
+ * utilise pour appeler les endpoints CORS user-scoped de BitQuest (ex.
+ * /api/bitlab/me/attempts).
+ *
+ * Différences avec le launch_token :
+ *   - aud: "bitlab-session" (anti-confusion cryptographique).
+ *   - Pas de nonce : usage multiple autorisé.
+ *   - TTL 2h : couvre une session de travail typique dans BitLab.
+ *   - Pas de replay check côté serveur : la révocation passe par
+ *     l'expiration naturelle.
+ *
+ * ⚠️ Ce token donne accès en lecture aux données user-scoped de BitQuest.
+ * Il ne doit PAS être utilisé pour des mutations (ne passe pas par CSRF).
+ * Les endpoints qui l'acceptent doivent être strictement GET + user-scoped.
+ * ============================================================ */
+
+const SESSION_TOKEN_TTL_SECONDS = 2 * 60 * 60; // 2h
+
+export interface SessionTokenClaims {
+  userId: string;
+  pseudo: string;
+  role: string;
+  iat: number;
+  exp: number;
+  v: number;
+}
+
+/** Émet un session token longue durée. Pas de nonce, usage multiple OK. */
+export async function issueSessionToken(
+  profile: Pick<LaunchTokenProfile, "userId" | "pseudo" | "role">,
+  ttlSeconds: number = SESSION_TOKEN_TTL_SECONDS,
+): Promise<{ token: string; expiresAt: Date }> {
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + ttlSeconds;
+  const token = await new SignJWT({
+    userId: profile.userId,
+    pseudo: profile.pseudo,
+    role: profile.role,
+    v: PROTOCOL_VERSION,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuer("bitquest")
+    .setAudience("bitlab-session")
+    .setIssuedAt(now)
+    .setExpirationTime(exp)
+    .sign(getSecretBytes());
+  log.info(
+    { userId: profile.userId, pseudo: profile.pseudo, v: PROTOCOL_VERSION, exp },
+    "session token issued",
+  );
+  return { token, expiresAt: new Date(exp * 1000) };
+}
+
+/** Vérifie un session token. Pas de nonce check (usage multiple). */
+export async function verifySessionToken(token: string): Promise<SessionTokenClaims> {
+  const { payload } = await jwtVerify(token, getSecretBytes(), {
+    issuer: "bitquest",
+    audience: "bitlab-session",
+  });
+  const claims = payload as unknown as Record<string, unknown>;
+  const { userId, pseudo, role, v } = claims;
+  if (
+    typeof userId !== "string" ||
+    typeof pseudo !== "string" ||
+    typeof role !== "string" ||
+    typeof v !== "number"
+  ) {
+    throw new Error("Session token : claims incomplètes.");
+  }
+  if (!Number.isInteger(v) || v < 1) {
+    throw new Error("Session token : version invalide.");
+  }
+  if (v > PROTOCOL_VERSION) {
+    throw new Error(
+      `Session token : version non supportée (serveur: ${PROTOCOL_VERSION}, token: ${v}).`,
+    );
+  }
+  return {
+    userId,
+    pseudo,
+    role,
+    v,
+    iat: claims.iat as number,
+    exp: claims.exp as number,
+  };
+}
+
+/** Helper : extrait et vérifie le session token depuis Authorization: Bearer. */
+export async function verifySessionFromRequest(
+  req: Request,
+): Promise<SessionTokenClaims | null> {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) return null;
+  const token = authHeader.slice(7).trim();
+  if (!token) return null;
+  try {
+    return await verifySessionToken(token);
+  } catch {
+    return null;
+  }
+}
+
+export const SESSION_TOKEN_TTL = SESSION_TOKEN_TTL_SECONDS;

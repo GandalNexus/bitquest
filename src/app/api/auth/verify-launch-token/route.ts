@@ -1,5 +1,9 @@
 import { clientIp, rateLimit } from "@/lib/bitquest/session";
-import { verifyLaunchTokenOrRespond } from "@/lib/auth/launch-token";
+import {
+  verifyLaunchTokenOrRespond,
+  issueSessionToken,
+  SESSION_TOKEN_TTL,
+} from "@/lib/auth/launch-token";
 import { parseJsonBody, verifyLaunchTokenSchema } from "@/lib/validation/schemas";
 import { db } from "@/lib/db";
 
@@ -90,6 +94,14 @@ export async function POST(req: Request) {
     );
   }
 
+  // Émet un session token longue durée (2h) pour que BitLab puisse
+  // appeler les endpoints user-scoped read-only via Authorization: Bearer.
+  const { token: sessionToken, expiresAt: sessionExpiresAt } = await issueSessionToken({
+    userId: user.id,
+    pseudo: user.pseudo,
+    role: user.role,
+  });
+
   return Response.json(
     {
       ok: true,
@@ -101,6 +113,11 @@ export async function POST(req: Request) {
         emailVerified: user.emailVerifiedAt !== null,
         isGuest: user.isGuest,
         isBot: user.isBot,
+      },
+      session: {
+        token: sessionToken,
+        expiresAt: sessionExpiresAt.toISOString(),
+        ttlSeconds: SESSION_TOKEN_TTL,
       },
     },
     { headers: extraHeaders },
