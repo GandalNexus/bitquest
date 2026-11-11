@@ -1,6 +1,6 @@
 {
   "name": "bitquest",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "BitQuest — gamified educational platform for learning Bitcoin and the Lightning Network (GandalNexus).",
   "license": "AGPL-3.0",
