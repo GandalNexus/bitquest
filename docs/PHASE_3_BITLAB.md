@@ -49,6 +49,24 @@ depuis la console admin.
 - Extraction de `amountSats`, `network`, `paymentHash`, `expiry`
 - Appelé depuis `/api/bitlab/proof` pour `kind=INVOICE` (400 si invalide)
 
+### Rate-limiting à deux dimensions (userId + IP)
+Chaque route BitLab applique **deux** rate-limits en Redis (fallback in-memory) :
+
+| Route | Limite userId (×/60s) | Limite IP (×/60s) |
+|---|---|---|
+| `/api/bitlab/challenge` | 30 | 120 |
+| `/api/bitlab/proof` | 20 | 80 |
+| `/api/bitlab/deep-link` | 30 | 120 |
+| `/api/bitlab/deep-link/verify-return` | 60 | 240 |
+
+- **IP d'abord** (avant `authenticate`) : protège contre DoS non-authentifié.
+- Extraction via `clientIp(req)` (`src/lib/bitquest/session.ts`) : priorité
+  `x-forwarded-for` (1re IP), fallback `x-real-ip`, fallback `"unknown"`
+  (bucket partagée fail-closed).
+- Ratio ×4 userId→IP pour tolérer NAT (familles, écoles, VPN d'entreprise).
+- **Prod requise** : un reverse proxy fiable (nginx/caddy) qui réécrit
+  `x-forwarded-for`. Sans proxy, un client peut spoofer le header.
+
 ### Versionnement du protocole BitQuest ↔ BitLab (`PROTOCOL_VERSION = 1`)
 - Source unique dans `src/lib/bitlab/protocol.ts` ; partagée par le JWT challenge
   et le deep-link HMAC signé.

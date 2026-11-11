@@ -344,6 +344,46 @@ describe("e2e proof ADDRESS — niveau USED", () => {
     expect(outcomes).toContain("REJECTED");
   });
 
+  it("rate-limit IP coupe plusieurs comptes derrière la même IP", async () => {
+    mockQuest("tx-basics");
+    // 30 appels userId est la limite ; l'IP limit est 120. On va forcer un
+    // 429 "depuis cette IP" en envoyant 121 requêtes depuis la même IP avec
+    // 4 userIds différents (30 chacun × 4 = 120, le 121e doit être bloqué).
+    // L'auth user dépend du header x-gn-user-id ; on mock findUnique pour
+    // accepter n'importe quel userId du jeu de test.
+    dbMock.user.findUnique.mockImplementation(() =>
+      Promise.resolve({ id: "u-dyn", token: "t-dyn", deletedAt: null }),
+    );
+
+    // IP unique à chaque run pour éviter d'hériter d'une bucket in-memory saturée
+    // par un test précédent dans le même process.
+    const ip = `203.0.113.${Math.floor(Math.random() * 254) + 1}`;
+    const make = () =>
+      new Request("http://localhost/api/bitlab/challenge", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": ip,
+          "x-gn-user-id": "u-dyn",
+          "x-gn-token": "t-dyn",
+        },
+        body: JSON.stringify({ questCode: "tx-basics", kind: "TX" }),
+      });
+
+    let lastIpRefusal: Response | null = null;
+    for (let i = 0; i < 125; i++) {
+      const res = await challengePOST(make());
+      if (res.status === 429) {
+        const body = (await res.json()) as { error: string };
+        if (body.error.includes("IP")) {
+          lastIpRefusal = res;
+          break;
+        }
+      }
+    }
+    expect(lastIpRefusal).not.toBeNull();
+  });
+
   it("accepte en niveau FORMAT (default) sans toucher mempool", async () => {
     mockQuest("addr-format"); // missionConfig null → FORMAT default
 

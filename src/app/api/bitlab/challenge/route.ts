@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { authenticate, rateLimit, unauthorized } from "@/lib/bitquest/session";
+import { authenticate, clientIp, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { freshNonce, issueChallenge, PROTOCOL_VERSION } from "@/lib/bitlab/jwt";
 import { bitlabChallengeSchema, parseJsonBody } from "@/lib/validation/schemas";
@@ -12,6 +12,11 @@ import { bitlabChallengeSchema, parseJsonBody } from "@/lib/validation/schemas";
  * rendant chaque JWT utilisable une seule fois.
  */
 export async function POST(req: Request) {
+  // Rate-limit IP AVANT auth : protège contre DoS non-authentifié
+  // (ratio × 4 par rapport au rate-limit userId pour tolérer NAT/famille/école).
+  if (!(await rateLimit(`bitlab-challenge-ip:${clientIp(req)}`, 120, 60_000))) {
+    return Response.json({ error: "Trop de requêtes depuis cette IP." }, { status: 429 });
+  }
   const user = await authenticate(req);
   if (!user) return unauthorized();
   if (isCookieAuthenticated(req)) {

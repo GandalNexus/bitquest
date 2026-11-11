@@ -90,6 +90,30 @@ export function unauthorized() {
   return Response.json({ error: "Session invalide ou expirée." }, { status: 401 });
 }
 
+/**
+ * Extrait l'adresse IP du client depuis les en-têtes de la requête.
+ *
+ * Priorité :
+ *   1. `x-forwarded-for` (standard de-facto en reverse proxy) : premier
+ *      segment avant la première virgule (format "ip1, ip2, ip3").
+ *   2. `x-real-ip` (nginx / certains proxys).
+ *   3. `"unknown"` : clé fail-closed (une seule bucket partagée pour tous
+ *      les clients non-identifiables — rate-limit strict mais pas de 500).
+ *
+ * Note : `x-forwarded-for` est sous le contrôle du client en l'absence
+ * de proxy. En prod, exiger un proxy fiable (nginx/caddy) qui le réécrit.
+ */
+export function clientIp(req: Request): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const real = req.headers.get("x-real-ip");
+  if (real) return real.trim();
+  return "unknown";
+}
+
 /* ============ Rate limiting (Redis si dispo, fallback in-memory) ============ */
 
 const hits = new Map<string, number[]>();

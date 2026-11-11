@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rateLimitInMemory } from "./session";
+import { clientIp, rateLimitInMemory } from "./session";
 
 /* ------------------------------------------------------------------ */
 /* rateLimit (backend in-memory)                                       */
@@ -50,5 +50,59 @@ describe("rateLimitInMemory", () => {
     for (let i = 0; i < 3; i++) expect(rateLimitInMemory(key, 3, 10_000)).toBe(true);
     expect(rateLimitInMemory(key, 3, 10_000)).toBe(false);
     expect(rateLimitInMemory(key, 3, 10_000)).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* clientIp — extraction de l'IP client depuis les headers HTTP        */
+/* ------------------------------------------------------------------ */
+
+function reqWith(headers: Record<string, string>): Request {
+  return new Request("http://localhost/x", { method: "POST", headers });
+}
+
+describe("clientIp", () => {
+  it("lit x-forwarded-for en priorité", () => {
+    expect(clientIp(reqWith({ "x-forwarded-for": "1.2.3.4" }))).toBe("1.2.3.4");
+  });
+
+  it("prend la première IP d'une chaîne x-forwarded-for", () => {
+    expect(
+      clientIp(reqWith({ "x-forwarded-for": "203.0.113.1, 10.0.0.1, 10.0.0.2" })),
+    ).toBe("203.0.113.1");
+  });
+
+  it("trim les espaces autour de la première IP", () => {
+    expect(clientIp(reqWith({ "x-forwarded-for": "  1.2.3.4  , 5.6.7.8" }))).toBe(
+      "1.2.3.4",
+    );
+  });
+
+  it("fallback sur x-real-ip si x-forwarded-for est absent", () => {
+    expect(clientIp(reqWith({ "x-real-ip": "198.51.100.42" }))).toBe("198.51.100.42");
+  });
+
+  it("préfère x-forwarded-for à x-real-ip", () => {
+    expect(
+      clientIp(
+        reqWith({
+          "x-forwarded-for": "1.2.3.4",
+          "x-real-ip": "198.51.100.42",
+        }),
+      ),
+    ).toBe("1.2.3.4");
+  });
+
+  it("retourne 'unknown' si aucun header n'est présent", () => {
+    expect(clientIp(reqWith({}))).toBe("unknown");
+  });
+
+  it("retourne 'unknown' si x-forwarded-for est vide", () => {
+    expect(clientIp(reqWith({ "x-forwarded-for": "" }))).toBe("unknown");
+  });
+
+  it("supporte l'IPv6", () => {
+    const ipv6 = "2001:db8::1";
+    expect(clientIp(reqWith({ "x-forwarded-for": ipv6 }))).toBe(ipv6);
   });
 });

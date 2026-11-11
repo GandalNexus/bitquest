@@ -1,4 +1,4 @@
-import { authenticate, rateLimit, unauthorized } from "@/lib/bitquest/session";
+import { authenticate, clientIp, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { bitlabDeepLinkSchema, parseJsonBody } from "@/lib/validation/schemas";
 import { buildBitlabDeepLink, signDeepLinkPayload } from "@/lib/bitlab/deep-link";
@@ -16,6 +16,10 @@ function getSignSecret(): string | null {
  * Le client peut appeler l'endpoint sans se soucier du secret.
  */
 export async function POST(req: Request) {
+  // Rate-limit IP AVANT auth (anti-DoS), ratio × 4 du userId limit.
+  if (!(await rateLimit(`bitlab-deep-link-ip:${clientIp(req)}`, 120, 60_000))) {
+    return Response.json({ error: "Trop de requêtes depuis cette IP." }, { status: 429 });
+  }
   const user = await authenticate(req);
   if (!user) return unauthorized();
   if (isCookieAuthenticated(req)) {

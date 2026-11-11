@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { authenticate, rateLimit, unauthorized } from "@/lib/bitquest/session";
+import { authenticate, clientIp, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { getTransaction, getBlock, getAddressStats, type Network } from "@/lib/bitlab/mempool";
 import { decodeInvoice } from "@/lib/bitlab/bolt11";
@@ -24,6 +24,10 @@ const log = logger("bitlab-proof");
  */
 export async function POST(req: Request) {
   const startedAt = Date.now();
+  // Rate-limit IP AVANT auth (anti-DoS), ratio × 4 du userId limit.
+  if (!(await rateLimit(`bitlab-proof-ip:${clientIp(req)}`, 80, 60_000))) {
+    return Response.json({ error: "Trop de requêtes depuis cette IP." }, { status: 429 });
+  }
   const user = await authenticate(req);
   if (!user) return unauthorized();
   if (isCookieAuthenticated(req)) {
