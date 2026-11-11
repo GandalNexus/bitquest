@@ -1,0 +1,19 @@
+{
+  "locale.switch.wo": "Wolof",
+  "auth.title": "Dalal ak jàmm ci BitQuest",
+  "auth.subtitle": "Jàngal Bitcoin, jëfandikoo BitLab, jot satoshis ciy jàngam.",
+  "nav.dashboard": "Tablo",
+  "nav.quests": "Mandat yi",
+  "nav.profile": "Sa profil",
+  "nav.wallet": "Wallet",
+  "nav.leaderboard": "Dëkk-dëkkële",
+  "nav.academy": "Akademi",
+  "nav.logout": "Génn",
+  "common.cancel": "Bañ",
+  "common.save": "Denc",
+  "common.delete": "Fàww",
+  "common.loading": "Mu ngi lekk…",
+  "common.error": "Njuumte",
+  "common.retry": "Jéemaat",
+  "common.back": "Dellu"
+}

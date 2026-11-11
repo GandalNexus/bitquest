@@ -21,6 +21,7 @@
   "locale.switch.label": "Language",
   "locale.switch.fr": "Français",
   "locale.switch.en": "English",
+  "locale.switch.wo": "Wolof",
   "auth.title": "Welcome to BitQuest",
   "auth.subtitle": "Learn Bitcoin, practice in BitLab, earn educational satoshis.",
   "auth.tab.login": "Log in",

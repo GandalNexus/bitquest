@@ -6,9 +6,10 @@ import { LOCALES, type Locale } from "./config";
 import { useLocale } from "./locale-provider";
 
 /**
- * Switch de langue minimal. On cycle entre FR / EN sur clic, ce qui est
- * plus compact qu'un menu déroulant pour seulement deux options. La
- * valeur active est annoncée par aria-label et persistée par cookie.
+ * Switch de langue cyclique. À 3 locales (fr/en/wo) on reste sur un
+ * clic unique qui avance dans l'ordre : fr → en → wo → fr. Le menu
+ * dropdown viendra si on passe à 4+ locales. La valeur active est
+ * annoncée par aria-label et persistée par cookie.
  */
 export function LanguageSwitch({ className }: { className?: string }) {
   const { locale, setLocale, t } = useLocale();
