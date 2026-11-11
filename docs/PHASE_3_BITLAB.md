@@ -52,6 +52,9 @@ REST externe. Audit log activé. Deep-link signé HMAC optionnel.
 - `getChannelViaLnd(id, cfg)` via `node:https` avec macaroon header
   (`Grpc-Metadata-macaroon`) et support TLS self-signed
 - Configuration par env (voir § *Config LND*)
+- Infra Docker testnet dédiée : voir
+  [`docs/DOCKER_LND.md`](DOCKER_LND.md) pour lancer un node lnd via
+  `docker compose --profile lnd` et extraire les credentials
 
 ### Dispatcher Lightning
 - `resolveChannel(network, scid)` dans `lightning.ts`
@@ -306,11 +309,11 @@ Réponses attendues :
 
 ## Prochaines étapes (roadmap)
 
-1. **CHANNEL sur testnet via LND** — câbler un node LND testnet dans
-   docker-compose.dev.yml pour tests d'intégration end-to-end.
-2. **Conversion `lightning-channel` (ln_channel)** — attend un node LND
-   testnet opérationnel (actuellement simulé par manque d'explorateur
-   public Lightning testnet).
+1. **Conversion `lightning-channel` (ln_channel)** — bascule la quête
+   `lightning` en `BITLAB_PROOF` maintenant que LND testnet est
+   disponible via `docker compose --profile lnd` (cf. DOCKER_LND.md).
+   Le test end-to-end dépend d'un wallet seedé et d'un channel ouvert
+   contre un pair de la testnet faucet.
 
 ## Audit & logs
 
