@@ -34,8 +34,11 @@ export async function POST(req: Request) {
     );
   }
 
-  const { url } = await issueEmailVerification(user.id);
-  // En prod : envoyer `url` par email via le provider. Dev : la URL est
-  // visible dans les logs (voir issueEmailVerification).
-  return Response.json({ ok: true, devUrl: process.env.NODE_ENV === "production" ? undefined : url });
+  const { url, dispatched } = await issueEmailVerification(user.id);
+  // devUrl exposé uniquement quand aucun provider réel n'a traité le
+  // mail (dev sans RESEND_API_KEY, ou erreur silencieuse). En prod avec
+  // provider actif, le front n'a pas besoin de l'URL.
+  const devUrl =
+    process.env.NODE_ENV === "production" || dispatched ? undefined : url;
+  return Response.json({ ok: true, dispatched, devUrl });
 }

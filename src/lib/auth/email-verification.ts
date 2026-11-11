@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/log";
+import { sendMail } from "@/lib/mail/mailer";
+import { verificationEmailTemplate } from "@/lib/mail/templates";
 
 const log = logger("email-verification");
 
@@ -32,20 +34,78 @@ export function buildVerificationUrl(token: string): string {
 }
 
 /**
- * Émet un token de vérification pour un utilisateur enregistré et
- * retourne l'URL correspondante. Idempotent : écrase un token existant
- * pour éviter de laisser traîner d'anciens tokens valides.
+ * Envoie l'email de vérification avec le token déjà généré. Utilisé à
+ * l'inscription (le token est écrit lors de la création du User, on
+ * veut juste déclencher l'envoi). Retourne `dispatched` pour signaler
+ * si un provider réel a traité le mail.
  */
-export async function issueEmailVerification(userId: string): Promise<{ url: string }> {
+export async function sendVerificationEmail(args: {
+  email: string;
+  pseudo: string;
+  token: string;
+}): Promise<{ url: string; dispatched: boolean }> {
+  const url = buildVerificationUrl(args.token);
+  const message = verificationEmailTemplate({
+    to: args.email,
+    pseudo: args.pseudo,
+    url,
+  });
+  const result = await sendMail(message);
+  const dispatched = result.ok && result.provider !== "none";
+  log.info(
+    { email: args.email, provider: result.provider, dispatched, resendId: result.id },
+    dispatched ? "verification email dispatched (register)" : "verification email not dispatched",
+  );
+  return { url, dispatched };
+}
+
+/**
+ * Émet un token de vérification pour un utilisateur enregistré et
+ * déclenche l'envoi par email via le provider configuré. Idempotent :
+ * écrase un token existant pour invalider les anciens liens.
+ *
+ * Retourne `{ url, dispatched }` :
+ *   - `url` : URL de vérification (toujours retournée)
+ *   - `dispatched` : true si le mailer a bien envoyé, false sinon
+ *     (provider=none ou échec). Le caller peut l'utiliser pour afficher
+ *     l'URL en dev quand aucun envoi réel n'a eu lieu.
+ */
+export async function issueEmailVerification(
+  userId: string,
+): Promise<{ url: string; dispatched: boolean }> {
   const token = generateVerificationToken();
   const user = await db.user.update({
     where: { id: userId },
     data: { verificationToken: token },
-    select: { email: true },
+    select: { email: true, pseudo: true },
   });
   const url = buildVerificationUrl(token);
-  log.info({ userId, email: user.email, url }, "verification email issued (console-only in dev)");
-  return { url };
+
+  if (!user.email) {
+    log.warn({ userId }, "verification requested for user without email — URL only");
+    return { url, dispatched: false };
+  }
+
+  const message = verificationEmailTemplate({
+    to: user.email,
+    pseudo: user.pseudo,
+    url,
+  });
+  const result = await sendMail(message);
+  const dispatched = result.ok && result.provider !== "none";
+
+  log.info(
+    {
+      userId,
+      email: user.email,
+      provider: result.provider,
+      dispatched,
+      resendId: result.id,
+    },
+    dispatched ? "verification email dispatched" : "verification email not dispatched (provider=none or error)",
+  );
+
+  return { url, dispatched };
 }
 
 /**

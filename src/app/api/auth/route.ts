@@ -2,7 +2,11 @@ import { db } from "@/lib/db";
 import { publicUser } from "@/lib/bitquest/progression";
 import { buildSessionCookie, rateLimit } from "@/lib/bitquest/session";
 import { buildCsrfCookie, computeCsrfToken } from "@/lib/auth/csrf";
-import { buildVerificationUrl, generateVerificationToken } from "@/lib/auth/email-verification";
+import {
+  buildVerificationUrl,
+  generateVerificationToken,
+  sendVerificationEmail,
+} from "@/lib/auth/email-verification";
 import { logger } from "@/lib/log";
 import { authBodySchema, parseJsonBody } from "@/lib/validation/schemas";
 import crypto from "crypto";
@@ -69,9 +73,16 @@ export async function POST(req: Request) {
           lastActiveDate: new Date().toISOString().slice(0, 10),
         },
       });
+      // Déclenche l'envoi (fire-and-forget pour ne pas bloquer la
+      // réponse ; le mailer catch ses propres erreurs).
+      void sendVerificationEmail({
+        email: user.email!,
+        pseudo: user.pseudo,
+        token: verificationToken,
+      });
       log.info(
         { userId: user.id, email: user.email, verificationUrl: buildVerificationUrl(verificationToken) },
-        "registration: verification URL emitted (console-only in dev)",
+        "registration: verification email queued",
       );
       return jsonWithSession({ user: publicUser(user), token: user.token }, user.token);
     }
