@@ -5,6 +5,7 @@ import { getTransaction, getBlock, type Network } from "@/lib/bitlab/mempool";
 import { decodeInvoice } from "@/lib/bitlab/bolt11";
 import { resolveChannel, isValidChannelIdentifier } from "@/lib/bitlab/lightning";
 import { verifyChallengeOrRespond } from "@/lib/bitlab/jwt";
+import { fireProofAttempt, type ProofOutcome } from "@/lib/bitlab/audit";
 import { bitlabProofSchema, parseJsonBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/log";
 
@@ -13,19 +14,11 @@ const log = logger("bitlab-proof");
 /**
  * POST /api/bitlab/proof — soumet une preuve de mission BitLab.
  *
- * Phase 3 foundation : l'endpoint persiste une BitLabProof vérifiée côté
- * explorateur (mempool.space / blockstream), MAIS ne remet AUCUN XP/sats
- * encore — le câblage « preuve → récompense » quête-par-quête viendra
- * dans un sprint ultérieur pour éviter une bascule brutale.
- *
- * Kinds supportés en v1 :
- *   - TX     : { txid } → lookup mempool, confirmed requis
- *   - BLOCK  : { hash } → lookup mempool
- *   - INVOICE, CHANNEL, ADDRESS : acceptés en structure mais non vérifiés
- *     encore (nécessitent BOLT11 decoder + LND api côté serveur, hors de
- *     cette foundation)
+ * Toutes les sorties du handler (succès ou refus) alimentent le journal
+ * d'audit BitLabProofAttempt via fireProofAttempt.
  */
 export async function POST(req: Request) {
+  const startedAt = Date.now();
   const user = await authenticate(req);
   if (!user) return unauthorized();
   if (isCookieAuthenticated(req)) {
@@ -33,24 +26,59 @@ export async function POST(req: Request) {
     if (!csrf.ok) return csrf.response;
   }
   if (!(await rateLimit(`bitlab-proof:${user.id}`, 20, 60_000))) {
+    fireProofAttempt({
+      userId: user.id,
+      questCode: "",
+      kind: "",
+      network: "",
+      outcome: "RATE_LIMITED",
+      startedAt,
+    });
     return Response.json({ error: "Trop de tentatives, patiente une minute." }, { status: 429 });
   }
 
   const parsed = await parseJsonBody(req, bitlabProofSchema);
-  if (!parsed.ok) return parsed.response;
+  if (!parsed.ok) {
+    fireProofAttempt({
+      userId: user.id,
+      questCode: "",
+      kind: "",
+      network: "",
+      outcome: "BAD_REQUEST",
+      reasonMessage: "schema validation failed",
+      startedAt,
+    });
+    return parsed.response;
+  }
   const { questCode, kind, network, payload, challenge } = parsed.data;
+
+  const audit = (outcome: ProofOutcome, reason?: string) =>
+    fireProofAttempt({
+      userId: user.id,
+      questCode,
+      kind,
+      network,
+      outcome,
+      reasonMessage: reason ?? null,
+      startedAt,
+    });
 
   // Vérifie que la quête existe (pas de FK Prisma mais on refuse les quêtes inconnues).
   const quest = await db.quest.findUnique({ where: { code: questCode }, select: { id: true } });
   if (!quest) {
+    audit("BAD_REQUEST", "quest inconnue");
     return Response.json({ error: "Quête inconnue." }, { status: 404 });
   }
 
   // JWT challenge obligatoire : vérifie signature + expiry + consomme le nonce.
   const chk = await verifyChallengeOrRespond(challenge);
-  if (!chk.ok) return chk.response;
+  if (!chk.ok) {
+    audit("INVALID_JWT", "signature/expiry/nonce");
+    return chk.response;
+  }
   const claims = chk.claims;
   if (claims.userId !== user.id || claims.questCode !== questCode || claims.kind !== kind) {
+    audit("INVALID_JWT", "mismatch user/quest/kind");
     return Response.json(
       { error: "JWT bitlab : paire (user, quest, kind) ne correspond pas." },
       { status: 400 },
@@ -61,13 +89,16 @@ export async function POST(req: Request) {
   if (kind === "TX") {
     const txid = typeof payload.txid === "string" ? payload.txid : null;
     if (!txid || !/^[0-9a-f]{64}$/i.test(txid)) {
+      audit("BAD_REQUEST", "txid mal formé");
       return Response.json({ error: "txid manquant ou mal formé." }, { status: 400 });
     }
     const tx = await getTransaction(network as Network, txid);
     if (!tx) {
+      audit("NOT_FOUND", "tx introuvable");
       return Response.json({ error: "Transaction introuvable sur l'explorateur." }, { status: 404 });
     }
     if (!tx.confirmed) {
+      audit("MEMPOOL");
       return Response.json(
         { error: "Transaction en mempool, pas encore confirmée.", mempool: true },
         { status: 409 },
@@ -80,10 +111,12 @@ export async function POST(req: Request) {
   } else if (kind === "BLOCK") {
     const hash = typeof payload.hash === "string" ? payload.hash : null;
     if (!hash || !/^[0-9a-f]{64}$/i.test(hash)) {
+      audit("BAD_REQUEST", "hash mal formé");
       return Response.json({ error: "hash de bloc manquant ou mal formé." }, { status: 400 });
     }
     const block = await getBlock(network as Network, hash);
     if (!block) {
+      audit("NOT_FOUND", "block introuvable");
       return Response.json({ error: "Bloc introuvable sur l'explorateur." }, { status: 404 });
     }
     payload.height = block.height;
@@ -92,6 +125,7 @@ export async function POST(req: Request) {
   if (kind === "INVOICE") {
     const bolt11 = typeof payload.bolt11 === "string" ? payload.bolt11 : null;
     if (!bolt11) {
+      audit("BAD_REQUEST", "bolt11 manquant");
       return Response.json({ error: "Invoice BOLT11 manquante dans payload.bolt11." }, { status: 400 });
     }
     try {
@@ -101,15 +135,15 @@ export async function POST(req: Request) {
       payload.paymentHash = decoded.paymentHash;
       payload.expiry = decoded.expiry;
     } catch (err) {
-      return Response.json(
-        { error: err instanceof Error ? err.message : "Invoice invalide." },
-        { status: 400 },
-      );
+      const msg = err instanceof Error ? err.message : "Invoice invalide.";
+      audit("REJECTED", `bolt11 invalide: ${msg}`);
+      return Response.json({ error: msg }, { status: 400 });
     }
   }
   if (kind === "CHANNEL") {
     const scid = typeof payload.scid === "string" ? payload.scid : null;
     if (!scid || !isValidChannelIdentifier(scid)) {
+      audit("BAD_REQUEST", "scid mal formé");
       return Response.json(
         { error: "payload.scid doit être <block>x<tx>x<vout> ou un chan_id numérique." },
         { status: 400 },
@@ -117,6 +151,7 @@ export async function POST(req: Request) {
     }
     const { channel, source } = await resolveChannel(network as Network, scid);
     if (source === "unavailable") {
+      audit("UNAVAILABLE", "LND non configuré");
       return Response.json(
         {
           error:
@@ -126,6 +161,7 @@ export async function POST(req: Request) {
       );
     }
     if (!channel) {
+      audit("NOT_FOUND", "channel introuvable");
       return Response.json(
         { error: "Channel Lightning introuvable sur l'explorateur." },
         { status: 404 },
@@ -160,6 +196,7 @@ export async function POST(req: Request) {
   });
 
   log.info({ userId: user.id, questCode, kind, network }, "bitlab proof accepted");
+  audit("ACCEPTED");
 
   return Response.json({
     ok: true,

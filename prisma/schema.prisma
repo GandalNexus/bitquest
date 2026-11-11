@@ -281,3 +281,26 @@ model BitLabProof {
   @@index([userId])
   @@index([questCode])
 }
+
+/**
+ * Journal d'audit de chaque soumission à /api/bitlab/proof.
+ * Enregistre les succès ET les refus pour permettre à l'ops de
+ * mesurer le taux de succès, détecter des tentatives abusives, et
+ * débuguer les problèmes BitLab/LND/mempool. Volumétrie attendue
+ * modérée (une entrée par tentative, pas par preuve vérifiée).
+ */
+model BitLabProofAttempt {
+  id            String   @id @default(cuid())
+  userId        String
+  questCode     String
+  kind          String // TX | BLOCK | INVOICE | CHANNEL | ADDRESS
+  network       String
+  outcome       String // ACCEPTED | REJECTED | NOT_FOUND | UNAVAILABLE | INVALID_JWT | MEMPOOL | BAD_REQUEST | RATE_LIMITED
+  reasonMessage String? // message court en français (facultatif)
+  latencyMs     Int // durée totale du handler
+  createdAt     DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([questCode, createdAt])
+  @@index([outcome, createdAt])
+}
