@@ -36,6 +36,13 @@ publique de divulgation).
 | Exempt pour auth header legacy (immune)      | ✅     | `isCookieAuthenticated()` gate          |
 | Rotation sur logout + password change        | ✅     | Set-Cookie clear ou nouveau CSRF        |
 | Secret validation (`CSRF_SECRET` requis prod) | ✅     | `getCsrfSecret()` throw en prod         |
+| Couverture gelée par test (P1.3)             | ✅     | `src/lib/auth/csrf-coverage.test.ts` — allowlist explicite, fail si ajout d'une route POST/PUT/DELETE sans CSRF |
+
+**Décision `SameSite=Lax` (motivation)** : `Strict` casserait la navigation
+entrante depuis des liens externes (notamment les emails de vérification qui
+pointent vers `/verify-email?token=…`). `Lax` autorise la méthode GET top-level
+depuis un domaine tiers mais bloque les requêtes POST cross-site (où le CSRF
+double-submit prend le relais). Garder `Lax`.
 
 ---
 
