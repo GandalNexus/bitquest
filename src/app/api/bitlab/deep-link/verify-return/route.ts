@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
   const parsed = await parseJsonBody(req, bitlabDeepLinkVerifySchema);
   if (!parsed.ok) return parsed.response;
-  const { questCode, kind, network, ts, sig } = parsed.data;
+  const { questCode, kind, network, ts, sig, v } = parsed.data;
 
   const secret = getSignSecret();
   if (!secret) {
@@ -43,6 +43,7 @@ export async function POST(req: Request) {
     ts,
     sig,
     secret,
+    v,
   });
 
   return Response.json({ ok: valid, enforced: true });

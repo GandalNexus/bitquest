@@ -5,6 +5,7 @@ import {
   signDeepLinkPayload,
   verifyDeepLinkPayload,
 } from "./deep-link";
+import { PROTOCOL_VERSION } from "./protocol";
 
 describe("buildBitlabDeepLink", () => {
   it("encode les paramètres obligatoires", () => {
@@ -236,5 +237,84 @@ describe("signDeepLinkPayload / verifyDeepLinkPayload", () => {
     expect(
       verifyDeepLinkPayload({ ...baseArgs, ts, sig: "###not-base64###" }),
     ).toBe(false);
+  });
+});
+
+describe("deep-link — versionnement (P0.3)", () => {
+  const baseArgs = {
+    userId: "user_abc",
+    questCode: "tx-basics",
+    kind: "TX" as const,
+    network: "testnet4",
+    secret: "s3cret-hmac-key-at-least-16-bytes",
+  };
+
+  it("signe par défaut au format PROTOCOL_VERSION courant", () => {
+    const ts = 1_700_000_000;
+    const withDefault = signDeepLinkPayload({ ...baseArgs, ts });
+    const withExplicitV = signDeepLinkPayload({ ...baseArgs, ts, v: PROTOCOL_VERSION });
+    expect(withDefault).toBe(withExplicitV);
+  });
+
+  it("produit des signatures différentes pour v=1 et legacy (v absent)", () => {
+    const ts = 1_700_000_000;
+    const v1 = signDeepLinkPayload({ ...baseArgs, ts, v: 1 });
+    const legacy = signDeepLinkPayload({ ...baseArgs, ts, v: undefined });
+    expect(v1).not.toBe(legacy);
+  });
+
+  it("verify accepte une URL v1 avec v fourni", () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = signDeepLinkPayload({ ...baseArgs, ts, v: 1 });
+    expect(verifyDeepLinkPayload({ ...baseArgs, ts, sig, v: 1 })).toBe(true);
+  });
+
+  it("verify accepte une URL v1 sans v (fallback essai courant d'abord)", () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = signDeepLinkPayload({ ...baseArgs, ts, v: 1 });
+    expect(verifyDeepLinkPayload({ ...baseArgs, ts, sig })).toBe(true);
+  });
+
+  it("verify accepte une URL legacy (émise sans v) avec v absent côté verify", () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = signDeepLinkPayload({ ...baseArgs, ts, v: undefined });
+    expect(verifyDeepLinkPayload({ ...baseArgs, ts, sig })).toBe(true);
+  });
+
+  it("verify rejette v > PROTOCOL_VERSION (anti-downgrade serveur)", () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = signDeepLinkPayload({ ...baseArgs, ts, v: 1 });
+    expect(
+      verifyDeepLinkPayload({ ...baseArgs, ts, sig, v: PROTOCOL_VERSION + 1 }),
+    ).toBe(false);
+  });
+
+  it("verify rejette v = 0 ou négatif", () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = signDeepLinkPayload({ ...baseArgs, ts, v: 1 });
+    expect(verifyDeepLinkPayload({ ...baseArgs, ts, sig, v: 0 })).toBe(false);
+    expect(verifyDeepLinkPayload({ ...baseArgs, ts, sig, v: -1 })).toBe(false);
+  });
+
+  it("verify rejette v non entier", () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = signDeepLinkPayload({ ...baseArgs, ts, v: 1 });
+    expect(verifyDeepLinkPayload({ ...baseArgs, ts, sig, v: 1.5 })).toBe(false);
+  });
+
+  it("verify rejette si v fourni mais signature altérée", () => {
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = signDeepLinkPayload({ ...baseArgs, ts, v: 1 });
+    const tampered = sig.slice(0, -4) + "XXXX";
+    expect(verifyDeepLinkPayload({ ...baseArgs, ts, sig: tampered, v: 1 })).toBe(
+      false,
+    );
+  });
+
+  it("verify avec v mismatch : URL signée v1 mais args.v=1 d'un autre serveur ne change rien", () => {
+    // Sanity : v=1 strict reste strict.
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = signDeepLinkPayload({ ...baseArgs, ts, v: 1 });
+    expect(verifyDeepLinkPayload({ ...baseArgs, ts, sig, v: 1 })).toBe(true);
   });
 });

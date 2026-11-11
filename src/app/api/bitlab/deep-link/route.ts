@@ -2,6 +2,7 @@ import { authenticate, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { bitlabDeepLinkSchema, parseJsonBody } from "@/lib/validation/schemas";
 import { buildBitlabDeepLink, signDeepLinkPayload } from "@/lib/bitlab/deep-link";
+import { PROTOCOL_VERSION } from "@/lib/bitlab/protocol";
 
 function getSignSecret(): string | null {
   return process.env.BITLAB_SIGN_SECRET?.trim() || null;
@@ -44,9 +45,11 @@ export async function POST(req: Request) {
       network,
       ts,
       secret,
+      v: PROTOCOL_VERSION,
     });
     extra.ts = ts;
     extra.sig = sig;
+    extra.v = PROTOCOL_VERSION;
     signed = true;
   }
 
@@ -59,5 +62,5 @@ export async function POST(req: Request) {
     extra,
   });
 
-  return Response.json({ ok: true, url, signed });
+  return Response.json({ ok: true, url, signed, protocolVersion: PROTOCOL_VERSION });
 }

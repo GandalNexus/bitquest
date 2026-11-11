@@ -31,6 +31,15 @@ depuis la console admin.
 - Extraction de `amountSats`, `network`, `paymentHash`, `expiry`
 - Appelé depuis `/api/bitlab/proof` pour `kind=INVOICE` (400 si invalide)
 
+### Versionnement du protocole BitQuest ↔ BitLab (`PROTOCOL_VERSION = 1`)
+- Source unique dans `src/lib/bitlab/protocol.ts` ; partagée par le JWT challenge
+  et le deep-link HMAC signé.
+- Émission : les deux canaux embarquent toujours `v: PROTOCOL_VERSION`.
+- Réception : `v > PROTOCOL_VERSION` rejeté (anti-downgrade), `v < 1` ou non-entier
+  rejeté, `v` absent toléré avec fallback legacy (grâce ≤ TTL : 1h JWT / 1h HMAC).
+- Les deux routes `/api/bitlab/challenge` et `/api/bitlab/deep-link` renvoient
+  `protocolVersion` dans leur JSON pour permettre au client BitLab de négocier.
+
 ### JWT challenge (anti-replay) — protocole versionné `v: 1`
 - `src/lib/bitlab/jwt.ts` — `jose` HS256
 - `POST /api/bitlab/challenge` émet un JWT contenant

@@ -471,6 +471,11 @@ export const bitlabDeepLinkVerifySchema = z.object({
   network: z.enum(BITLAB_NETWORKS),
   ts: z.number().int().positive(),
   sig: z.string().min(16).max(128),
+  /**
+   * Version du protocole lue depuis l'URL de retour BitLab. Facultatif
+   * pour supporter les URLs émises avant P0.3 (fallback legacy côté verify).
+   */
+  v: z.number().int().positive().max(999).optional(),
 });
 
 export type BitlabDeepLinkVerifyBody = z.infer<typeof bitlabDeepLinkVerifySchema>;

@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { PROTOCOL_VERSION } from "./protocol";
 
 /**
  * Protocole deep-link BitQuest ↔ BitLab — Phase 3.
@@ -12,20 +13,49 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * puis nettoie l'URL via `router.replace(pathname)`.
  *
  * Signature HMAC optionnelle : quand BITLAB_SIGN_SECRET est configuré,
- * BitQuest signe (questCode|kind|network|userId|ts) et attache
- * `sig=<base64url>` + `ts=<unix>` à la deep-link. BitLab est supposé
- * échoer ces deux params inchangés à la redirection de retour. Côté
- * réception, BitQuest vérifie la signature + l'âge (max 1h). Si le
- * secret n'est pas configuré, le flux est inchangé (signature optionnelle).
+ * BitQuest signe (v|userId|questCode|kind|network|ts) et attache
+ * `sig=<base64url>` + `ts=<unix>` + `v=<version>` à la deep-link.
+ * BitLab échoe ces params inchangés à la redirection de retour. Côté
+ * réception, BitQuest vérifie la signature + l'âge (max 1h) + la
+ * version. Si le secret n'est pas configuré, le flux est inchangé
+ * (signature optionnelle).
+ *
+ * Versionnement (P0.3) :
+ *   - Format canonique v1 : `${v}|${userId}|${questCode}|${kind}|${network}|${ts}`.
+ *   - Format legacy (sans v) : `${userId}|${questCode}|${kind}|${network}|${ts}`.
+ *   - À l'émission : toujours v1.
+ *   - À la vérification : essaie v1 puis fallback legacy si `v` est absent
+ *     côté params reçus. Les URLs émises avant le bump restent valides
+ *     jusqu'à expiration naturelle (TTL 1h).
  */
 
 export type BitlabDeepLinkKind = "TX" | "BLOCK" | "INVOICE" | "CHANNEL" | "ADDRESS";
 
 const MAX_SIG_AGE_SECONDS = 60 * 60;
 
+interface CanonicalArgs {
+  userId: string;
+  questCode: string;
+  kind: BitlabDeepLinkKind;
+  network: string;
+  ts: number;
+  v?: number;
+}
+
+/**
+ * Format canonique du payload à signer.
+ * - v1 : `${v}|${userId}|${questCode}|${kind}|${network}|${ts}`
+ * - legacy (v omis) : `${userId}|${questCode}|${kind}|${network}|${ts}`
+ */
+function canonical(args: CanonicalArgs): string {
+  const base = `${args.userId}|${args.questCode}|${args.kind}|${args.network}|${args.ts}`;
+  return args.v === undefined ? base : `${args.v}|${base}`;
+}
+
 /**
  * Calcule la signature HMAC-SHA256 base64url du payload canonique.
- * Payload = `${userId}|${questCode}|${kind}|${network}|${ts}`.
+ * Par défaut, émet au format `v: PROTOCOL_VERSION`. Pour émettre un
+ * payload legacy (tests de compat), passer explicitement `v: undefined`.
  */
 export function signDeepLinkPayload(args: {
   userId: string;
@@ -34,15 +64,41 @@ export function signDeepLinkPayload(args: {
   network: string;
   ts: number;
   secret: string;
+  /** Version du protocole. Default: PROTOCOL_VERSION courant. */
+  v?: number;
 }): string {
-  const canonical = `${args.userId}|${args.questCode}|${args.kind}|${args.network}|${args.ts}`;
-  return createHmac("sha256", args.secret).update(canonical).digest("base64url");
+  const v = "v" in args ? args.v : PROTOCOL_VERSION;
+  return createHmac("sha256", args.secret)
+    .update(canonical({ ...args, v }))
+    .digest("base64url");
+}
+
+function compareSignatures(expectedBase64url: string, providedBase64url: string): boolean {
+  let expectedBuf: Buffer;
+  let providedBuf: Buffer;
+  try {
+    expectedBuf = Buffer.from(expectedBase64url, "base64url");
+    providedBuf = Buffer.from(providedBase64url, "base64url");
+  } catch {
+    return false;
+  }
+  if (expectedBuf.length !== providedBuf.length) return false;
+  return timingSafeEqual(expectedBuf, providedBuf);
 }
 
 /**
  * Vérifie une signature deep-link. Retourne true si la signature est
- * valide ET l'âge inférieur à `MAX_SIG_AGE_SECONDS`. Utilise
- * `timingSafeEqual` pour éviter les timing attacks.
+ * valide ET l'âge inférieur à `MAX_SIG_AGE_SECONDS` ET la version du
+ * protocole compatible. Utilise `timingSafeEqual` pour éviter les
+ * timing attacks.
+ *
+ * Résolution de la version :
+ *   - `v` fourni dans args → vérifie strictement avec cette version
+ *     (rejet si `v > PROTOCOL_VERSION`, `v < 1` ou non-entier).
+ *   - `v` absent → essaie d'abord le format `PROTOCOL_VERSION` courant,
+ *     puis fallback legacy (payload canonique sans préfixe `v`).
+ *     Permet la transition pendant la fenêtre d'expiration des URLs
+ *     émises avant l'introduction du champ.
  */
 export function verifyDeepLinkPayload(args: {
   userId: string;
@@ -53,28 +109,34 @@ export function verifyDeepLinkPayload(args: {
   sig: string;
   secret: string;
   nowMs?: number;
+  /** Version lue depuis l'URL/payload. Si absente, essaie courant puis legacy. */
+  v?: number;
 }): boolean {
   const now = args.nowMs ?? Date.now();
   const ageSeconds = Math.floor((now - args.ts * 1000) / 1000);
   if (ageSeconds < 0 || ageSeconds > MAX_SIG_AGE_SECONDS) return false;
-  const expected = signDeepLinkPayload({
-    userId: args.userId,
-    questCode: args.questCode,
-    kind: args.kind,
-    network: args.network,
-    ts: args.ts,
-    secret: args.secret,
-  });
-  let expectedBuf: Buffer;
-  let providedBuf: Buffer;
-  try {
-    expectedBuf = Buffer.from(expected, "base64url");
-    providedBuf = Buffer.from(args.sig, "base64url");
-  } catch {
-    return false;
+
+  const tryWith = (v: number | undefined): boolean => {
+    const expected = signDeepLinkPayload({
+      userId: args.userId,
+      questCode: args.questCode,
+      kind: args.kind,
+      network: args.network,
+      ts: args.ts,
+      secret: args.secret,
+      v,
+    });
+    return compareSignatures(expected, args.sig);
+  };
+
+  if (args.v !== undefined) {
+    if (!Number.isInteger(args.v) || args.v < 1) return false;
+    if (args.v > PROTOCOL_VERSION) return false;
+    return tryWith(args.v);
   }
-  if (expectedBuf.length !== providedBuf.length) return false;
-  return timingSafeEqual(expectedBuf, providedBuf);
+
+  // `v` absent côté URL : tentative versioned courante puis fallback legacy.
+  return tryWith(PROTOCOL_VERSION) || tryWith(undefined);
 }
 
 export interface DeepLinkOptions {

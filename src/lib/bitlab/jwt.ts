@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { getRedis } from "@/lib/cache/redis";
 import { logger } from "@/lib/log";
+import { PROTOCOL_VERSION } from "./protocol";
 
 const log = logger("bitlab-jwt");
 
@@ -25,21 +26,11 @@ const log = logger("bitlab-jwt");
 const DEFAULT_TTL_SECONDS = 60 * 60; // 1 heure
 
 /**
- * Version actuelle du protocole JWT BitQuest ↔ BitLab.
- *
- * - À l'émission : tout nouveau JWT embarque `v: PROTOCOL_VERSION`.
- * - À la réception :
- *   - `v` absent → accepté (JWT émis avant l'introduction du champ,
- *     grâce temporaire jusqu'à l'expiration des tokens en circulation).
- *   - `v === PROTOCOL_VERSION` → accepté.
- *   - `v > PROTOCOL_VERSION` → rejeté (un client plus récent parle à un
- *     serveur plus ancien — faille potentielle, on refuse explicitement).
- *   - `v` invalide (non-entier, négatif) → rejeté.
- *
- * Bump cette constante quand une évolution du format rend les anciens
- * tokens incompatibles (pas pour un simple ajout de champ facultatif).
+ * Re-export pour conserver la compatibilité des imports existants
+ * (`import { PROTOCOL_VERSION } from "@/lib/bitlab/jwt"`). La source
+ * de vérité est désormais `./protocol`, partagée avec le deep-link signé.
  */
-export const PROTOCOL_VERSION = 1;
+export { PROTOCOL_VERSION } from "./protocol";
 
 export interface ChallengePayload {
   userId: string;
