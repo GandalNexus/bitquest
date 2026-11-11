@@ -295,7 +295,7 @@ model BitLabProofAttempt {
   questCode     String
   kind          String // TX | BLOCK | INVOICE | CHANNEL | ADDRESS
   network       String
-  outcome       String // ACCEPTED | REJECTED | NOT_FOUND | UNAVAILABLE | INVALID_JWT | MEMPOOL | BAD_REQUEST | RATE_LIMITED
+  outcome       String // ACCEPTED | REJECTED | NOT_FOUND | UNAVAILABLE | INVALID_JWT | MEMPOOL | BAD_REQUEST | RATE_LIMITED | DUPLICATE
   reasonMessage String? // message court en français (facultatif)
   latencyMs     Int // durée totale du handler
   createdAt     DateTime @default(now())

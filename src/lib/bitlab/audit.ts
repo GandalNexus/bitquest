@@ -20,7 +20,13 @@ export type ProofOutcome =
   | "INVALID_JWT"
   | "MEMPOOL"
   | "BAD_REQUEST"
-  | "RATE_LIMITED";
+  | "RATE_LIMITED"
+  /**
+   * Tentative de double consommation d'une preuve déjà `consumed: true`.
+   * Émis depuis `/api/quests/[code]/progress` lorsqu'un `mission_submit`
+   * est répété alors que les récompenses ont déjà été attribuées.
+   */
+  | "DUPLICATE";
 
 export interface RecordProofAttemptInput {
   userId: string;

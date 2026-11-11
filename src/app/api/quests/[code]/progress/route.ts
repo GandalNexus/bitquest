@@ -16,6 +16,8 @@ import {
 } from "@/lib/bitquest/progression";
 import { generateMission, validateMission } from "@/lib/bitquest/missions";
 import { parseJsonBody, questProgressBodySchema } from "@/lib/validation/schemas";
+import { consumeBitlabProof } from "@/lib/bitlab/consume";
+import { fireProofAttempt } from "@/lib/bitlab/audit";
 
 type XpResult = Awaited<ReturnType<typeof awardXp>>;
 
@@ -220,14 +222,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
        * Phase 3 : les quêtes BITLAB_PROOF utilisent une vraie preuve
        * (testnet/signet) persistée via /api/bitlab/proof. On consomme
        * une BitLabProof non-consumed à la place du simulated validator.
+       *
+       * Consommation atomique via `consumeBitlabProof` (updateMany conditionnel) :
+       * garantit qu'un replay de `mission_submit` ne crédite les récompenses
+       * qu'une seule fois, même en cas de requêtes concurrentes (P0.2).
        */
       let result: { success: boolean; feedback: string; proof?: Record<string, unknown> };
       if (quest.missionKind === "BITLAB_PROOF") {
-        const proof = await db.bitLabProof.findFirst({
-          where: { userId: user.id, questCode: quest.code, consumed: false },
-          orderBy: { verifiedAt: "desc" },
-        });
-        if (!proof) {
+        const startedAt = Date.now();
+        const consumption = await consumeBitlabProof(db.bitLabProof, user.id, quest.code);
+
+        if (consumption.status === "NO_PROOF") {
           await db.userQuestProgress.update({
             where: { id: p.id },
             data: { missionAttempts: p.missionAttempts + 1 },
@@ -241,11 +246,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             progress: refreshed,
           });
         }
-        // Marque la preuve comme consommée dans la même mise à jour atomique que les attempts.
-        await db.bitLabProof.update({
-          where: { id: proof.id },
-          data: { consumed: true },
-        });
+
+        if (consumption.status === "DUPLICATE") {
+          // Replay après consommation. On NE crédite PAS les récompenses et on
+          // trace un outcome DUPLICATE dans l'audit log BitLab.
+          const existing = consumption.existing;
+          fireProofAttempt({
+            userId: user.id,
+            questCode: quest.code,
+            kind: existing.kind,
+            network: existing.network,
+            outcome: "DUPLICATE",
+            reasonMessage: "mission_submit après consommation de la preuve",
+            startedAt,
+          });
+          const refreshed = await db.userQuestProgress.findUniqueOrThrow({ where: { id: p.id } });
+          const alreadyCompleted = refreshed.status === "COMPLETED";
+          return Response.json({
+            success: alreadyCompleted,
+            idempotent: true,
+            feedback: alreadyCompleted
+              ? "Mission déjà validée — aucune récompense supplémentaire attribuée."
+              : "Preuve BitLab déjà utilisée pour cette quête.",
+            proof: alreadyCompleted && refreshed.missionProof
+              ? (JSON.parse(refreshed.missionProof) as Record<string, unknown>)
+              : undefined,
+            progress: refreshed,
+            attemptsLeft: Math.max(0, MISSION_MAX_ATTEMPTS - refreshed.missionAttempts),
+          });
+        }
+
+        // consumption.status === "CONSUMED"
+        const proof = consumption.proof;
         const parsedPayload = (() => {
           try {
             return JSON.parse(proof.payload) as Record<string, unknown>;
@@ -293,20 +325,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
         });
       }
 
-      /* ---- Mission réussie : XP mission + complétion de quête ---- */
-      let xp: XpResult | null = null;
-      if (!p.missionProof) {
-        xp = await awardXp(user.id, XP_RULES.MISSION_SUCCESS, "mission");
-      }
-      await db.userQuestProgress.update({
-        where: { id: p.id },
-        data: { missionProof: JSON.stringify(result.proof), status: "COMPLETED", completedAt: new Date() },
+      /* ---- Mission réussie : complétion atomique de la quête ----
+       * updateMany conditionnel sur `status != COMPLETED` garantit que les
+       * récompenses (XP mission, XP complétion, sats, events) ne sont
+       * attribuées qu'une seule fois même en cas de double soumission
+       * concurrente (P0.2 — idempotence stricte). */
+      const completion = await db.userQuestProgress.updateMany({
+        where: { id: p.id, status: { not: "COMPLETED" } },
+        data: {
+          missionProof: JSON.stringify(result.proof),
+          status: "COMPLETED",
+          completedAt: new Date(),
+        },
       });
+      const justCompleted = completion.count > 0;
 
-      // Bonus de complétion (une seule fois)
+      let xp: XpResult | null = null;
       let bonusXp: XpResult | null = null;
-      const wasCompleted = p.completedAt !== null;
-      if (!wasCompleted) {
+      let satsResult = { granted: 0, fullReward: 0, streakBonusPct: 0, capped: false, streakBonus: 0 };
+
+      if (justCompleted) {
+        if (!p.missionProof) {
+          xp = await awardXp(user.id, XP_RULES.MISSION_SUCCESS, "mission");
+        }
         bonusXp = await awardXp(user.id, XP_RULES.QUEST_BONUS, "completion");
         await db.userEvent.create({
           data: {
@@ -315,12 +356,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             payload: JSON.stringify({ questCode: quest.code, questTitle: quest.title, proof: result.proof }),
           },
         });
-      }
 
-      /* ---- Récompenses sats (plafond journalier + bonus streak) ---- */
-      const fresh = await db.user.findUniqueOrThrow({ where: { id: user.id } });
-      let satsResult = { granted: 0, fullReward: 0, streakBonusPct: 0, capped: false, streakBonus: 0 };
-      if (!wasCompleted) {
+        /* ---- Récompenses sats (plafond journalier + bonus streak) ---- */
+        const fresh = await db.user.findUniqueOrThrow({ where: { id: user.id } });
         satsResult = await awardSats(user.id, quest.satsReward, fresh.streak, quest.title);
         await db.user.update({
           where: { id: user.id },
@@ -351,7 +389,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
         progress: finalProgress,
         xp,
         bonusXp,
-        sats: wasCompleted ? null : satsResult,
+        sats: justCompleted ? satsResult : null,
+        idempotent: !justCompleted,
         user: publicUser(finalUser),
         badges: newBadges,
       });
