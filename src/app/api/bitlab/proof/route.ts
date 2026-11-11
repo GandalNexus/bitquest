@@ -3,7 +3,7 @@ import { authenticate, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { getTransaction, getBlock, type Network } from "@/lib/bitlab/mempool";
 import { decodeInvoice } from "@/lib/bitlab/bolt11";
-import { getChannel, isValidChannelIdentifier } from "@/lib/bitlab/lightning";
+import { resolveChannel, isValidChannelIdentifier } from "@/lib/bitlab/lightning";
 import { verifyChallengeOrRespond } from "@/lib/bitlab/jwt";
 import { bitlabProofSchema, parseJsonBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/log";
@@ -115,7 +115,16 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const channel = await getChannel(scid);
+    const { channel, source } = await resolveChannel(network as Network, scid);
+    if (source === "unavailable") {
+      return Response.json(
+        {
+          error:
+            "Vérification de channel Lightning indisponible sur ce réseau : configurez LND_REST_URL et LND_MACAROON_HEX.",
+        },
+        { status: 501 },
+      );
+    }
     if (!channel) {
       return Response.json(
         { error: "Channel Lightning introuvable sur l'explorateur." },
@@ -129,6 +138,7 @@ export async function POST(req: Request) {
     payload.nodeLeftPub = channel.nodeLeftPub;
     payload.nodeRightPub = channel.nodeRightPub;
     payload.transactionId = channel.transactionId;
+    payload.source = source;
   }
   // ADDRESS : accepté en l'état (dérivation locale non vérifiable côté serveur sans xpub).
 

@@ -1,4 +1,6 @@
 import { logger } from "@/lib/log";
+import { getLndConfig, getChannelViaLnd } from "./lnd";
+import type { Network } from "./mempool";
 
 const log = logger("lightning");
 
@@ -96,4 +98,28 @@ export async function getChannel(identifier: string): Promise<ChannelInfo | null
     log.warn({ err: err instanceof Error ? err.message : String(err), url }, "channel lookup failed");
     return null;
   }
+}
+
+/**
+ * Dispatcher de lookup Lightning :
+ *   - testnet4 / signet / regtest : LND REST si LND_REST_URL+LND_MACAROON_HEX
+ *     sont définis. Si LND n'est pas configuré, la vérif n'est pas possible
+ *     et la fonction retourne null (le handler route répondra 501).
+ *   - sinon : fallback mempool.space (mainnet-only, bon pour démo).
+ */
+export async function resolveChannel(
+  network: Network,
+  identifier: string,
+): Promise<{ channel: ChannelInfo | null; source: "lnd" | "mempool" | "unavailable" }> {
+  if (network === "testnet4" || network === "signet" || network === "regtest") {
+    const cfg = getLndConfig();
+    if (!cfg) {
+      log.warn({ network }, "LND non configuré pour réseau testnet — vérif indisponible");
+      return { channel: null, source: "unavailable" };
+    }
+    const channel = await getChannelViaLnd(identifier, cfg);
+    return { channel, source: "lnd" };
+  }
+  const channel = await getChannel(identifier);
+  return { channel, source: "mempool" };
 }
