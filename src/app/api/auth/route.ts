@@ -7,6 +7,7 @@ import {
   generateVerificationToken,
   sendVerificationEmail,
 } from "@/lib/auth/email-verification";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { logger } from "@/lib/log";
 import { authBodySchema, parseJsonBody } from "@/lib/validation/schemas";
 import crypto from "crypto";
@@ -20,19 +21,6 @@ function jsonWithSession(payload: unknown, token: string): Response {
   headers.append("Set-Cookie", buildSessionCookie(token, { maxAgeSeconds: maxAge }));
   headers.append("Set-Cookie", buildCsrfCookie(computeCsrfToken(token), { maxAgeSeconds: maxAge }));
   return new Response(JSON.stringify(payload), { status: 200, headers });
-}
-
-function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(password, salt, 32).toString("hex");
-  return `${salt}:${hash}`;
-}
-
-function verifyPassword(password: string, stored: string): boolean {
-  const [salt, hash] = stored.split(":");
-  if (!salt || !hash) return false;
-  const check = crypto.scryptSync(password, salt, 32).toString("hex");
-  return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(check, "hex"));
 }
 
 const GUEST_NAMES = [

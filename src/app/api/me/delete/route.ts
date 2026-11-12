@@ -7,20 +7,11 @@ import {
   unauthorized,
 } from "@/lib/bitquest/session";
 import { buildClearCsrfCookie, isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
+import { verifyPassword } from "@/lib/auth/password";
 import { deleteAccountSchema, parseJsonBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/log";
 
 const log = logger("account-delete");
-
-function verifyPassword(password: string, stored: string): boolean {
-  const [salt, hash] = stored.split(":");
-  if (!salt || !hash) return false;
-  const check = crypto.scryptSync(password, salt, 32).toString("hex");
-  const a = Buffer.from(hash, "hex");
-  const b = Buffer.from(check, "hex");
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
-}
 
 /**
  * POST /api/me/delete — soft-delete RGPD de l'utilisateur courant.

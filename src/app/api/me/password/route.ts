@@ -2,26 +2,11 @@ import crypto from "crypto";
 import { db } from "@/lib/db";
 import { authenticate, buildSessionCookie, rateLimit, unauthorized } from "@/lib/bitquest/session";
 import { buildCsrfCookie, computeCsrfToken, isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { changePasswordSchema, parseJsonBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/log";
 
 const log = logger("password");
-
-function verifyPassword(password: string, stored: string): boolean {
-  const [salt, hash] = stored.split(":");
-  if (!salt || !hash) return false;
-  const check = crypto.scryptSync(password, salt, 32).toString("hex");
-  const a = Buffer.from(hash, "hex");
-  const b = Buffer.from(check, "hex");
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
-}
-
-function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(password, salt, 32).toString("hex");
-  return `${salt}:${hash}`;
-}
 
 /**
  * POST /api/me/password — change le mot de passe d'un utilisateur enregistré.
