@@ -351,3 +351,64 @@ model BitLabProofAttempt {
   @@index([questCode, createdAt])
   @@index([outcome, createdAt])
 }
+
+/**
+ * Feature flags dynamiques (P3). Permet d'activer/désactiver du code
+ * par environnement ou par utilisateur sans redéploiement. Deux modes :
+ *   - Global : `enabled` s'applique à tous.
+ *   - Per-user : `userIds` (JSON array) override — le flag est "on"
+ *     pour ces userIds même si enabled=false. Pattern release canary.
+ */
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String
+  enabled     Boolean  @default(false)
+  userIds     String   @default("[]")
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([key])
+}
+
+/**
+ * Attestation signée d'une réalisation d'apprentissage (P3). Snapshot
+ * immuable ; l'émission d'un véritable certificat (NIP, X.509, PDF
+ * signé) se greffera dessus plus tard via Certificate.
+ *
+ * Types :
+ *   - QUEST_COMPLETED : l'user a complété la quête `targetCode`.
+ *   - COURSE_COMPLETED : toutes les leçons publiées du cours lues.
+ *   - BADGE_EARNED : l'user a débloqué le badge `targetCode`.
+ */
+model Attestation {
+  id          String        @id @default(cuid())
+  userId      String
+  kind        String
+  targetCode  String
+  metadata    String        @default("{}")
+  issuedAt    DateTime      @default(now())
+  Certificate Certificate[]
+
+  @@unique([userId, kind, targetCode])
+  @@index([userId, issuedAt])
+  @@index([kind, targetCode])
+}
+
+/**
+ * Certificat exportable (P3, placeholder pour phase 5+). Référence une
+ * Attestation et ajoute les champs d'export (format, URL publique,
+ * signature externe). Simple snapshot JSON pour l'instant ; la
+ * signature cryptographique arrivera avec le module nostr/NIP.
+ */
+model Certificate {
+  id            String      @id @default(cuid())
+  attestationId String
+  attestation   Attestation @relation(fields: [attestationId], references: [id], onDelete: Cascade)
+  format        String
+  publicUrl     String?
+  signatureJson String      @default("{}")
+  issuedAt      DateTime    @default(now())
+
+  @@index([attestationId])
+}
