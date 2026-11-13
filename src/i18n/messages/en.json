@@ -34,6 +34,8 @@
   "auth.submit.register": "Create my account",
   "auth.submit.guest": "Continue as guest",
   "auth.guest.hint": "An ephemeral account to explore BitQuest with no commitment.",
+  "auth.returnTo.banner": "Sign in to return to BitLab",
+  "auth.returnTo.host": "BitLab · {host}",
   "dashboard.greeting": "Hello, {name}",
   "dashboard.level": "Lv. {level} · {title}",
   "dashboard.xp.before.next": "{remaining} XP to Lv. {next}",

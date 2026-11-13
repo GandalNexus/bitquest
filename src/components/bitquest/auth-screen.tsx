@@ -168,10 +168,12 @@ export function AuthScreen() {
         >
           <FlaskConical className="h-4 w-4 shrink-0 text-primary" aria-hidden />
           <span className="min-w-0 flex-1">
-            Connecte-toi pour retourner à{" "}
-            <strong className="font-semibold">BitLab</strong>
+            <strong className="font-semibold">{t("auth.returnTo.banner")}</strong>
             {returnToHost && (
-              <span className="text-muted-foreground"> · {returnToHost}</span>
+              <span className="text-muted-foreground">
+                {" · "}
+                {returnToHost}
+              </span>
             )}
           </span>
           <ArrowRight className="h-4 w-4 shrink-0 text-primary" aria-hidden />
