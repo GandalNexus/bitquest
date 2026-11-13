@@ -11,7 +11,9 @@ import {
   FlaskConical,
   GraduationCap,
   Map,
+  PenSquare,
   Play,
+  ShieldCheck,
   Sparkles,
   Star,
   Target,
@@ -26,7 +28,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useMe, useMyBitlabAttempts, useMyBitlabStats, useQuests } from "@/lib/bitquest/hooks";
+import {
+  useIsAdmin,
+  useIsEditor,
+  useMe,
+  useMyBitlabAttempts,
+  useMyBitlabStats,
+  useQuests,
+} from "@/lib/bitquest/hooks";
 import { formatSats } from "@/lib/bitquest/client";
 import type { View } from "@/lib/bitquest/store";
 import {
@@ -467,6 +476,66 @@ function OnboardingBanner({ onStart }: { onStart: () => void }) {
   );
 }
 
+/* ============ Tuile contextuelle par rôle (EDITOR / ADMIN) ============ */
+
+/**
+ * Tuile « Studio » ou « Admin » affichée uniquement si le user a un rôle
+ * élevé. Rend immédiatement visible depuis le dashboard ce qu'un éditeur
+ * ou admin peut faire en plus d'un apprenant.
+ */
+function RoleActionsTile() {
+  const isAdmin = useIsAdmin();
+  const isEditor = useIsEditor();
+  if (!isEditor) return null;
+
+  return (
+    <motion.section {...fadeUp} transition={{ duration: 0.35 }}>
+      <Card className="rounded-xl border-primary/30 bg-primary/[0.03]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            {isAdmin ? (
+              <ShieldCheck className="h-4 w-4 text-primary" aria-hidden />
+            ) : (
+              <PenSquare className="h-4 w-4 text-emerald-500" aria-hidden />
+            )}
+            {isAdmin ? "Console d'administration" : "Studio éditorial"}
+          </CardTitle>
+          <CardDescription>
+            {isAdmin
+              ? "Gestion complète de la plateforme : utilisateurs, contenu, modération, audit."
+              : "Crée et publie des cours, chapitres, leçons et quêtes pour l'Académie."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {isAdmin ? (
+            <>
+              <Button asChild size="sm">
+                <Link href="/admin">
+                  <ShieldCheck className="h-4 w-4" aria-hidden />
+                  Ouvrir Admin
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/studio">
+                  <PenSquare className="h-4 w-4" aria-hidden />
+                  Studio
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <Button asChild size="sm">
+              <Link href="/studio">
+                <PenSquare className="h-4 w-4" aria-hidden />
+                Ouvrir le Studio
+              </Link>
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
 /* ============ Dashboard ============ */
 
 /**
@@ -755,6 +824,9 @@ export function Dashboard({
 
           {/* LOT 4B — Tuile Missions en cours (reprise + historique) */}
           <ActiveMissionsTile />
+
+          {/* Tuile contextuelle Studio / Admin (visible uniquement si EDITOR+) */}
+          <RoleActionsTile />
         </div>
 
         {/* --- Colonne droite --- */}

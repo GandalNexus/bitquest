@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { requireAdminOrDenied } from "../_require-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,9 @@ const rarityStyles: Record<string, string> = {
 };
 
 export default async function AdminBadgesPage() {
+  const gate = await requireAdminOrDenied();
+  if (!gate.ok) return gate.element;
+
   const badges = await db.badge.findMany({
     orderBy: [{ rarity: "asc" }, { name: "asc" }],
     include: { _count: { select: { users: true } } },

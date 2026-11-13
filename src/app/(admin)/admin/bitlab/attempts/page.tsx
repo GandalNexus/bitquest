@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { requireAdminOrDenied } from "../../_require-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,9 @@ export default async function AdminBitlabAttemptsPage({
 }: {
   searchParams: Promise<{ outcome?: string; quest?: string }>;
 }) {
+  const gate = await requireAdminOrDenied();
+  if (!gate.ok) return gate.element;
+
   const { outcome: outcomeFilter, quest: questFilter } = await searchParams;
   const outcome =
     outcomeFilter && OUTCOMES.includes(outcomeFilter as Outcome)

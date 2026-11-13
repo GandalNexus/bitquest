@@ -4,7 +4,7 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useBitQuest, type View } from "@/lib/bitquest/store";
-import { useMe } from "@/lib/bitquest/hooks";
+import { useMe, useIsAdmin, useIsEditor, useRole } from "@/lib/bitquest/hooks";
 import { api, clearStoredSession } from "@/lib/bitquest/client";
 import { XpBar } from "./ui-bits";
 import { OrbiteMark, QuestBubble } from "./brand";
@@ -21,6 +21,8 @@ import {
   Sun,
   Moon,
   Compass,
+  PenSquare,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,6 +51,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const user = useBitQuest((s) => s.user);
   const logout = useBitQuest((s) => s.logout);
   const { data } = useMe();
+  const isAdmin = useIsAdmin();
+  const isEditor = useIsEditor();
+  const role = useRole();
   const { theme, setTheme } = useTheme();
   const t = useT();
   const [mounted, setMounted] = useState(false);
@@ -120,6 +125,45 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
 
           <div className="ml-auto flex items-center gap-1.5">
+            {/* Accès contextuel Studio / Admin selon le rôle de la session.
+                 Rend le rôle visible dès le header — l'utilisateur comprend
+                 immédiatement ce qu'il peut faire. */}
+            {me && isEditor && !isAdmin && (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="hidden gap-1.5 border-emerald-500/40 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400 sm:inline-flex"
+                aria-label="Ouvrir le Studio éditorial"
+              >
+                <Link href="/studio">
+                  <PenSquare className="h-3.5 w-3.5" aria-hidden />
+                  Studio
+                </Link>
+              </Button>
+            )}
+            {me && isAdmin && (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="hidden gap-1.5 border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 sm:inline-flex"
+                aria-label="Ouvrir la console d'administration"
+              >
+                <Link href="/admin">
+                  <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+                  Admin
+                </Link>
+              </Button>
+            )}
+            {me && role !== "APPRENTICE" && (
+              <span
+                className="hidden rounded-md border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground sm:inline"
+                aria-label={`Rôle : ${role}`}
+              >
+                {role}
+              </span>
+            )}
             <LanguageSwitch />
             <Button
               variant="ghost"

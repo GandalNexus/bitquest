@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   Trophy,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import { requireRoleSsr } from "@/lib/auth/server";
 import { Button } from "@/components/ui/button";
@@ -21,25 +22,45 @@ export const metadata = {
   description: "Console d'administration BitQuest",
 };
 
-/** Navigation admin. */
-const NAV = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  /** `"ADMIN"` → visible ADMIN uniquement. Sinon visible à partir d'EDITOR. */
+  minRole?: "EDITOR" | "ADMIN";
+};
+
+/**
+ * Nav admin complète. `minRole: "ADMIN"` filtre les entrées sensibles
+ * (gestion users, audit, modération gamification) hors de la vue EDITOR.
+ */
+const NAV: NavItem[] = [
   { href: "/admin", label: "Vue d'ensemble", icon: LayoutDashboard },
-  { href: "/admin/users", label: "Utilisateurs", icon: Users },
+  { href: "/admin/users", label: "Utilisateurs", icon: Users, minRole: "ADMIN" },
   { href: "/admin/courses", label: "Cours", icon: BookOpen },
   { href: "/admin/quests", label: "Quêtes", icon: Map },
-  { href: "/admin/badges", label: "Badges", icon: Trophy },
-  { href: "/admin/challenges", label: "Défis", icon: Flame },
-  { href: "/admin/bitlab/attempts", label: "BitLab preuves", icon: FlaskConical },
-  { href: "/admin/audit", label: "Audit log", icon: ClipboardList },
-  { href: "/admin/health", label: "État service", icon: Activity },
+  { href: "/admin/badges", label: "Badges", icon: Trophy, minRole: "ADMIN" },
+  { href: "/admin/challenges", label: "Défis", icon: Flame, minRole: "ADMIN" },
+  { href: "/admin/bitlab/attempts", label: "BitLab preuves", icon: FlaskConical, minRole: "ADMIN" },
+  { href: "/admin/audit", label: "Audit log", icon: ClipboardList, minRole: "ADMIN" },
+  { href: "/admin/health", label: "État service", icon: Activity, minRole: "ADMIN" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const gate = await requireRoleSsr("ADMIN");
+  // EDITOR+ peut accéder ; les pages ADMIN-only (users, audit, badges, challenges,
+  // bitlab/attempts, health) vérifient à nouveau leur propre guard SSR.
+  const gate = await requireRoleSsr("EDITOR");
 
   if (!gate.ok) {
     return <AccessDenied reason={gate.reason} />;
   }
+
+  const isAdmin = gate.user.role === "ADMIN";
+  const brandLabel = isAdmin ? "ADMIN" : "STUDIO";
+  const brandClass = isAdmin
+    ? "bg-primary/10 text-primary"
+    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+  const visibleNav = NAV.filter((item) => !item.minRole || isAdmin);
 
   return (
     <div className="min-h-screen bg-background">
@@ -47,7 +68,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <header className="border-b bg-card">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
           <Link href="/admin" className="flex items-center gap-2 font-display font-bold">
-            <span className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">ADMIN</span>
+            <span className={`rounded-md px-2 py-1 text-xs ${brandClass}`}>{brandLabel}</span>
             <span>
               <span className="text-primary">BIT</span>QUEST
             </span>
@@ -67,7 +88,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="mx-auto flex w-full max-w-6xl gap-6 px-4 py-6">
         <aside className="hidden w-56 shrink-0 md:block">
           <nav aria-label="Navigation admin" className="space-y-1">
-            {NAV.map((item) => (
+            {visibleNav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

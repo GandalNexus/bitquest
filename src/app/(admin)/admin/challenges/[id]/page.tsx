@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChallengeForm } from "../challenge-form";
+import { requireAdminOrDenied } from "../../_require-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,9 @@ export default async function EditChallengePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const gate = await requireAdminOrDenied();
+  if (!gate.ok) return gate.element;
+
   const { id } = await params;
   const challenge = await db.dailyChallenge.findUnique({
     where: { id },

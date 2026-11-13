@@ -5,7 +5,7 @@ import { adminCourseCreateSchema, parseJsonBody } from "@/lib/validation/schemas
 
 /** POST /api/admin/courses — crée un cours (ADMIN). */
 export async function POST(req: Request) {
-  const guard = await requireRoleAndCsrf(req, "ADMIN");
+  const guard = await requireRoleAndCsrf(req, "EDITOR");
   if (!guard.ok) return guard.response;
 
   const parsed = await parseJsonBody(req, adminCourseCreateSchema);

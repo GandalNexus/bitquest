@@ -4,11 +4,15 @@ import { todayUtc } from "@/lib/bitquest/challenges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChallengeForm } from "../challenge-form";
+import { requireAdminOrDenied } from "../../_require-admin";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Nouveau défi — Admin BitQuest" };
 
-export default function NewChallengePage() {
+export default async function NewChallengePage() {
+  const gate = await requireAdminOrDenied();
+  if (!gate.ok) return gate.element;
+
   return (
     <div className="space-y-6">
       <Button asChild variant="ghost" size="sm" className="-ml-2">

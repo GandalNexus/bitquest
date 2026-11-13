@@ -11,6 +11,7 @@ import {
 import { getHealthStatus, HEALTH_DEGRADED_MS, type HealthReport } from "@/lib/health";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { requireAdminOrDenied } from "../_require-admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -32,6 +33,9 @@ function formatUptime(seconds: number): string {
 }
 
 export default async function AdminHealthPage() {
+  const gate = await requireAdminOrDenied();
+  if (!gate.ok) return gate.element;
+
   const report: HealthReport = await getHealthStatus();
   const style = statusStyles[report.status];
 

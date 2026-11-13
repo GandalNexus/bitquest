@@ -5,6 +5,7 @@ import { todayUtc } from "@/lib/bitquest/challenges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { requireAdminOrDenied } from "../_require-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,9 @@ const classifyLabels: Record<"past" | "today" | "future", string> = {
 };
 
 export default async function AdminChallengesPage() {
+  const gate = await requireAdminOrDenied();
+  if (!gate.ok) return gate.element;
+
   const today = todayUtc();
   const challenges = await db.dailyChallenge.findMany({
     orderBy: { date: "desc" },

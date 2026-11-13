@@ -8,7 +8,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ code: string }> },
 ) {
-  const guard = await requireRoleAndCsrf(req, "ADMIN");
+  const guard = await requireRoleAndCsrf(req, "EDITOR");
   if (!guard.ok) return guard.response;
 
   const { code } = await params;

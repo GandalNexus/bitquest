@@ -2,6 +2,7 @@ import { ClipboardList } from "lucide-react";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { requireAdminOrDenied } from "../_require-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,9 @@ export default async function AdminAuditPage({
 }: {
   searchParams: Promise<{ action?: string }>;
 }) {
+  const gate = await requireAdminOrDenied();
+  if (!gate.ok) return gate.element;
+
   const { action: actionFilter } = await searchParams;
   const filter = actionFilter && ACTIONS.includes(actionFilter as Action)
     ? (actionFilter as Action)

@@ -3,10 +3,14 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BadgeForm } from "../badge-form";
+import { requireAdminOrDenied } from "../../_require-admin";
 
 export const metadata = { title: "Nouveau badge — Admin BitQuest" };
 
-export default function NewBadgePage() {
+export default async function NewBadgePage() {
+  const gate = await requireAdminOrDenied();
+  if (!gate.ok) return gate.element;
+
   return (
     <div className="space-y-6">
       <Button asChild variant="ghost" size="sm" className="-ml-2">

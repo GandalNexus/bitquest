@@ -8,7 +8,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireRoleAndCsrf(req, "ADMIN");
+  const guard = await requireRoleAndCsrf(req, "EDITOR");
   if (!guard.ok) return guard.response;
 
   const { id } = await params;
@@ -53,7 +53,7 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireRoleAndCsrf(req, "ADMIN");
+  const guard = await requireRoleAndCsrf(req, "EDITOR");
   if (!guard.ok) return guard.response;
 
   const { id } = await params;

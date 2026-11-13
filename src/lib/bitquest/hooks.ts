@@ -1,9 +1,33 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, loadStoredSession, clearStoredSession } from "./client";
+import { api, loadStoredSession, clearStoredSession, type Role } from "./client";
 import { useBitQuest } from "./store";
 import { useEffect } from "react";
+
+const ROLE_RANK: Record<Role, number> = { APPRENTICE: 0, EDITOR: 1, ADMIN: 2 };
+
+function roleOf(value: unknown): Role {
+  return value === "ADMIN" || value === "EDITOR" || value === "APPRENTICE"
+    ? value
+    : "APPRENTICE";
+}
+
+/** Rôle de l'utilisateur courant (APPRENTICE par défaut si pas de session). */
+export function useRole(): Role {
+  const user = useBitQuest((s) => s.user);
+  return roleOf(user?.role);
+}
+
+/** `true` si rôle ≥ EDITOR (EDITOR ou ADMIN). */
+export function useIsEditor(): boolean {
+  return ROLE_RANK[useRole()] >= ROLE_RANK.EDITOR;
+}
+
+/** `true` si rôle === ADMIN. */
+export function useIsAdmin(): boolean {
+  return useRole() === "ADMIN";
+}
 
 export function useHasSession() {
   const userId = useBitQuest((s) => s.userId);

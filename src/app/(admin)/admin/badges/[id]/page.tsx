@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BadgeForm } from "../badge-form";
+import { requireAdminOrDenied } from "../../_require-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,9 @@ export default async function EditBadgePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const gate = await requireAdminOrDenied();
+  if (!gate.ok) return gate.element;
+
   const { id } = await params;
   const badge = await db.badge.findUnique({
     where: { id },

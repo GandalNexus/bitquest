@@ -8,7 +8,7 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireRoleAndCsrf(req, "ADMIN");
+  const guard = await requireRoleAndCsrf(req, "EDITOR");
   if (!guard.ok) return guard.response;
 
   const { id: courseId } = await params;
