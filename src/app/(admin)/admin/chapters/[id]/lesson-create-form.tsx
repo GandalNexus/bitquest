@@ -3,6 +3,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
+import { useContentBasePath } from "@/lib/admin/base-path";
 
 /**
  * Formulaire de création rapide d'une leçon. Le contenu est pré-rempli
@@ -16,6 +17,7 @@ export function LessonCreateForm({
   nextOrder: number;
 }) {
   const router = useRouter();
+  const basePath = useContentBasePath();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState({
@@ -52,7 +54,7 @@ export function LessonCreateForm({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((data as { error?: string }).error ?? `Erreur ${res.status}`);
       const lessonId = (data as { lesson: { id: string } }).lesson.id;
-      startTransition(() => router.push(`/admin/lessons/${lessonId}`));
+      startTransition(() => router.push(`${basePath}/lessons/${lessonId}`));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue.");
     }
