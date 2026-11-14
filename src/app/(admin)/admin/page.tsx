@@ -1,4 +1,14 @@
-import { BookOpen, FlaskConical, GraduationCap, Map, TrendingUp, Trophy, Users } from "lucide-react";
+import {
+  Activity,
+  BookOpen,
+  FlaskConical,
+  GraduationCap,
+  Map,
+  TrendingUp,
+  Trophy,
+  Users,
+  Zap,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +62,44 @@ export default async function AdminDashboardPage() {
   ]);
   const bitlabAcceptedPct =
     bitlabAttempts24h > 0 ? Math.round((bitlabAccepted24h / bitlabAttempts24h) * 100) : 0;
+
+  // ============ Santé opérationnelle 24h (alerting) ============
+  // BitLab proofs : top outcomes non-ACCEPTED pour détecter les régressions
+  // côté verif. Lightning rewards : PAID vs FAILED + top failure codes.
+  const [bitlabOutcomes, lightningRewards24h, lightningFailuresTop] = await Promise.all([
+    db.bitLabProofAttempt.groupBy({
+      by: ["outcome"],
+      where: { createdAt: { gte: last24h }, outcome: { not: "ACCEPTED" } },
+      _count: { _all: true },
+      orderBy: { _count: { outcome: "desc" } },
+      take: 5,
+    }),
+    db.lightningReward.groupBy({
+      by: ["status"],
+      where: { createdAt: { gte: last24h } },
+      _count: { _all: true },
+    }),
+    db.lightningReward.groupBy({
+      by: ["failureReason"],
+      where: {
+        createdAt: { gte: last24h },
+        status: "FAILED",
+        failureReason: { not: null },
+      },
+      _count: { _all: true },
+      orderBy: { _count: { failureReason: "desc" } },
+      take: 3,
+    }),
+  ]);
+  const rewardsPaid =
+    lightningRewards24h.find((r) => r.status === "PAID")?._count._all ?? 0;
+  const rewardsFailed =
+    lightningRewards24h.find((r) => r.status === "FAILED")?._count._all ?? 0;
+  const rewardsPending =
+    lightningRewards24h.find((r) => r.status === "PENDING")?._count._all ?? 0;
+  const rewardsTotal = rewardsPaid + rewardsFailed + rewardsPending;
+  const rewardsPaidPct =
+    rewardsTotal > 0 ? Math.round((rewardsPaid / rewardsTotal) * 100) : 0;
 
   // Analytics pédagogiques : complétion et friction par quête. Groupement
   // côté DB (count per questId, partitionné par status) pour éviter de
@@ -160,6 +208,117 @@ export default async function AdminDashboardPage() {
         {stats.map((stat) => (
           <StatCard key={stat.label} stat={stat} />
         ))}
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Activity className="h-4 w-4 text-primary" aria-hidden />
+              Santé BitLab preuves · 24h
+            </CardTitle>
+            <CardDescription>
+              {bitlabAttempts24h} tentatives, {bitlabAcceptedPct}% ACCEPTED.
+              {bitlabAttempts24h > 0 && bitlabAcceptedPct < 50 && (
+                <span className="ml-1 font-medium text-destructive">
+                  ⚠ Taux de succès faible — investiguer.
+                </span>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {bitlabOutcomes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucune tentative refusée sur 24h. Rien à signaler.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {bitlabOutcomes.map((o) => (
+                  <li key={o.outcome} className="flex items-center justify-between text-sm">
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                      {o.outcome}
+                    </code>
+                    <span className="tabular-nums text-muted-foreground">
+                      {o._count._all}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Zap className="h-4 w-4 text-amber-500" aria-hidden />
+              Lightning rewards · 24h
+            </CardTitle>
+            <CardDescription>
+              {rewardsTotal === 0
+                ? "Aucune tentative sur 24h."
+                : `${rewardsTotal} tentative${rewardsTotal > 1 ? "s" : ""} · ${rewardsPaidPct}% PAID`}
+              {rewardsTotal > 0 && rewardsFailed > rewardsPaid && (
+                <span className="ml-1 font-medium text-destructive">
+                  ⚠ Plus d&apos;échecs que de paiements — vérifier LND + plafonds.
+                </span>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {rewardsTotal === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Le programme n&apos;a déclenché aucun flux — flag OFF ou
+                queue vide.
+              </p>
+            ) : (
+              <>
+                <div className="mb-3 flex gap-2 text-xs">
+                  <Badge
+                    variant="outline"
+                    className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600"
+                  >
+                    PAID {rewardsPaid}
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="border-destructive/40 bg-destructive/10 text-destructive"
+                  >
+                    FAILED {rewardsFailed}
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="border-amber-500/40 bg-amber-500/10 text-amber-600"
+                  >
+                    PENDING {rewardsPending}
+                  </Badge>
+                </div>
+                {lightningFailuresTop.length > 0 && (
+                  <>
+                    <div className="mb-1.5 text-xs text-muted-foreground">
+                      Top raisons d&apos;échec :
+                    </div>
+                    <ul className="space-y-1">
+                      {lightningFailuresTop.map((f) => (
+                        <li
+                          key={f.failureReason ?? "unknown"}
+                          className="flex items-center justify-between text-sm"
+                        >
+                          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                            {f.failureReason ?? "—"}
+                          </code>
+                          <span className="tabular-nums text-muted-foreground">
+                            {f._count._all}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
       </section>
 
       <section>

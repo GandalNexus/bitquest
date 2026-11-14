@@ -27,6 +27,12 @@ export interface AcademyLessonNode {
   completed: boolean;
 }
 
+export interface AcademyChapterPrerequisite {
+  questCode: string;
+  questTitle: string;
+  completed: boolean;
+}
+
 export interface AcademyChapterNode {
   id: string;
   slug: string;
@@ -34,6 +40,15 @@ export interface AcademyChapterNode {
   summary: string;
   order: number;
   lessons: AcademyLessonNode[];
+  /**
+   * `true` si le chapitre est pédagogiquement verrouillé : il existe au
+   * moins un ChapterQuest lié dont la quête n'est pas COMPLETED pour
+   * l'utilisateur authentifié. Les users anonymes voient tout déverrouillé
+   * (preview). Ce gate est UX-only, le contenu reste accessible par URL
+   * directe — à sens pédagogique, pas sécuritaire.
+   */
+  locked: boolean;
+  prerequisites: AcademyChapterPrerequisite[];
 }
 
 export interface AcademyCourseTree {
@@ -101,6 +116,33 @@ export function pickNeighbors<T extends { id: string }>(
     prev: i > 0 ? flat[i - 1] : null,
     next: i < flat.length - 1 ? flat[i + 1] : null,
   };
+}
+
+/**
+ * Calcule l'état de verrouillage d'un chapitre à partir de ses quêtes
+ * prérequises et des codes de quêtes COMPLETED pour l'utilisateur.
+ * Fonction pure (sans I/O) — exposée pour test unitaire.
+ *
+ * - Anonymes (userId null côté caller → `completedQuestCodes.size === 0`
+ *   combiné avec `anonymous=true`) : `locked=false` (preview).
+ * - Authentifiés sans aucun prérequis : `locked=false`.
+ * - Authentifiés avec au moins 1 prérequis non COMPLETED : `locked=true`.
+ */
+export function computeChapterLock(
+  linkedQuests: { quest: { code: string; title: string } }[],
+  completedQuestCodes: Set<string>,
+  anonymous: boolean,
+): {
+  locked: boolean;
+  prerequisites: { questCode: string; questTitle: string; completed: boolean }[];
+} {
+  const prerequisites = linkedQuests.map((cq) => ({
+    questCode: cq.quest.code,
+    questTitle: cq.quest.title,
+    completed: completedQuestCodes.has(cq.quest.code),
+  }));
+  const locked = !anonymous && prerequisites.some((p) => !p.completed);
+  return { locked, prerequisites };
 }
 
 /** Sélectionne la prochaine leçon non complétée (ou la première s'il y en a aucune). */
@@ -179,6 +221,10 @@ export async function getCourseTree(
             where: { publishedAt: { not: null } },
             orderBy: { order: "asc" },
           },
+          linkedQuests: {
+            orderBy: { order: "asc" },
+            include: { quest: { select: { code: true, title: true } } },
+          },
         },
       },
     },
@@ -194,23 +240,56 @@ export async function getCourseTree(
     : [];
   const completedIds = new Set(progressRows.map((p) => p.lessonId));
 
-  const chapters: AcademyChapterNode[] = course.chapters.map((ch) => ({
-    id: ch.id,
-    slug: ch.slug,
-    title: ch.title,
-    summary: ch.summary,
-    order: ch.order,
-    lessons: ch.lessons.map((l) => ({
-      id: l.id,
-      slug: l.slug,
-      title: l.title,
-      summary: l.summary,
-      content: l.content,
-      estimatedMinutes: l.estimatedMinutes,
-      order: l.order,
-      completed: completedIds.has(l.id),
-    })),
-  }));
+  // Collecte des quêtes prérequises distinctes puis fetch unique de leur
+  // statut COMPLETED pour l'utilisateur — évite N+1 par chapitre.
+  const prereqQuestCodes = Array.from(
+    new Set(
+      course.chapters.flatMap((ch) =>
+        ch.linkedQuests.map((cq) => cq.quest.code),
+      ),
+    ),
+  );
+  const completedQuestCodes = userId && prereqQuestCodes.length > 0
+    ? new Set(
+        (
+          await db.userQuestProgress.findMany({
+            where: {
+              userId,
+              status: "COMPLETED",
+              quest: { code: { in: prereqQuestCodes } },
+            },
+            select: { quest: { select: { code: true } } },
+          })
+        ).map((p) => p.quest.code),
+      )
+    : new Set<string>();
+
+  const chapters: AcademyChapterNode[] = course.chapters.map((ch) => {
+    const { locked, prerequisites } = computeChapterLock(
+      ch.linkedQuests,
+      completedQuestCodes,
+      userId === null,
+    );
+    return {
+      id: ch.id,
+      slug: ch.slug,
+      title: ch.title,
+      summary: ch.summary,
+      order: ch.order,
+      locked,
+      prerequisites,
+      lessons: ch.lessons.map((l) => ({
+        id: l.id,
+        slug: l.slug,
+        title: l.title,
+        summary: l.summary,
+        content: l.content,
+        estimatedMinutes: l.estimatedMinutes,
+        order: l.order,
+        completed: completedIds.has(l.id),
+      })),
+    };
+  });
 
   const totalLessons = lessonIds.length;
   const completedLessons = completedIds.size;

@@ -28,15 +28,13 @@ l'audit ont été refermés par le LOT 14 :
   AES-GCM, stocker le ciphertext. Prompt passphrase au boot ou
   à l'utilisation. Alternative : WebAuthn + CryptoKey non-exportable.
 
-### BitQuest · ChapterQuest gate non enforcé
+### ~~BitQuest · ChapterQuest gate non enforcé~~ → **résolu LOT 16**
 
-- **Problème** : `ChapterQuest` lie une quête à un chapitre mais ne
-  bloque pas la lecture des leçons suivantes si la quête n'est pas
-  complétée. L'apprenant peut parcourir le cours sans pratiquer.
-- **Impact** : pédagogique, pas sécuritaire.
-- **Action** : API `/api/academy/courses/[slug]` enrichir
-  `locked: true` sur les chapitres où la quête prérequise n'est pas
-  COMPLETED. UI `academy/*` afficher cadenas.
+- Helper pur `computeChapterLock()` + enrichissement `getCourseTree`
+  avec `locked` + `prerequisites` + UI badge Lock.
+- Sémantique : anonymes preview, authentifiés = gate pédagogique.
+- Reste : seeder des entrées `ChapterQuest` pour activer la feature
+  (la table est vide en dev actuel).
 
 ### BitQuest · Auto-trigger Lightning reward à la complétion quête
 

@@ -208,6 +208,12 @@ export interface AcademyLessonNodeDTO {
   completed: boolean;
 }
 
+export interface AcademyChapterPrerequisiteDTO {
+  questCode: string;
+  questTitle: string;
+  completed: boolean;
+}
+
 export interface AcademyChapterNodeDTO {
   id: string;
   slug: string;
@@ -215,6 +221,8 @@ export interface AcademyChapterNodeDTO {
   summary: string;
   order: number;
   lessons: AcademyLessonNodeDTO[];
+  locked: boolean;
+  prerequisites: AcademyChapterPrerequisiteDTO[];
 }
 
 export interface AcademyCourseTreeDTO {

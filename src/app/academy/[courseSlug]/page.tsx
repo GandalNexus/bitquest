@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Clock,
   GraduationCap,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -132,15 +133,45 @@ function Chapters({ course }: { course: AcademyCourseTreeDTO }) {
     <ol className="space-y-4" aria-label="Chapitres du cours">
       {course.chapters.map((chapter, idx) => (
         <li key={chapter.id}>
-          <Card className="rounded-xl">
+          <Card className={chapter.locked ? "rounded-xl opacity-70" : "rounded-xl"}>
             <CardHeader>
-              <CardTitle className="text-base">
-                <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-sm text-primary">
-                  {idx + 1}
-                </span>
-                {chapter.title}
-              </CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <span
+                    className={
+                      chapter.locked
+                        ? "inline-flex h-7 w-7 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground"
+                        : "inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-sm text-primary"
+                    }
+                  >
+                    {chapter.locked ? <Lock className="h-3.5 w-3.5" aria-hidden /> : idx + 1}
+                  </span>
+                  {chapter.title}
+                </CardTitle>
+              </div>
               <CardDescription>{chapter.summary}</CardDescription>
+              {chapter.locked && chapter.prerequisites.length > 0 && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
+                >
+                  <Lock className="mr-1 inline h-3 w-3" aria-hidden />
+                  Termine d&apos;abord
+                  {chapter.prerequisites.map((p, i) => (
+                    <span key={p.questCode}>
+                      {i === 0 ? " " : ", "}
+                      <Link
+                        href={`/quests/${p.questCode}`}
+                        className="font-medium underline-offset-2 hover:underline"
+                      >
+                        {p.questTitle}
+                      </Link>
+                    </span>
+                  ))}
+                  {" "}pour débloquer ce chapitre.
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {chapter.lessons.length === 0 ? (
@@ -153,18 +184,27 @@ function Chapters({ course }: { course: AcademyCourseTreeDTO }) {
                     <li key={lesson.id}>
                       <Link
                         href={`/academy/${course.slug}/${lesson.slug}`}
-                        className="group flex items-center gap-3 rounded-lg border bg-background/60 p-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+                        aria-disabled={chapter.locked}
+                        className={
+                          chapter.locked
+                            ? "group flex items-center gap-3 rounded-lg border bg-background/40 p-3 opacity-60 pointer-events-none"
+                            : "group flex items-center gap-3 rounded-lg border bg-background/60 p-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+                        }
                       >
                         <div
                           className={
                             lesson.completed
                               ? "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-500"
-                              : "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+                              : chapter.locked
+                                ? "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+                                : "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
                           }
                           aria-hidden
                         >
                           {lesson.completed ? (
                             <CheckCircle2 className="h-4 w-4" />
+                          ) : chapter.locked ? (
+                            <Lock className="h-4 w-4" />
                           ) : (
                             <BookOpen className="h-4 w-4" />
                           )}
@@ -195,13 +235,24 @@ function Chapters({ course }: { course: AcademyCourseTreeDTO }) {
   );
 }
 
-/** Choisit la prochaine leçon non terminée en traversant l'arbre dans l'ordre. */
+/**
+ * Choisit la prochaine leçon non terminée en traversant l'arbre dans
+ * l'ordre. Ignore les chapitres verrouillés : on ne proposera jamais
+ * de reprendre dans un chapitre prérequis non satisfait.
+ */
 function pickNextLessonFromTree(
   course: AcademyCourseTreeDTO,
 ): { slug: string; title: string } | null {
-  const flat = course.chapters.flatMap((ch) =>
-    ch.lessons.map((l) => ({ id: l.id, slug: l.slug, title: l.title, completed: l.completed })),
-  );
+  const flat = course.chapters
+    .filter((ch) => !ch.locked)
+    .flatMap((ch) =>
+      ch.lessons.map((l) => ({
+        id: l.id,
+        slug: l.slug,
+        title: l.title,
+        completed: l.completed,
+      })),
+    );
   const next = selectNextLesson(
     flat,
     new Set(flat.filter((l) => l.completed).map((l) => l.id)),

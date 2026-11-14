@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  computeChapterLock,
   computeCoursePct,
   flattenLessons,
   pickNeighbors,
@@ -131,5 +132,60 @@ describe("selectNextLesson", () => {
 
   it("retourne null sur une liste vide", () => {
     expect(selectNextLesson([], new Set())).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* computeChapterLock                                                  */
+/* ------------------------------------------------------------------ */
+
+describe("computeChapterLock", () => {
+  const txBasics = { quest: { code: "tx-basics", title: "Transactions Basics" } };
+  const feesMempool = { quest: { code: "fees-mempool", title: "Fees et Mempool" } };
+
+  it("sans prérequis → locked=false même authentifié", () => {
+    const r = computeChapterLock([], new Set(), false);
+    expect(r.locked).toBe(false);
+    expect(r.prerequisites).toEqual([]);
+  });
+
+  it("anonyme avec prérequis → locked=false (preview)", () => {
+    const r = computeChapterLock([txBasics], new Set(), true);
+    expect(r.locked).toBe(false);
+    expect(r.prerequisites).toEqual([
+      { questCode: "tx-basics", questTitle: "Transactions Basics", completed: false },
+    ]);
+  });
+
+  it("authentifié + prérequis non complété → locked=true", () => {
+    const r = computeChapterLock([txBasics], new Set(), false);
+    expect(r.locked).toBe(true);
+    expect(r.prerequisites[0].completed).toBe(false);
+  });
+
+  it("authentifié + prérequis complété → locked=false", () => {
+    const r = computeChapterLock([txBasics], new Set(["tx-basics"]), false);
+    expect(r.locked).toBe(false);
+    expect(r.prerequisites[0].completed).toBe(true);
+  });
+
+  it("plusieurs prérequis : un seul manquant suffit à verrouiller", () => {
+    const r = computeChapterLock(
+      [txBasics, feesMempool],
+      new Set(["tx-basics"]),
+      false,
+    );
+    expect(r.locked).toBe(true);
+    expect(r.prerequisites[0].completed).toBe(true);
+    expect(r.prerequisites[1].completed).toBe(false);
+  });
+
+  it("plusieurs prérequis tous complétés → locked=false", () => {
+    const r = computeChapterLock(
+      [txBasics, feesMempool],
+      new Set(["tx-basics", "fees-mempool"]),
+      false,
+    );
+    expect(r.locked).toBe(false);
   });
 });
