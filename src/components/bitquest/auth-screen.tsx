@@ -2,7 +2,8 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, BookOpen, Coins, FlaskConical, Loader2, LogIn, Target, UserPlus } from "lucide-react";
+import { ArrowRight, BookOpen, Coins, FlaskConical, Loader2, LogIn, Sparkles, Target, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -154,8 +155,16 @@ export function AuthScreen() {
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(232,114,12,0.06),transparent_45%)]"
       />
 
-      {/* ===== Switch de langue ===== */}
-      <div className="absolute right-4 top-4 z-20">
+      {/* ===== Switch de langue + lien landing ===== */}
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+        <Link
+          href="/gandalnexus"
+          className="inline-flex items-center gap-1.5 rounded-full border bg-card/70 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur transition-colors hover:border-primary/40 hover:text-foreground"
+          aria-label="En savoir plus sur GandalNexus"
+        >
+          <Sparkles className="h-3 w-3 text-primary" aria-hidden />
+          <span>GandalNexus</span>
+        </Link>
         <LanguageSwitch />
       </div>
 
