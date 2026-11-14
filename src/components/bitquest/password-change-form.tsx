@@ -33,7 +33,7 @@ export function PasswordChangeForm({ userId }: { userId: string }) {
       setError(t("account.password.error.mismatch"));
       return;
     }
-    if (next.length < 6) {
+    if (next.length < 10) {
       setError(t("account.password.error.tooShort"));
       return;
     }

@@ -31,16 +31,32 @@ const log = logger("lightning-rewards");
  * (séparation stricte des journaux sim vs réel).
  * ============================================================ */
 
-/** Plafond par défaut pour éviter un sinistre si flag mal-configuré. */
+/** Plafond par invoice. */
 const DEFAULT_MAX_MSAT = 100_000_000; // 100 000 sats
+
+/**
+ * Plafond glissant par utilisateur. La fenêtre couvre PAID + PENDING
+ * (défense anti-race : un paiement en vol compte dans l'enveloppe tant
+ * qu'il n'est pas marqué FAILED). Un sinistre LND reste donc borné par
+ * ces plafonds même si un bug de code appelle sendReward() en boucle.
+ */
+const DEFAULT_MAX_DAILY_MSAT = 50_000_000; // 50 000 sats / 24h
+const DEFAULT_MAX_WEEKLY_MSAT = 200_000_000; // 200 000 sats / 7 j
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
 
 export interface SendRewardInput {
   userId: string;
   invoiceBolt11: string;
   /** Contexte libre (JSON) : questCode, triggeredBy, etc. */
   context?: Record<string, unknown>;
-  /** Override du plafond msat (défaut DEFAULT_MAX_MSAT). */
+  /** Override du plafond par invoice (défaut DEFAULT_MAX_MSAT). */
   maxMsat?: number;
+  /** Override du plafond glissant 24h (défaut DEFAULT_MAX_DAILY_MSAT). */
+  maxDailyMsat?: number;
+  /** Override du plafond glissant 7j (défaut DEFAULT_MAX_WEEKLY_MSAT). */
+  maxWeeklyMsat?: number;
 }
 
 export type SendRewardStatus = "PAID" | "FAILED";
@@ -63,6 +79,8 @@ export const SendRewardFailure = {
   INVOICE_MAINNET: "INVOICE_MAINNET",
   INVOICE_NO_AMOUNT: "INVOICE_NO_AMOUNT",
   INVOICE_OVER_CAP: "INVOICE_OVER_CAP",
+  INVOICE_OVER_DAILY_CAP: "INVOICE_OVER_DAILY_CAP",
+  INVOICE_OVER_WEEKLY_CAP: "INVOICE_OVER_WEEKLY_CAP",
   LND_ERROR: "LND_ERROR",
   LND_NO_PREIMAGE: "LND_NO_PREIMAGE",
 } as const;
@@ -82,6 +100,8 @@ function isLiveModeEnabled(): boolean {
 export async function sendReward(input: SendRewardInput): Promise<SendRewardResult> {
   const { userId, invoiceBolt11 } = input;
   const maxMsat = input.maxMsat ?? DEFAULT_MAX_MSAT;
+  const maxDailyMsat = input.maxDailyMsat ?? DEFAULT_MAX_DAILY_MSAT;
+  const maxWeeklyMsat = input.maxWeeklyMsat ?? DEFAULT_MAX_WEEKLY_MSAT;
   const context = input.context ?? {};
   const contextJson = JSON.stringify(context);
 
@@ -118,7 +138,7 @@ export async function sendReward(input: SendRewardInput): Promise<SendRewardResu
     return failReward(userId, invoiceBolt11, 0, contextJson, SendRewardFailure.INVOICE_INVALID);
   }
 
-  // Garde 3 : plafond
+  // Garde 3 : plafond par invoice
   if (amountMsat > maxMsat) {
     return failReward(
       userId,
@@ -126,6 +146,31 @@ export async function sendReward(input: SendRewardInput): Promise<SendRewardResu
       amountMsat,
       contextJson,
       SendRewardFailure.INVOICE_OVER_CAP,
+    );
+  }
+
+  // Garde 3bis : plafond glissant 24h (PAID + PENDING)
+  const now = Date.now();
+  const dailySinceMsat = await sumRewardsSince(userId, new Date(now - DAY_MS));
+  if (dailySinceMsat + amountMsat > maxDailyMsat) {
+    return failReward(
+      userId,
+      invoiceBolt11,
+      amountMsat,
+      contextJson,
+      SendRewardFailure.INVOICE_OVER_DAILY_CAP,
+    );
+  }
+
+  // Garde 3ter : plafond glissant 7 jours
+  const weeklySinceMsat = await sumRewardsSince(userId, new Date(now - WEEK_MS));
+  if (weeklySinceMsat + amountMsat > maxWeeklyMsat) {
+    return failReward(
+      userId,
+      invoiceBolt11,
+      amountMsat,
+      contextJson,
+      SendRewardFailure.INVOICE_OVER_WEEKLY_CAP,
     );
   }
 
@@ -203,6 +248,24 @@ export async function sendReward(input: SendRewardInput): Promise<SendRewardResu
     preimageHex: outcome.preimageHex,
     failureReason: null,
   };
+}
+
+/**
+ * Somme en msat des rewards PAID ou encore PENDING émis par `userId`
+ * depuis `since`. Utilisé pour appliquer les plafonds glissants 24h / 7j.
+ * PENDING est inclus pour éviter qu'un bug ou une attaque force N appels
+ * concurrents à sendReward() avant qu'aucun ne bascule PAID.
+ */
+async function sumRewardsSince(userId: string, since: Date): Promise<number> {
+  const agg = await db.lightningReward.aggregate({
+    _sum: { amountMsat: true },
+    where: {
+      userId,
+      status: { in: ["PAID", "PENDING"] },
+      createdAt: { gte: since },
+    },
+  });
+  return agg._sum.amountMsat ?? 0;
 }
 
 /**

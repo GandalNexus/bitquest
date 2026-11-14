@@ -18,7 +18,7 @@ export const authRegisterSchema = z.object({
     .toLowerCase()
     .regex(/^\S+@\S+\.\S+$/, "Adresse email invalide."),
   pseudo: z.string().trim().min(3, "Le pseudo doit contenir au moins 3 caractères.").max(20, "Le pseudo doit contenir au plus 20 caractères."),
-  password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères."),
+  password: z.string().min(10, "Le mot de passe doit contenir au moins 10 caractères."),
 });
 
 export const authLoginSchema = z.object({
@@ -465,7 +465,7 @@ export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Mot de passe actuel requis."),
   newPassword: z
     .string()
-    .min(6, "Le nouveau mot de passe doit contenir au moins 6 caractères.")
+    .min(10, "Le nouveau mot de passe doit contenir au moins 10 caractères.")
     .max(200, "Mot de passe trop long."),
 });
 

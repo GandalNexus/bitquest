@@ -82,7 +82,7 @@
   "account.password.submit": "Soppi baatu-kàggu",
   "account.password.submitting": "Soppi…",
   "account.password.error.mismatch": "Ñaari baatu-kàggu yi bokkul.",
-  "account.password.error.tooShort": "Baatu-kàggu bu bees war a am 6 lëtt sañax.",
+  "account.password.error.tooShort": "Baatu-kàggu bu bees war a am 10 lëtt sañax.",
   "account.password.toast.title": "Baatu-kàggu soppeeku",
   "account.password.toast.description": "Sa yeneen session yi génn nañu.",
   "account.delete.cta.open": "Fàww sama kont",

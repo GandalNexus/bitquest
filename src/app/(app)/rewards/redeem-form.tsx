@@ -23,6 +23,8 @@ const FAILURE_LABELS: Record<string, string> = {
   INVOICE_MAINNET: "Nous n'acceptons que les invoices testnet / signet / regtest.",
   INVOICE_NO_AMOUNT: "L'invoice doit avoir un montant explicite.",
   INVOICE_OVER_CAP: "Montant au-dessus du plafond autorisé.",
+  INVOICE_OVER_DAILY_CAP: "Plafond quotidien dépassé — reviens demain.",
+  INVOICE_OVER_WEEKLY_CAP: "Plafond hebdomadaire dépassé — reviens la semaine prochaine.",
   LND_NO_PREIMAGE: "LND n'a pas renvoyé de preimage — paiement non confirmé.",
 };
 

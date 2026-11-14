@@ -881,7 +881,7 @@ describe("adminChallengeUpdateSchema", () => {
 describe("changePasswordSchema", () => {
   it("valide un payload correct", () => {
     expect(
-      changePasswordSchema.safeParse({ currentPassword: "old-pass", newPassword: "new-pass" }).success,
+      changePasswordSchema.safeParse({ currentPassword: "old-pass", newPassword: "new-pass-10" }).success,
     ).toBe(true);
   });
 
@@ -891,9 +891,9 @@ describe("changePasswordSchema", () => {
     ).toBe(false);
   });
 
-  it("rejette un newPassword < 6 caractères", () => {
+  it("rejette un newPassword < 10 caractères", () => {
     expect(
-      changePasswordSchema.safeParse({ currentPassword: "old", newPassword: "12345" }).success,
+      changePasswordSchema.safeParse({ currentPassword: "old", newPassword: "123456789" }).success,
     ).toBe(false);
   });
 

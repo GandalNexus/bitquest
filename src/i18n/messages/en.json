@@ -77,7 +77,7 @@
   "account.password.submit": "Change password",
   "account.password.submitting": "Updating…",
   "account.password.error.mismatch": "The two new passwords do not match.",
-  "account.password.error.tooShort": "New password must be at least 6 characters.",
+  "account.password.error.tooShort": "New password must be at least 10 characters.",
   "account.password.toast.title": "Password updated",
   "account.password.toast.description": "Your other sessions have been logged out.",
   "account.delete.cta.open": "Delete my account",

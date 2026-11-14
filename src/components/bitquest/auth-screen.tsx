@@ -87,8 +87,8 @@ export function AuthScreen() {
       setError("Entre une adresse e-mail valide.");
       return;
     }
-    if (registerPassword.length < 6) {
-      setError("Le mot de passe doit contenir au moins 6 caractères.");
+    if (registerPassword.length < 10) {
+      setError("Le mot de passe doit contenir au moins 10 caractères.");
       return;
     }
     setLoading(true);
@@ -303,8 +303,8 @@ export function AuthScreen() {
                         name="password"
                         type="password"
                         autoComplete="new-password"
-                        placeholder="Au moins 6 caractères"
-                        minLength={6}
+                        placeholder="Au moins 10 caractères"
+                        minLength={10}
                         required
                         className="h-11"
                         value={registerPassword}

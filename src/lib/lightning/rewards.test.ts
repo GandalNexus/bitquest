@@ -9,6 +9,7 @@ const dbMock = vi.hoisted(() => ({
   lightningReward: {
     create: vi.fn(),
     update: vi.fn(),
+    aggregate: vi.fn(),
   },
   // Rails « simulés » : jamais touchés par sendReward (vérifié par test
   // d'isolation stricte plus bas — manifesto GandalNexus).
@@ -48,6 +49,8 @@ let originalLive: string | undefined;
 beforeEach(() => {
   dbMock.lightningReward.create.mockReset();
   dbMock.lightningReward.update.mockReset();
+  dbMock.lightningReward.aggregate.mockReset();
+  dbMock.lightningReward.aggregate.mockResolvedValue({ _sum: { amountMsat: 0 } });
   flagMock.isFeatureEnabled.mockReset();
   bolt11Mock.decodeInvoice.mockReset();
   lndMock.getLndConfig.mockReset();
@@ -142,6 +145,61 @@ describe("sendReward — gardes", () => {
     const res = await sendReward({ userId: USER_ID, invoiceBolt11: INVOICE, maxMsat: 100_000 });
     expect(res.status).toBe("FAILED");
     expect(res.failureReason).toBe(SendRewardFailure.INVOICE_OVER_CAP);
+  });
+
+  it("refuse si plafond 24h dépassé (sum existing + new > daily cap)", async () => {
+    flagMock.isFeatureEnabled.mockResolvedValue(true);
+    bolt11Mock.decodeInvoice.mockReturnValue({
+      amountSats: 10,
+      amountMsat: 10_000,
+      network: "testnet",
+      timestamp: 0,
+      expiry: 3600,
+      paymentHash: null,
+      description: null,
+      payeeNodeKey: "",
+    });
+    // Déjà 9 500 msat crédités (PAID + PENDING) sur 24h : nouvelle
+    // demande de 10 000 msat → 19 500 > maxDailyMsat 15 000.
+    dbMock.lightningReward.aggregate.mockResolvedValueOnce({
+      _sum: { amountMsat: 9_500 },
+    });
+    const res = await sendReward({
+      userId: USER_ID,
+      invoiceBolt11: INVOICE,
+      maxDailyMsat: 15_000,
+    });
+    expect(res.status).toBe("FAILED");
+    expect(res.failureReason).toBe(SendRewardFailure.INVOICE_OVER_DAILY_CAP);
+    expect(lndRouterSendMock).not.toHaveBeenCalled();
+  });
+
+  it("refuse si plafond 7j dépassé (daily OK, weekly KO)", async () => {
+    flagMock.isFeatureEnabled.mockResolvedValue(true);
+    bolt11Mock.decodeInvoice.mockReturnValue({
+      amountSats: 10,
+      amountMsat: 10_000,
+      network: "testnet",
+      timestamp: 0,
+      expiry: 3600,
+      paymentHash: null,
+      description: null,
+      payeeNodeKey: "",
+    });
+    // 1er appel aggregate = fenêtre 24h → 5 000 (OK avec maxDailyMsat 20 000)
+    // 2e appel aggregate = fenêtre 7j → 90 000 (+ 10 000 = 100 000 > 50 000)
+    dbMock.lightningReward.aggregate
+      .mockResolvedValueOnce({ _sum: { amountMsat: 5_000 } })
+      .mockResolvedValueOnce({ _sum: { amountMsat: 90_000 } });
+    const res = await sendReward({
+      userId: USER_ID,
+      invoiceBolt11: INVOICE,
+      maxDailyMsat: 20_000,
+      maxWeeklyMsat: 50_000,
+    });
+    expect(res.status).toBe("FAILED");
+    expect(res.failureReason).toBe(SendRewardFailure.INVOICE_OVER_WEEKLY_CAP);
+    expect(lndRouterSendMock).not.toHaveBeenCalled();
   });
 
   it("refuse si LND n'est pas configuré", async () => {

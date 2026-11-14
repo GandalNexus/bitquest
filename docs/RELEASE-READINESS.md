@@ -1,0 +1,135 @@
+# RELEASE READINESS — GandalNexus v1
+
+> Checklist de mise en production. État 2026-11-14 · LOT 14.
+> Statuts : ✅ prêt · ⚠️ partiel · ❌ bloquant · ➖ hors scope v1.
+
+## 1. Sécurité
+
+| Item | Statut | Commentaire |
+|---|---|---|
+| Cookie session HttpOnly + Lax + Secure | ✅ | Secure actif si NODE_ENV=production. |
+| CSRF HMAC double-submit | ✅ | 26/29 routes mutation (3 exemptes documentées). |
+| Password hashing scrypt + salt 16B + timing-safe | ✅ | |
+| Password min length ≥ 10 chars | ✅ | LOT 14. |
+| Rate-limit (Redis + fallback) | ✅ | userId + IP sur routes BitLab, user-only ailleurs. |
+| JWT secrets validés au boot (prod) | ✅ | Throw si manquant en NODE_ENV=production. |
+| Anti-replay nonce (Redis SET NX) | ✅ | Launch token + challenge + verify-return. |
+| Lightning rewards : plafonds glissants 24h/7j | ✅ | LOT 14, défense contre boucles sendReward. |
+| Kill-switch `LND_SEND_REWARDS_LIVE=1` | ✅ | OFF par défaut, ops opt-in explicite. |
+| CORS allowlist pour routes publiques BitLab-facing | ✅ | `BITLAB_ALLOWED_ORIGINS` strict en prod. |
+| Déconnexion globale | ✅ | LOT 14. |
+| Logger pino + redaction secrets | ✅ | |
+
+## 2. Fiabilité
+
+| Item | Statut | Commentaire |
+|---|---|---|
+| Timeout 5s sur appels mempool / blockstream | ✅ | `AbortController`. |
+| Fallback mempool → blockstream | ✅ | tryGet transparent. |
+| Postgres backup automatisé | ⚠️ | Scripts `scripts/backup-postgres.sh` prêts ; cron à configurer en prod. |
+| Postgres restore testé | ✅ | `scripts/restore-postgres.sh` + doc dans `POSTGRES_PROD.md`. |
+| MissionAttempt idempotence (double-submit) | ✅ | `updateMany` conditionnel atomique. |
+| MissionAttempt expiration 2h | ✅ | Transition EXPIRED idempotente. |
+| Redis anti-replay disponible | ⚠️ | Si Redis down → `log.warn` + désactivé. Monitorer. |
+
+## 3. Qualité
+
+| Item | Statut | Commentaire |
+|---|---|---|
+| Tests vitest | ✅ | **824/824 verts** (BitQuest) + 139/139 (BitLab). |
+| Typecheck tsc | ✅ | Exit 0 des deux côtés. |
+| ESLint | ✅ | Exit 0 des deux côtés. |
+| Coverage CSRF / Zod / logger (gel) | ✅ | Tests de propriété. |
+| E2E Playwright | ⚠️ | 6 scénarios smoke ; pas de flow mission. Voir `TECHNICAL-DEBT.md` section mineure. |
+
+## 4. Observabilité
+
+| Item | Statut | Commentaire |
+|---|---|---|
+| Logger structuré pino | ✅ | Scopes catégorisés (bitlab-proof, lightning-rewards, audit, …). |
+| Sentry opt-in via DSN | ✅ | Guide ops `SENTRY_OPS.md`. |
+| Dashboards Sentry configurés | ➖ | Décision ops à prendre ; guide fourni (alerte >10 err/min). |
+| Health endpoint | ✅ | `/api/health` + `/admin/health`. |
+| Analytics admin (completion %, friction) | ✅ | Queries live Prisma. |
+
+## 5. Documentation
+
+| Doc | Statut | Rôle |
+|---|---|---|
+| `FEATURES-INVENTORY.md` | ✅ (LOT 14) | Inventaire fonctionnalités. |
+| `IMPLEMENTATION-STATUS.md` | ✅ (LOT 14) | Critères d'acceptation par bloc. |
+| `BITQUEST-BITLAB-INTEGRATION.md` | ✅ (LOT 14) | Protocole + états + erreurs. |
+| `TECHNICAL-DEBT.md` | ✅ (LOT 14) | Dette classée. |
+| `RELEASE-READINESS.md` | ✅ (LOT 14) | Ce document. |
+| `BITQUEST_ARCHITECTURE.md` | ✅ | Historique. |
+| `BITQUEST_ROADMAP.md` | ✅ | Phases 0-5. |
+| `SECURITY_CHECKLIST.md` | ⚠️ | À mettre à jour (6→10 chars). |
+| `POSTGRES_PROD.md` | ✅ | Procédure backup/restore. |
+| `SENTRY_OPS.md` | ✅ | Activation Sentry + RGPD. |
+| `DOCKER_DEVELOPMENT.md` | ✅ | Dev avec compose. |
+| `DOCKER_LND.md` | ✅ | LND testnet opt-in. |
+| `I18N_WOLOF.md` | ✅ | Guide i18n Wolof. |
+| `PHASE_3_BITLAB.md` | ✅ | État Phase 3 historique. |
+
+## 6. Blockers hors-scope v1
+
+- ❌ Pas de chiffrement at-rest des clés BitLab → **v1 testnet-only**.
+  Pour passer mainnet il faut d'abord régler cette dette (voir
+  `TECHNICAL-DEBT.md` §2).
+- ❌ Pas de certification vérifiable (NIP-attestation) → modèle posé,
+  UI absente.
+
+## 7. Variables d'environnement requises en prod
+
+```bash
+# Database
+DATABASE_URL=postgres://user:pwd@host:5432/bitquest
+
+# Redis (indispensable)
+REDIS_URL=redis://host:6379
+
+# Secrets (32 bytes min, rotation rituelle documentée)
+CSRF_SECRET=<32+ random bytes>
+BITLAB_JWT_SECRET=<32+ random bytes>
+BITLAB_LAUNCH_SECRET=<32+ random bytes> # optionnel, fallback sur BITLAB_JWT_SECRET
+BITLAB_SIGN_SECRET=<32+ random bytes>   # optionnel, HMAC deep-link
+
+# SSO
+BITLAB_ALLOWED_ORIGINS=https://bitlab.example.com
+
+# Observabilité (opt-in)
+SENTRY_DSN=https://...@sentry.io/...
+NEXT_PUBLIC_SENTRY_DSN=https://...@sentry.io/...
+SENTRY_TRACES_SAMPLE_RATE=0.1
+
+# Lightning rewards (OFF par défaut)
+LND_REST_URL=https://lnd:8080
+LND_MACAROON_HEX=<hex>
+LND_SEND_REWARDS_LIVE=0  # 1 pour activer les paiements réels
+
+# Node
+NODE_ENV=production
+```
+
+## 8. Checklist jour-J
+
+- [ ] Backup Postgres pre-release testé.
+- [ ] Rotation des secrets validée (nouveau set appliqué, ancien archivé 7 j).
+- [ ] `docker compose up -d` ou pipeline CI/CD appliqué.
+- [ ] `npx prisma migrate deploy` exécuté.
+- [ ] Smoke test HTTP sur 29 pages (app + admin + studio) → 200.
+- [ ] Health endpoint 200.
+- [ ] CSP / HSTS / rate-limit NGINX configurés.
+- [ ] DNS `bitquest.example.com` + `bitlab.example.com`.
+- [ ] Monitoring Redis + Postgres (RAM, disk, connection count).
+- [ ] Vérifier `BITLAB_ALLOWED_ORIGINS` contient l'URL de prod BitLab.
+- [ ] Vérifier `LND_SEND_REWARDS_LIVE=0` (reste OFF jusqu'à audit externe).
+- [ ] Log d'ouverture de prod dans le journal ops.
+
+## 9. Rollback
+
+- `docker compose down && docker compose up -d` sur l'image précédente.
+- Postgres : `scripts/restore-postgres.sh <dump>.gz` (durée ~ 2-3 min
+  sur < 1M rows).
+- BitLab : image statique Vercel-like, rollback via tag git ou
+  précédente artefact.
