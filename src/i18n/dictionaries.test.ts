@@ -33,7 +33,7 @@ describe("translate", () => {
 
   it("retombe sur FR pour une clé WO non définie", () => {
     // La clé existe en FR mais pas en WO : doit retourner le FR.
-    expect(translate("wo", "dashboard.greeting")).toBe("Bonjour, {name}");
+    expect(translate("wo", "leaderboard.title")).toBe("Classement des aventuriers");
   });
 
   it("retombe sur FR pour une clé EN non définie", () => {

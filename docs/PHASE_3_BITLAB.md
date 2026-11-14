@@ -225,6 +225,8 @@ params :
   - `hash=<hex64>` pour BLOCK
   - `bolt11=<lnXXX>` pour INVOICE
   - `scid=<block>x<tx>x<vout>` ou chan_id pour CHANNEL
+    → côté BitLab, `LnChannelView.scidFormatted` fournit le format
+    attendu (voir `bitlab/docs/channel-scid.md` — CTA auto à venir)
   - `address=<base58/bech32>` pour ADDRESS
 - `ts` et `sig` échoés (si sender les a envoyés)
 

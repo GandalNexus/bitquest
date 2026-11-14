@@ -284,6 +284,33 @@ Boucle "earn" réelle : des satoshis Testnet distribués par BitQuest.
 - KYC-léger (vérification email, streak minimal, quêtes débloquées).
 - Audit sécurité externe avant mise en ligne.
 
+### Infrastructure livrée (2026-11-14)
+- [x] Modèle Prisma `LightningReward` (migration additive
+  `20261113180000_add_lightning_reward`).
+- [x] Helper `sendReward(userId, invoiceBolt11, context)` dans
+  `src/lib/lightning/rewards.ts` — gardes empilées (flag + invoice
+  + plafond + LND configuré + kill-switch `LND_SEND_REWARDS_LIVE=1`).
+- [x] Couche wire isolée `src/lib/lightning/rewards-lnd.ts` (POST
+  `/v2/router/send`) — mockable en test sans toucher `node:https`.
+- [x] Feature flag `lightning.rewards` seedé OFF par défaut (prisma
+  seed, upsert idempotent).
+- [x] 11 tests unitaires avec isolation stricte vérifiée : `sendReward`
+  ne mute **jamais** `User.sats`, ni ne crée de `WalletTransaction` ou
+  d'`UserEvent SATS_EARNED` (manifesto § séparation stricte sim/réel).
+
+### Reste à faire pour livrer la phase 4
+
+- [ ] UI : page apprenant « fournir une invoice pour récompense »
+  + validation réseau matchant la quête.
+- [ ] Appel `sendReward()` au moment où une quête BITLAB_PROOF-réelle
+  se complète, gated par `isFeatureEnabled("lightning.rewards", userId)`.
+- [ ] Plafonds journaliers / hebdomadaires / par-IP (middleware
+  Redis sliding window réutilisable).
+- [ ] KYC-léger (email vérifié + streak ≥ N + quêtes required).
+- [ ] UI admin `/admin/lightning-rewards` (liste + filtres par status).
+- [ ] Audit sécurité externe + runbook ops (rotation macaroon,
+  monitoring balance LND, alerting).
+
 ### Livrable gatekeeper phase 4
 Un apprenant qualifié reçoit N sats Testnet sur une invoice Lightning qu'il fournit, sans intervention humaine, avec une piste d'audit complète.
 
