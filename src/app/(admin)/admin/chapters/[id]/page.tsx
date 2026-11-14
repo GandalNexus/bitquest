@@ -1,12 +1,13 @@
 import { ContentLink as Link } from "@/components/admin/content-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BookOpen, CheckCircle2, Clock, Plus } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, Clock, Lock, Plus } from "lucide-react";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChapterForm } from "../chapter-form";
 import { LessonCreateForm } from "./lesson-create-form";
+import { LinkedQuestsPanel } from "./linked-quests";
 
 export const dynamic = "force-dynamic";
 
@@ -16,25 +17,43 @@ export default async function EditChapterPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const chapter = await db.chapter.findUnique({
-    where: { id },
-    include: {
-      course: { select: { id: true, slug: true, title: true } },
-      lessons: {
-        orderBy: { order: "asc" },
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-          summary: true,
-          estimatedMinutes: true,
-          order: true,
-          publishedAt: true,
+  const [chapter, availableQuests] = await Promise.all([
+    db.chapter.findUnique({
+      where: { id },
+      include: {
+        course: { select: { id: true, slug: true, title: true } },
+        lessons: {
+          orderBy: { order: "asc" },
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            summary: true,
+            estimatedMinutes: true,
+            order: true,
+            publishedAt: true,
+          },
+        },
+        linkedQuests: {
+          orderBy: { order: "asc" },
+          include: { quest: { select: { id: true, code: true, title: true } } },
         },
       },
-    },
-  });
+    }),
+    db.quest.findMany({
+      orderBy: [{ track: "asc" }, { order: "asc" }],
+      select: { code: true, title: true, track: true },
+    }),
+  ]);
   if (!chapter) notFound();
+
+  const linkedInitial = chapter.linkedQuests.map((l) => ({
+    questId: l.questId,
+    questCode: l.quest.code,
+    questTitle: l.quest.title,
+    order: l.order,
+    note: l.note,
+  }));
 
   return (
     <div className="space-y-6">
@@ -123,6 +142,27 @@ export default async function EditChapterPage({
               })}
             </ul>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Lock className="h-4 w-4 text-amber-500" aria-hidden />
+            Quêtes prérequises ({linkedInitial.length})
+          </CardTitle>
+          <CardDescription>
+            Un apprenant doit compléter ces quêtes avant de pouvoir
+            accéder aux leçons de ce chapitre. Gate pédagogique
+            (anonymes voient le chapitre en preview).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <LinkedQuestsPanel
+            chapterId={chapter.id}
+            initial={linkedInitial}
+            availableQuests={availableQuests}
+          />
         </CardContent>
       </Card>
 
