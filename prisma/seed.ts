@@ -222,6 +222,61 @@ async function main() {
   }
   console.log(`Défis du jour : ${dailyChallengesSeed.length} seedés (fenêtre aujourd'hui + 6 j)`);
 
+  /* ---- Membres de l'équipe GandalNexus (landing /gandalnexus) ---- */
+  // upsert par `name` logique : pas d'unique côté DB mais on idempotisera
+  // via findFirst + create/update pour que `npm run db:seed` soit safe à
+  // rejouer. On évite d'écraser les éditions faites en prod via l'admin.
+  const seededMembers = [
+    {
+      name: "Alhassane Diallo",
+      role: "Lead ingénieur · architecte",
+      contribution:
+        "Design système, auth, protocole BitQuest ↔ BitLab, infra Docker et CI.",
+      initials: "AD",
+      order: 0,
+    },
+    {
+      name: "Contributeurs GandalNexus",
+      role: "Collective communautaire",
+      contribution:
+        "Pédagogie, i18n (FR/EN/Wolof), missions BitLab, docs, revue sécurité.",
+      initials: "GN",
+      order: 1,
+    },
+  ];
+  for (const m of seededMembers) {
+    const existing = await db.teamMember.findFirst({ where: { name: m.name } });
+    if (existing) continue; // ne pas écraser une édition manuelle
+    await db.teamMember.create({
+      data: {
+        name: m.name,
+        role: m.role,
+        contribution: m.contribution,
+        initials: m.initials,
+        order: m.order,
+        publishedAt: new Date(),
+      },
+    });
+  }
+  console.log(`Équipe : ${seededMembers.length} membres seedés (idempotent)`);
+
+  /* ---- Feature flags (P3/P4) ---- */
+  const seededFlags = [
+    {
+      key: "lightning.rewards",
+      description:
+        "Active les récompenses Lightning réelles (payment via LND). OFF par défaut : les quêtes distribuent uniquement des sats simulés tant que le flag n'est pas armé par un admin.",
+    },
+  ];
+  for (const f of seededFlags) {
+    await db.featureFlag.upsert({
+      where: { key: f.key },
+      update: { description: f.description },
+      create: { key: f.key, description: f.description, enabled: false },
+    });
+  }
+  console.log(`Feature flags : ${seededFlags.length} seedés`);
+
   console.log("Seed terminé.");
 }
 

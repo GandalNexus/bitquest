@@ -35,6 +35,7 @@ model User {
   dailyChallengeCompletions DailyChallengeCompletion[]
   bitLabProofs BitLabProof[]
   missionAttempts MissionAttempt[]
+  lightningRewards LightningReward[]
 }
 
 model Quest {
@@ -411,4 +412,62 @@ model Certificate {
   issuedAt      DateTime    @default(now())
 
   @@index([attestationId])
+}
+
+/**
+ * Récompense Lightning réelle (P4). Enregistre chaque tentative de
+ * paiement Lightning vers un invoice fourni par l'apprenant. Isolé
+ * strictement des « sats » simulés du jeu (champ `User.sats`) — ne
+ * jamais mélanger les deux flux comptables (manifesto GandalNexus).
+ *
+ * Status :
+ *   - PENDING : créé, LND pas encore sollicité ou en route.
+ *   - PAID    : LND a renvoyé un preimage — succès confirmé.
+ *   - FAILED  : LND a renvoyé une erreur (réseau, no route, expired,
+ *               cancelled). `failureReason` contient le message court.
+ *
+ * Activation : feature flag `lightning.rewards` (off par défaut) ET
+ * variables d'env LND configurées. Sans les deux : `sendReward()`
+ * refuse de créer la ligne et n'appelle jamais LND.
+ */
+/**
+ * Membre de l'équipe GandalNexus affiché sur la landing publique
+ * `/gandalnexus`. CRUD administré depuis `/admin/team-members`.
+ *
+ * - `publishedAt` null = brouillon (non affiché publiquement).
+ * - `order` croissant pour contrôler l'ordre d'affichage.
+ * - `initials` sert d'avatar fallback si `avatarUrl` absent (ex. "AD").
+ */
+model TeamMember {
+  id           String    @id @default(cuid())
+  name         String
+  role         String // ex. "Lead ingénieur · architecte"
+  contribution String // description longue (max ~1KB)
+  initials     String // 1-4 caractères, avatar fallback
+  avatarUrl    String? // URL image optionnelle
+  order        Int       @default(0)
+  publishedAt  DateTime? // null = brouillon
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([order])
+  @@index([publishedAt])
+}
+
+model LightningReward {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoiceBolt11  String // invoice fournie par l'utilisateur
+  amountMsat     Int // montant demandé (msats), copié depuis l'invoice
+  status         String    @default("PENDING") // PENDING | PAID | FAILED
+  preimageHex    String? // présent si status=PAID
+  feeMsat        Int? // frais LND effectivement payés
+  failureReason  String? // message court FR si status=FAILED
+  attemptContext String    @default("{}") // JSON libre : questCode, triggeredBy, etc.
+  createdAt      DateTime  @default(now())
+  paidAt         DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
