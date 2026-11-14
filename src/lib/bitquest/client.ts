@@ -344,6 +344,17 @@ export const api = {
         consumed: boolean;
       } | null;
     }>("/api/me/bitlab-stats"),
+  myAttestations: () =>
+    request<{
+      items: Array<{
+        id: string;
+        kind: string;
+        targetCode: string;
+        targetTitle: string;
+        metadata: Record<string, unknown> | null;
+        issuedAt: string;
+      }>;
+    }>("/api/me/attestations"),
   myBitlabAttempts: (state: "active" | "all" = "all", limit = 20) =>
     request<{
       attempts: Array<{

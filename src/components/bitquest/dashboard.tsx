@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import {
   AlertCircle,
   ArrowRight,
+  Award,
   CheckCircle2,
   Clock,
   Coins,
@@ -32,6 +33,7 @@ import {
   useIsAdmin,
   useIsEditor,
   useMe,
+  useMyAttestations,
   useMyBitlabAttempts,
   useMyBitlabStats,
   useQuests,
@@ -164,6 +166,80 @@ function AcademyTeaser() {
  *
  * Silencieux en cas d'erreur réseau (ne doit pas casser le dashboard).
  */
+/* ============================================================
+ * LOT 27 — Tuile Attestations
+ *
+ * Expose le compteur d'Attestations immuables de l'utilisateur, créées
+ * automatiquement par le handler event-bus LOT 25. Masquée si aucune
+ * (zéro bruit UI pour les nouveaux comptes).
+ * ============================================================ */
+function AttestationsTile() {
+  const titleId = "dashboard-attestations-title";
+  const { data, isLoading, isError } = useMyAttestations();
+
+  if (isError) return null;
+  const count = data?.items.length ?? 0;
+  if (!isLoading && count === 0) return null; // Pas de tuile si zéro
+
+  const last = data?.items[0];
+  return (
+    <motion.section
+      {...fadeUp}
+      transition={{ duration: 0.35, delay: 0.24 }}
+      aria-labelledby={titleId}
+    >
+      <Card className="h-full rounded-xl">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div className="min-w-0">
+            <CardTitle
+              id={titleId}
+              className="flex items-center gap-2 text-base sm:text-lg"
+            >
+              <Award className="h-5 w-5 text-primary" aria-hidden />
+              Mes attestations
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Chaque quête complétée génère une attestation immuable
+              (socle NIP/Nostr).
+            </CardDescription>
+          </div>
+          <Badge
+            variant="outline"
+            className="shrink-0 border-primary/40 bg-primary/10 text-primary"
+          >
+            {count}
+          </Badge>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-1 text-sm">
+            {last && (
+              <>
+                <p className="text-muted-foreground">
+                  Dernière :{" "}
+                  <span className="text-foreground font-medium">{last.targetTitle}</span>
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {new Date(last.issuedAt).toLocaleDateString("fr-FR", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </p>
+              </>
+            )}
+          </div>
+          <Button asChild variant="outline" className="w-full shrink-0 sm:w-auto">
+            <Link href="/attestations">
+              Voir toutes
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
 function BitlabActivityTile() {
   const titleId = "dashboard-bitlab-title";
   const { data, isLoading, isError } = useMyBitlabStats();
@@ -824,6 +900,9 @@ export function Dashboard({
 
           {/* LOT 4B — Tuile Missions en cours (reprise + historique) */}
           <ActiveMissionsTile />
+
+          {/* LOT 27 — Tuile Attestations (socle preuve exportable Nostr) */}
+          <AttestationsTile />
 
           {/* Tuile contextuelle Studio / Admin (visible uniquement si EDITOR+) */}
           <RoleActionsTile />

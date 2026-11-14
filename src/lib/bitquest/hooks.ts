@@ -109,6 +109,21 @@ export function useMyBitlabStats() {
 }
 
 /**
+ * Attestations de l'utilisateur courant (LOT 26/27). Alimenté par
+ * le handler event-bus `quest.completed` → Attestation. Tuile
+ * dashboard + page dédiée `/attestations`.
+ */
+export function useMyAttestations() {
+  const enabled = useHasSession();
+  return useQuery({
+    queryKey: ["me", "attestations"],
+    queryFn: api.myAttestations,
+    enabled,
+    retry: 1,
+  });
+}
+
+/**
  * Liste des tentatives BitLab de l'utilisateur (LOT 4). `state` filtre
  * sur les tentatives actives (reprise de mission) ou toutes (historique).
  * Variants cache-indépendants via inclusion de `state` + `limit` dans la clé.
