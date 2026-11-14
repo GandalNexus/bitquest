@@ -82,12 +82,20 @@ export async function GET(req: Request) {
   }
 
   const user = await authenticate(req);
+  // Mode silent (`?silent=1`) : déclenché par BitLab au mount pour
+  // vérifier passivement si l'utilisateur a déjà une session BitQuest.
+  // Dans ce mode, on NE REDIRIGE PAS vers le login si pas de session ;
+  // on renvoie vers BitLab avec `sso_silent=none` pour éviter la boucle
+  // et laisser BitLab afficher son bouton « Se connecter ».
+  const silent = inputUrl.searchParams.get("silent") === "1";
 
-  // Pas de session : redirige vers la home BitQuest en préservant returnTo.
-  // La page BitQuest peut (à terme) proposer un flow "connecte-toi puis
-  // reviens à BitLab" ; pour l'instant, c'est un simple rebond où l'user
-  // devra cliquer à nouveau sur "Se connecter" après login.
+  // Pas de session : rebond.
   if (!user) {
+    if (silent) {
+      const back = new URL(returnTo.toString());
+      back.searchParams.set("sso_silent", "none");
+      return Response.redirect(back.toString(), 302);
+    }
     const fallback = new URL("/", inputUrl.origin);
     fallback.searchParams.set("returnTo", returnTo.toString());
     return Response.redirect(fallback.toString(), 302);

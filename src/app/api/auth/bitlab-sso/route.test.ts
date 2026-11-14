@@ -186,6 +186,37 @@ describe("GET /api/auth/bitlab-sso — redirects", () => {
     expect(url.searchParams.get("returnTo")).toBe(returnTo);
   });
 
+  it("silent=1 sans session → redirige vers returnTo?sso_silent=none (pas de login)", async () => {
+    mockUserByToken(null);
+    const returnTo = "http://localhost:3001/foo";
+    const res = await GET(
+      makeGet(
+        `http://localhost/api/auth/bitlab-sso?returnTo=${encodeURIComponent(returnTo)}&silent=1`,
+      ),
+    );
+    expect(res.status).toBe(302);
+    const url = new URL(res.headers.get("location")!);
+    expect(url.origin + url.pathname).toBe("http://localhost:3001/foo");
+    expect(url.searchParams.get("sso_silent")).toBe("none");
+    // On ne doit PAS rebondir vers la home BitQuest en silent.
+    expect(url.pathname).not.toBe("/");
+  });
+
+  it("silent=1 avec session → même comportement (launch_token)", async () => {
+    mockUserByToken(USER);
+    const returnTo = "http://localhost:3001/bitlab";
+    const res = await GET(
+      makeGetWithSession(
+        `http://localhost/api/auth/bitlab-sso?returnTo=${encodeURIComponent(returnTo)}&silent=1`,
+        SESSION_TOKEN,
+      ),
+    );
+    expect(res.status).toBe(302);
+    const url = new URL(res.headers.get("location")!);
+    expect(url.searchParams.get("launch_token")).toBeTruthy();
+    expect(url.searchParams.get("sso_silent")).toBeNull();
+  });
+
   it("avec session → redirige vers <returnTo>?launch_token=XXX", async () => {
     mockUserByToken(USER);
     const returnTo = "http://localhost:3001/bitlab";

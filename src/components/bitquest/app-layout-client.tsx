@@ -1,8 +1,6 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "next-themes";
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { useBitQuest } from "@/lib/bitquest/store";
 import { useMe, useSessionHydration } from "@/lib/bitquest/hooks";
 import { AppShell } from "./app-shell";
@@ -15,6 +13,12 @@ import { LoadingState } from "./ui-bits";
  * - Affiche AuthScreen si pas de session.
  * - Charge le profil utilisateur (useMe).
  * - Enveloppe les pages dans AppShell (header, nav, footer).
+ *
+ * `ThemeProvider` et `QueryClientProvider` sont désormais fournis par
+ * `src/app/providers.tsx` (monté dans le layout racine). Les isoler
+ * là-haut évite le warning React « Encountered a script tag… » émis
+ * par le `<script>` anti-FOUC de next-themes quand ThemeProvider vit
+ * sous un boundary `"use client"`.
  */
 function AppGate({ children }: { children: ReactNode }) {
   useSessionHydration();
@@ -55,19 +59,5 @@ function AppGate({ children }: { children: ReactNode }) {
 }
 
 export function AppLayoutClient({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: { staleTime: 15_000, refetchOnWindowFocus: false },
-        },
-      }),
-  );
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-        <AppGate>{children}</AppGate>
-      </ThemeProvider>
-    </QueryClientProvider>
-  );
+  return <AppGate>{children}</AppGate>;
 }

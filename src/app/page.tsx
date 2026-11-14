@@ -1,8 +1,6 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "next-themes";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useBitQuest } from "@/lib/bitquest/store";
 import { useMe, useSessionHydration } from "@/lib/bitquest/hooks";
@@ -117,23 +115,18 @@ function BitQuestApp() {
 }
 
 export default function Page() {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: { staleTime: 15_000, refetchOnWindowFocus: false },
-        },
-      }),
-  );
-
+  // ThemeProvider + QueryClientProvider sont désormais fournis par
+  // `src/app/providers.tsx` (monté depuis layout.tsx). Les déplacer
+  // hors de cette page client évite le warning React :
+  //   « Encountered a script tag while rendering React component »
+  // qu'émettait le script anti-FOUC de next-themes quand ThemeProvider
+  // vivait sous un boundary `"use client"`.
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-        <Suspense fallback={null}>
-          <ReturnToBridge />
-        </Suspense>
-        <BitQuestApp />
-      </ThemeProvider>
-    </QueryClientProvider>
+    <>
+      <Suspense fallback={null}>
+        <ReturnToBridge />
+      </Suspense>
+      <BitQuestApp />
+    </>
   );
 }

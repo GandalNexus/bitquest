@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { LocaleProvider } from "@/i18n/locale-provider";
 import { getServerLocale } from "@/i18n/server";
+import { Providers } from "./providers";
 
 /* Charte BitQuest : Orbitron (display & logos) + Exo 2 (texte courant) */
 const orbitron = Orbitron({
@@ -59,9 +60,14 @@ export default async function RootLayout({
       <body
         className={`${orbitron.variable} ${exo2.variable} ${geistMono.variable} font-sans antialiased bg-background text-foreground`}
       >
+        <a href="#main-content" className="sr-only-focusable">
+          Passer au contenu principal
+        </a>
         <LocaleProvider initial={locale}>
-          {children}
-          <Toaster />
+          <Providers>
+            <div id="main-content">{children}</div>
+            <Toaster />
+          </Providers>
         </LocaleProvider>
       </body>
     </html>
