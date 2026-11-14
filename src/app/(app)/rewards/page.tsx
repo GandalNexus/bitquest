@@ -22,7 +22,11 @@ export const metadata = {
  * ⚠️ Historique affiché ici ≠ wallet simulé (`/wallet`). Les deux rails
  * restent strictement séparés (manifesto § sim/réel).
  */
-export default async function RewardsPage() {
+export default async function RewardsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ from?: string }>;
+}) {
   const auth = await requireRoleSsr("APPRENTICE");
   if (!auth.ok) {
     if (auth.reason === "unauthenticated") redirect("/");
@@ -31,6 +35,11 @@ export default async function RewardsPage() {
 
   const user = auth.user;
   const enabled = await isFeatureEnabled("lightning.rewards", user.id);
+
+  const sp = (await searchParams) ?? {};
+  // `?from=<questCode>` : contexte de redirection depuis le flash récompense
+  // d'une quête complétée. Normalise strictement (slug) pour éviter l'injection.
+  const fromQuestCode = sp.from && /^[a-z0-9_-]{1,40}$/.test(sp.from) ? sp.from : null;
 
   const history = enabled
     ? await db.lightningReward.findMany({
@@ -84,6 +93,20 @@ export default async function RewardsPage() {
         </Card>
       ) : (
         <>
+          {fromQuestCode && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm"
+            >
+              <strong className="font-medium text-amber-600 dark:text-amber-400">
+                Tu viens de compléter la quête « {fromQuestCode} »
+              </strong>
+              <span className="ml-1 text-muted-foreground">
+                — colle une invoice BOLT11 pour recevoir tes sats réels.
+              </span>
+            </div>
+          )}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Envoyer une récompense</CardTitle>

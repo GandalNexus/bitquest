@@ -3,6 +3,7 @@ import { BookOpen, ChevronRight, Plus } from "lucide-react";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CrudSearchBar } from "@/components/admin/crud-search-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +13,25 @@ export const dynamic = "force-dynamic";
  * réécrit les hrefs `/admin/*` vers `/studio/*` quand l'URL courante
  * est sous `/studio`.
  */
-export default async function AdminChaptersPage() {
+export default async function AdminChaptersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ q?: string }>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const query = (sp.q ?? "").trim().slice(0, 60);
+
+  const where = query.length > 0
+    ? {
+        OR: [
+          { title: { contains: query, mode: "insensitive" as const } },
+          { summary: { contains: query, mode: "insensitive" as const } },
+        ],
+      }
+    : undefined;
+
   const chapters = await db.chapter.findMany({
+    where,
     orderBy: [{ course: { order: "asc" } }, { order: "asc" }],
     include: {
       course: { select: { id: true, slug: true, title: true } },
@@ -27,7 +45,9 @@ export default async function AdminChaptersPage() {
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Chapitres</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Vue à plat de tous les chapitres. Clique pour éditer le contenu et ses leçons.
+            {chapters.length} chapitre{chapters.length > 1 ? "s" : ""}
+            {query ? ` · recherche « ${query} »` : ""}
+            {" · Clique pour éditer le contenu et ses leçons."}
           </p>
         </div>
         <Button asChild>
@@ -38,14 +58,24 @@ export default async function AdminChaptersPage() {
         </Button>
       </header>
 
+      <CrudSearchBar
+        initialQuery={query}
+        placeholder="Titre ou résumé du chapitre…"
+        ariaLabel="Rechercher un chapitre"
+      />
+
       {chapters.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
             <BookOpen className="h-8 w-8 opacity-40" aria-hidden />
-            <p className="text-sm">Aucun chapitre pour l&apos;instant.</p>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/admin/chapters/new">Créer le premier chapitre</Link>
-            </Button>
+            <p className="text-sm">
+              {query ? `Aucun chapitre ne matche « ${query} ».` : "Aucun chapitre pour l'instant."}
+            </p>
+            {!query && (
+              <Button asChild variant="outline" size="sm">
+                <Link href="/admin/chapters/new">Créer le premier chapitre</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (

@@ -23,6 +23,7 @@ import {
   Target,
   Trophy,
   XCircle,
+  Zap,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -936,12 +937,14 @@ function MissionStep({
 /* ============ Étape 5 : Récompenses ============ */
 
 function RewardsStep({
+  questCode,
   questTitle,
   rewards,
   onBackToMap,
   onDashboard,
   t,
 }: {
+  questCode: string;
   questTitle: string;
   rewards: MissionSubmitResponse;
   onBackToMap: () => void;
@@ -1075,6 +1078,21 @@ function RewardsStep({
                 })}
               </div>
             </div>
+          )}
+
+          {sats && sats.granted > 0 && (
+            <a
+              href={`/rewards?from=${encodeURIComponent(questCode)}`}
+              className="flex items-center justify-between rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
+            >
+              <span className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-amber-500" aria-hidden />
+                <span className="font-medium">{t("rewards.lightning.cta.label")}</span>
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {t("rewards.lightning.cta.hint")}
+              </span>
+            </a>
           )}
 
           <div className="flex flex-col gap-2 pt-2 sm:flex-row">
@@ -1523,6 +1541,7 @@ export function QuestPlayer({
 
           {step === "rewards" && rewards && (
             <RewardsStep
+              questCode={code}
               questTitle={quest.title}
               rewards={rewards}
               onBackToMap={onCompleted}

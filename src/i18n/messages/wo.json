@@ -134,5 +134,23 @@
   "rewards.history.empty": "Amul tentative léegi.",
   "rewards.status.PAID": "Fey",
   "rewards.status.PENDING": "Di xaar",
-  "rewards.status.FAILED": "Faale"
+  "rewards.status.FAILED": "Faale",
+  "rewards.lightning.cta.label": "Jot ni sats yu dëgg ⚡",
+  "rewards.lightning.cta.hint": "Lightning testnet / signet",
+  "rewards.lightning.from.banner": "Nga nopp mandat « {code} » — jox ab invoice BOLT11 ngir am sa sats yu dëgg.",
+
+  "rewards.backToMap": "Dellu ci karta",
+  "rewards.dashboard": "Tablo",
+  "rewards.badges.title": "Badge yu ubbeeku",
+  "rewards.proofLabel": "Preuve denc ci serveur (BitLab)",
+  "rewards.feedback.title": "Noot bu baax !",
+  "rewards.bonusXp": "+{xp} XP yu yokk",
+  "rewards.sats.receive": "Mu ngi ñëw",
+  "rewards.sats.streakBonus": " — mu def {bonus} dollar bu yokk (+{pct} %)",
+  "rewards.sats.cap.title": "Plafond bes bu",
+  "rewards.sats.cap.description": "Plafond bes bu 10 000 sats egg na — jamono ji ëllëg dinañu ko yónnee.",
+
+  "rarity.COMMON": "Commun",
+  "rarity.RARE": "Rare",
+  "rarity.EPIC": "Épique"
 }

@@ -5,6 +5,7 @@ import { todayUtc } from "@/lib/bitquest/challenges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CrudSearchBar } from "@/components/admin/crud-search-bar";
 import { requireAdminOrDenied } from "../_require-admin";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ const classifyLabels: Record<"past" | "today" | "future", string> = {
 export default async function AdminChallengesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ when?: string; page?: string }>;
+  searchParams?: Promise<{ when?: string; page?: string; q?: string }>;
 }) {
   const gate = await requireAdminOrDenied();
   if (!gate.ok) return gate.element;
@@ -40,29 +41,47 @@ export default async function AdminChallengesPage({
   const whenFilter =
     sp.when === "past" || sp.when === "today" || sp.when === "future" ? sp.when : null;
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
+  const query = (sp.q ?? "").trim().slice(0, 60);
 
   const today = todayUtc();
-  const dateFilter = (() => {
+  const dateClause = (() => {
     if (whenFilter === "today") return { date: today };
     if (whenFilter === "past") return { date: { lt: today } };
     if (whenFilter === "future") return { date: { gt: today } };
-    return undefined;
+    return null;
   })();
+  const searchClause = query.length > 0
+    ? {
+        OR: [
+          { title: { contains: query, mode: "insensitive" as const } },
+          { prompt: { contains: query, mode: "insensitive" as const } },
+        ],
+      }
+    : null;
+  const andClauses = [dateClause, searchClause].filter(
+    (c): c is NonNullable<typeof c> => c !== null,
+  );
+  const whereFilter = andClauses.length > 0 ? { AND: andClauses } : undefined;
 
   const [challenges, totalCount] = await Promise.all([
     db.dailyChallenge.findMany({
-      where: dateFilter,
+      where: whereFilter,
       orderBy: { date: "desc" },
       include: { _count: { select: { completions: true } } },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
-    db.dailyChallenge.count({ where: dateFilter }),
+    db.dailyChallenge.count({ where: whereFilter }),
   ]);
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const qs = (patch: Record<string, string | null>) => {
     const params = new URLSearchParams();
-    const merged: Record<string, string | null> = { when: whenFilter, page: null, ...patch };
+    const merged: Record<string, string | null> = {
+      when: whenFilter,
+      q: query || null,
+      page: null,
+      ...patch,
+    };
     for (const [k, v] of Object.entries(merged)) {
       if (v) params.set(k, v);
     }
@@ -77,6 +96,7 @@ export default async function AdminChallengesPage({
           <p className="mt-1 text-sm text-muted-foreground">
             {totalCount} défi{totalCount > 1 ? "s" : ""}
             {whenFilter ? ` · ${classifyLabels[whenFilter]}` : ""}
+            {query ? ` · recherche « ${query} »` : ""}
             {pageCount > 1 ? ` · page ${page}/${pageCount}` : ""}
           </p>
         </div>
@@ -94,6 +114,12 @@ export default async function AdminChallengesPage({
         <FilterChip href={`/admin/challenges?${qs({ when: "today" })}`} active={whenFilter === "today"} label="Aujourd'hui" />
         <FilterChip href={`/admin/challenges?${qs({ when: "future" })}`} active={whenFilter === "future"} label="À venir" />
       </div>
+
+      <CrudSearchBar
+        initialQuery={query}
+        placeholder="Titre ou prompt du défi…"
+        ariaLabel="Rechercher un défi du jour"
+      />
 
       {challenges.length === 0 ? (
         <Card>

@@ -4,14 +4,29 @@ import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CrudSearchBar } from "@/components/admin/crud-search-bar";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Liste à plat de toutes les leçons (admin + studio).
  */
-export default async function AdminLessonsPage() {
+export default async function AdminLessonsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ q?: string }>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const query = (sp.q ?? "").trim().slice(0, 60);
+
+  const where = query.length > 0
+    ? {
+        title: { contains: query, mode: "insensitive" as const },
+      }
+    : undefined;
+
   const lessons = await db.lesson.findMany({
+    where,
     orderBy: [
       { chapter: { course: { order: "asc" } } },
       { chapter: { order: "asc" } },
@@ -34,7 +49,9 @@ export default async function AdminLessonsPage() {
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Leçons</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Vue à plat de toutes les leçons. Clique pour éditer le Markdown.
+            {lessons.length} leçon{lessons.length > 1 ? "s" : ""}
+            {query ? ` · recherche « ${query} »` : ""}
+            {" · Clique pour éditer le Markdown."}
           </p>
         </div>
         <Button asChild>
@@ -45,14 +62,24 @@ export default async function AdminLessonsPage() {
         </Button>
       </header>
 
+      <CrudSearchBar
+        initialQuery={query}
+        placeholder="Titre de leçon…"
+        ariaLabel="Rechercher une leçon"
+      />
+
       {lessons.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
             <PenSquare className="h-8 w-8 opacity-40" aria-hidden />
-            <p className="text-sm">Aucune leçon pour l&apos;instant.</p>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/admin/lessons/new">Créer la première leçon</Link>
-            </Button>
+            <p className="text-sm">
+              {query ? `Aucune leçon ne matche « ${query} ».` : "Aucune leçon pour l'instant."}
+            </p>
+            {!query && (
+              <Button asChild variant="outline" size="sm">
+                <Link href="/admin/lessons/new">Créer la première leçon</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (

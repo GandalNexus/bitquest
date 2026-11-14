@@ -4,11 +4,30 @@ import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CrudSearchBar } from "@/components/admin/crud-search-bar";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminCoursesPage() {
+export default async function AdminCoursesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ q?: string }>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const query = (sp.q ?? "").trim().slice(0, 60);
+
+  const where = query.length > 0
+    ? {
+        OR: [
+          { title: { contains: query, mode: "insensitive" as const } },
+          { subtitle: { contains: query, mode: "insensitive" as const } },
+          { slug: { contains: query, mode: "insensitive" as const } },
+        ],
+      }
+    : undefined;
+
   const courses = await db.course.findMany({
+    where,
     orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     include: {
       _count: { select: { chapters: true } },
@@ -22,7 +41,8 @@ export default async function AdminCoursesPage() {
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Cours</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Créer, modifier et publier les parcours Académie.
+            {courses.length} cours{query ? ` · recherche « ${query} »` : ""}
+            {" · Créer, modifier et publier les parcours Académie."}
           </p>
         </div>
         <Button asChild>
@@ -33,14 +53,24 @@ export default async function AdminCoursesPage() {
         </Button>
       </header>
 
+      <CrudSearchBar
+        initialQuery={query}
+        placeholder="Titre, slug ou sous-titre…"
+        ariaLabel="Rechercher un cours"
+      />
+
       {courses.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
             <BookOpen className="h-8 w-8 opacity-40" aria-hidden />
-            <p className="text-sm">Aucun cours pour l&apos;instant.</p>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/admin/courses/new">Créer le premier cours</Link>
-            </Button>
+            <p className="text-sm">
+              {query ? `Aucun cours ne matche « ${query} ».` : "Aucun cours pour l'instant."}
+            </p>
+            {!query && (
+              <Button asChild variant="outline" size="sm">
+                <Link href="/admin/courses/new">Créer le premier cours</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
