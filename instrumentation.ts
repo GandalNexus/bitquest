@@ -20,6 +20,13 @@ import type { Instrumentation } from "next";
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("./sentry.server.config");
+    // Handlers event-bus : brancher au boot node pour que les
+    // évènements (quest.completed, etc.) soient consommés dès le
+    // premier request.
+    const { registerAttestationHandlers } = await import(
+      "./src/lib/handlers/attestations"
+    );
+    registerAttestationHandlers();
   }
   if (process.env.NEXT_RUNTIME === "edge") {
     await import("./sentry.edge.config");

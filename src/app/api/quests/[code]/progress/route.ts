@@ -19,6 +19,7 @@ import { parseJsonBody, questProgressBodySchema } from "@/lib/validation/schemas
 import { consumeBitlabProof } from "@/lib/bitlab/consume";
 import { fireProofAttempt } from "@/lib/bitlab/audit";
 import { snapshotAttemptResult } from "@/lib/bitlab/attempt";
+import { emit } from "@/lib/event-bus";
 
 type XpResult = Awaited<ReturnType<typeof awardXp>>;
 
@@ -389,18 +390,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       // pas d'attempt en cours (compat ascendante : les anciens flux sans
       // deep-link n'en créent pas).
       if (justCompleted) {
+        const totalXpEarned = (xp?.xpGained ?? 0) + (bonusXp?.xpGained ?? 0);
         await snapshotAttemptResult({
           userId: user.id,
           questCode: quest.code,
           result: {
             questStatus: "COMPLETED",
-            xpEarned: (xp?.xpGained ?? 0) + (bonusXp?.xpGained ?? 0),
+            xpEarned: totalXpEarned,
             satsEarned: satsResult.granted,
             satsCapped: satsResult.capped,
             streakBonusPct: satsResult.streakBonusPct,
             badges: newBadges.map((b) => ({ code: b.code, name: b.name })),
             completedAt: new Date().toISOString(),
           },
+        });
+        // Event-bus : les handlers (attestations, analytics, Nostr…)
+        // s'abonnent via `on("quest.completed", …)`. Non bloquant : si
+        // un handler throw ou prend du temps, la réponse HTTP n'attend
+        // pas (Promise.allSettled interne).
+        void emit("quest.completed", {
+          userId: user.id,
+          questCode: quest.code,
+          xpEarned: totalXpEarned,
+          satsEarned: satsResult.granted,
         });
       }
 
