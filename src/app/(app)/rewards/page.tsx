@@ -5,6 +5,7 @@ import { requireRoleSsr } from "@/lib/auth/server";
 import { isFeatureEnabled } from "@/lib/feature-flag";
 import { db } from "@/lib/db";
 import { RedeemForm } from "./redeem-form";
+import { parseQuestCodeHint } from "./from-param";
 
 export const dynamic = "force-dynamic";
 
@@ -38,8 +39,8 @@ export default async function RewardsPage({
 
   const sp = (await searchParams) ?? {};
   // `?from=<questCode>` : contexte de redirection depuis le flash récompense
-  // d'une quête complétée. Normalise strictement (slug) pour éviter l'injection.
-  const fromQuestCode = sp.from && /^[a-z0-9_-]{1,40}$/.test(sp.from) ? sp.from : null;
+  // d'une quête complétée. Normalise strictement (slug) via helper testé.
+  const fromQuestCode = parseQuestCodeHint(sp.from);
 
   const history = enabled
     ? await db.lightningReward.findMany({
