@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireRoleSsr } from "@/lib/auth/server";
 import { db } from "@/lib/db";
+import { ExportCertificateButton } from "./export-button";
 
 export const dynamic = "force-dynamic";
 
@@ -123,8 +124,8 @@ export default async function MyAttestationsPage() {
                       </Badge>
                     </div>
                   </CardHeader>
-                  {(meta.xpEarned || meta.satsEarned) && (
-                    <CardContent className="flex flex-wrap items-center gap-3 text-sm">
+                  <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-3">
                       {meta.xpEarned ? (
                         <span className="inline-flex items-center gap-1 text-muted-foreground">
                           +{meta.xpEarned} XP
@@ -136,8 +137,12 @@ export default async function MyAttestationsPage() {
                           +{meta.satsEarned} sats
                         </span>
                       ) : null}
-                    </CardContent>
-                  )}
+                    </div>
+                    <ExportCertificateButton
+                      attestationId={r.id}
+                      targetCode={r.targetCode}
+                    />
+                  </CardContent>
                 </Card>
               </li>
             );
