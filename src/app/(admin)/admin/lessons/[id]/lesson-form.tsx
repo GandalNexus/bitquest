@@ -2,8 +2,25 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import { readCookie } from "@/lib/bitquest/client";
+
+// MDXEditor dépend de Lexical (DOM only) → import dynamique sans SSR.
+// Skeleton = textarea en lecture seule pour éviter un layout shift.
+const MarkdownEditor = dynamic(
+  () => import("@/components/admin/markdown-editor").then((m) => m.MarkdownEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="w-full animate-pulse rounded-md border bg-muted/30"
+        style={{ minHeight: 400 }}
+        aria-label="Chargement de l'éditeur"
+      />
+    ),
+  },
+);
 
 interface LessonInitial {
   id: string;
@@ -129,13 +146,14 @@ export function LessonForm({ initial }: { initial: LessonInitial }) {
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium">Contenu (Markdown)</span>
+          <span className="text-sm font-medium">Contenu (Markdown WYSIWYG)</span>
           <button
             type="button"
             onClick={() => setPreview((p) => !p)}
             className="rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+            aria-pressed={preview}
           >
-            {preview ? "Éditer" : "Aperçu"}
+            {preview ? "Éditer" : "Aperçu brut"}
           </button>
         </div>
         {preview ? (
@@ -143,12 +161,10 @@ export function LessonForm({ initial }: { initial: LessonInitial }) {
             <ReactMarkdown>{state.content}</ReactMarkdown>
           </article>
         ) : (
-          <textarea
-            required
-            rows={18}
+          <MarkdownEditor
             value={state.content}
-            onChange={(e) => setState({ ...state, content: e.target.value })}
-            className="w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
+            onChange={(next) => setState({ ...state, content: next })}
+            placeholder="## Titre de la leçon&#10;&#10;Écris en Markdown — les raccourcis `#`, `*`, `>`, `[lien](url)` fonctionnent."
           />
         )}
       </div>

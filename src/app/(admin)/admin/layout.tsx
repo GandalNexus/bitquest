@@ -12,6 +12,8 @@ import {
   ShieldAlert,
   Trophy,
   Users,
+  UsersRound,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { requireRoleSsr } from "@/lib/auth/server";
@@ -41,7 +43,9 @@ const NAV: NavItem[] = [
   { href: "/admin/quests", label: "Quêtes", icon: Map },
   { href: "/admin/badges", label: "Badges", icon: Trophy, minRole: "ADMIN" },
   { href: "/admin/challenges", label: "Défis", icon: Flame, minRole: "ADMIN" },
+  { href: "/admin/team-members", label: "Équipe", icon: UsersRound, minRole: "ADMIN" },
   { href: "/admin/bitlab/attempts", label: "BitLab preuves", icon: FlaskConical, minRole: "ADMIN" },
+  { href: "/admin/lightning-rewards", label: "Lightning rewards", icon: Zap, minRole: "ADMIN" },
   { href: "/admin/audit", label: "Audit log", icon: ClipboardList, minRole: "ADMIN" },
   { href: "/admin/health", label: "État service", icon: Activity, minRole: "ADMIN" },
 ];

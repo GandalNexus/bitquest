@@ -1,7 +1,8 @@
-import Link from "next/link";
-import { ChevronRight, Coins, Map, Star } from "lucide-react";
+import { ContentLink as Link } from "@/components/admin/content-link";
+import { ChevronRight, Coins, Map, Plus, Star } from "lucide-react";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
@@ -30,20 +31,30 @@ export default async function AdminQuestsPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-2xl font-bold tracking-tight">Quêtes</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Éditer les métadonnées d&apos;une quête (titre, intro, récompenses, niveau requis).
-          Le contenu théorique, le quiz et la configuration de mission se modifient pour l&apos;instant
-          via le seed (Phase 2.6b à venir).
-        </p>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Quêtes</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Créer une coquille de quête ou éditer les métadonnées, la théorie,
+            le quiz et la configuration mission.
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/admin/quests/new">
+            <Plus className="h-4 w-4" aria-hidden />
+            Nouvelle quête
+          </Link>
+        </Button>
       </header>
 
       {grouped.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
             <Map className="h-8 w-8 opacity-40" aria-hidden />
-            <p className="text-sm">Aucune quête seedée.</p>
+            <p className="text-sm">Aucune quête pour l&apos;instant.</p>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin/quests/new">Créer la première quête</Link>
+            </Button>
           </CardContent>
         </Card>
       ) : (

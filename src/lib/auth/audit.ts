@@ -25,7 +25,9 @@ export type AuditAction =
   | "LESSON_CREATE"
   | "LESSON_UPDATE"
   | "LESSON_DELETE"
+  | "QUEST_CREATE"
   | "QUEST_UPDATE"
+  | "QUEST_DELETE"
   | "QUEST_THEORY_UPDATE"
   | "QUEST_QUIZ_UPDATE"
   | "QUEST_MISSION_UPDATE"
@@ -35,6 +37,9 @@ export type AuditAction =
   | "CHALLENGE_CREATE"
   | "CHALLENGE_UPDATE"
   | "CHALLENGE_DELETE"
+  | "TEAM_MEMBER_CREATE"
+  | "TEAM_MEMBER_UPDATE"
+  | "TEAM_MEMBER_DELETE"
   | "USER_PURGE";
 
 export async function logAdminAction(

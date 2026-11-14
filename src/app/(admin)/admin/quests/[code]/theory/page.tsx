@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ContentLink as Link } from "@/components/admin/content-link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BookOpen } from "lucide-react";
 import { db } from "@/lib/db";

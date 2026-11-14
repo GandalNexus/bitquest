@@ -9,4 +9,4 @@
  * `/admin/courses` → layout admin le laisse passer (gate EDITOR+).
  */
 export { default } from "@/app/(admin)/admin/courses/[id]/page";
-export { dynamic } from "@/app/(admin)/admin/courses/[id]/page";
+export const dynamic = "force-dynamic";

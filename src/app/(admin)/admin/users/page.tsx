@@ -1,12 +1,15 @@
-import { Bot, UserCheck, UserRound, Users } from "lucide-react";
+import { Bot, ChevronLeft, ChevronRight, UserCheck, UserRound, Users } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireRoleSsr } from "@/lib/auth/server";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RoleForm } from "./role-form";
 import { PurgeButton } from "./purge-button";
+import { UsersSearchForm } from "./users-search-form";
 
 export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 25;
 
 /* ============ Formatage ============ */
 
@@ -25,47 +28,70 @@ function formatDate(d: Date): string {
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string; view?: string }>;
+  searchParams: Promise<{ role?: string; view?: string; q?: string; page?: string }>;
 }) {
   // Le layout parent (admin/layout.tsx) garantit déjà ADMIN ; on récupère
   // l'id courant pour marquer "toi" sur la bonne ligne.
   const auth = await requireRoleSsr("ADMIN");
   const currentUserId = auth.ok ? auth.user.id : null;
 
-  const { role: roleFilter, view: viewFilter } = await searchParams;
-  const filter = roleFilter && ["APPRENTICE", "EDITOR", "ADMIN"].includes(roleFilter)
-    ? roleFilter
+  const sp = await searchParams;
+  const filter = sp.role && ["APPRENTICE", "EDITOR", "ADMIN"].includes(sp.role)
+    ? sp.role
     : null;
-  const showDeleted = viewFilter === "deleted";
+  const showDeleted = sp.view === "deleted";
+  const query = (sp.q ?? "").trim().slice(0, 60);
+  const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
 
-  const users = await db.user.findMany({
-    where: showDeleted
-      ? { deletedAt: { not: null } }
-      : { deletedAt: null, ...(filter ? { role: filter } : {}) },
-    orderBy: showDeleted
-      ? [{ deletedAt: "desc" }]
-      : [{ role: "asc" }, { createdAt: "desc" }],
-    select: {
-      id: true,
-      pseudo: true,
-      email: true,
-      role: true,
-      isGuest: true,
-      isBot: true,
-      xp: true,
-      sats: true,
-      createdAt: true,
-      deletedAt: true,
-    },
-  });
+  // Filtre composite : état supprimé + rôle + recherche pseudo (ILIKE Postgres
+  // via Prisma `contains, mode: "insensitive"`). Si le filtre rôle est actif
+  // alors qu'on regarde les supprimés, on l'ignore (comportement précédent).
+  const whereBase = showDeleted
+    ? { deletedAt: { not: null } }
+    : { deletedAt: null, ...(filter ? { role: filter } : {}) };
+  const whereWithSearch = query.length > 0
+    ? {
+        AND: [whereBase, { pseudo: { contains: query, mode: "insensitive" as const } }],
+      }
+    : whereBase;
 
-  const [totalCount, admins, editors, apprentices, deletedCount] = await Promise.all([
-    db.user.count({ where: { deletedAt: null } }),
-    db.user.count({ where: { deletedAt: null, role: "ADMIN" } }),
-    db.user.count({ where: { deletedAt: null, role: "EDITOR" } }),
-    db.user.count({ where: { deletedAt: null, role: "APPRENTICE" } }),
-    db.user.count({ where: { deletedAt: { not: null } } }),
-  ]);
+  const skip = (page - 1) * PAGE_SIZE;
+
+  const [users, filteredCount, totalCount, admins, editors, apprentices, deletedCount] =
+    await Promise.all([
+      db.user.findMany({
+        where: whereWithSearch,
+        orderBy: showDeleted
+          ? [{ deletedAt: "desc" }]
+          : [{ role: "asc" }, { createdAt: "desc" }],
+        select: {
+          id: true,
+          pseudo: true,
+          email: true,
+          role: true,
+          isGuest: true,
+          isBot: true,
+          xp: true,
+          sats: true,
+          createdAt: true,
+          deletedAt: true,
+        },
+        skip,
+        take: PAGE_SIZE,
+      }),
+      db.user.count({ where: whereWithSearch }),
+      db.user.count({ where: { deletedAt: null } }),
+      db.user.count({ where: { deletedAt: null, role: "ADMIN" } }),
+      db.user.count({ where: { deletedAt: null, role: "EDITOR" } }),
+      db.user.count({ where: { deletedAt: null, role: "APPRENTICE" } }),
+      db.user.count({ where: { deletedAt: { not: null } } }),
+    ]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
+  const canPrev = page > 1;
+  const canNext = page < pageCount;
+  const prevHref = `/admin/users?${buildQueryString(sp, { page: String(page - 1) })}`;
+  const nextHref = `/admin/users?${buildQueryString(sp, { page: String(page + 1) })}`;
 
   return (
     <div className="space-y-6">
@@ -80,31 +106,33 @@ export default async function AdminUsersPage({
       {/* Compteurs + filtres */}
       <section className="flex flex-wrap items-center gap-2">
         <FilterChip
-          href="/admin/users"
+          href={`/admin/users?${buildQueryString(sp, { role: null, view: null, page: null })}`}
           active={!showDeleted && filter === null}
           label={`Tous (${totalCount})`}
         />
         <FilterChip
-          href="/admin/users?role=ADMIN"
+          href={`/admin/users?${buildQueryString(sp, { role: "ADMIN", view: null, page: null })}`}
           active={!showDeleted && filter === "ADMIN"}
           label={`Admin (${admins})`}
         />
         <FilterChip
-          href="/admin/users?role=EDITOR"
+          href={`/admin/users?${buildQueryString(sp, { role: "EDITOR", view: null, page: null })}`}
           active={!showDeleted && filter === "EDITOR"}
           label={`Editor (${editors})`}
         />
         <FilterChip
-          href="/admin/users?role=APPRENTICE"
+          href={`/admin/users?${buildQueryString(sp, { role: "APPRENTICE", view: null, page: null })}`}
           active={!showDeleted && filter === "APPRENTICE"}
           label={`Apprentice (${apprentices})`}
         />
         <FilterChip
-          href="/admin/users?view=deleted"
+          href={`/admin/users?${buildQueryString(sp, { role: null, view: "deleted", page: null })}`}
           active={showDeleted}
           label={`Supprimés (${deletedCount})`}
         />
       </section>
+
+      <UsersSearchForm initialQuery={query} />
 
       <Card>
         <CardHeader>
@@ -113,7 +141,9 @@ export default async function AdminUsersPage({
             {filter ? `Filtre : ${filter}` : "Tous les utilisateurs"}
           </CardTitle>
           <CardDescription>
-            {users.length} résultat{users.length > 1 ? "s" : ""}
+            {filteredCount} résultat{filteredCount > 1 ? "s" : ""}
+            {pageCount > 1 ? ` · page ${page}/${pageCount}` : ""}
+            {query ? ` · pseudo contient « ${query} »` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
@@ -185,12 +215,73 @@ export default async function AdminUsersPage({
           </table>
           {users.length === 0 && (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              Aucun utilisateur dans ce filtre.
+              {query ? `Aucun utilisateur ne matche « ${query} ».` : "Aucun utilisateur dans ce filtre."}
             </p>
           )}
         </CardContent>
+        {pageCount > 1 && (
+          <div className="flex items-center justify-between border-t px-4 py-2 text-xs text-muted-foreground">
+            <span>
+              {skip + 1}–{Math.min(skip + users.length, filteredCount)} sur {filteredCount}
+            </span>
+            <div className="flex items-center gap-1">
+              <PageLink href={prevHref} disabled={!canPrev} label="Précédente" direction="prev" />
+              <PageLink href={nextHref} disabled={!canNext} label="Suivante" direction="next" />
+            </div>
+          </div>
+        )}
       </Card>
     </div>
+  );
+}
+
+/**
+ * Construit une nouvelle querystring à partir de searchParams en
+ * appliquant `overrides` : `null` → supprime la clé, autre → remplace.
+ * Les clés absentes des overrides sont conservées telles quelles.
+ */
+function buildQueryString(
+  current: { role?: string; view?: string; q?: string; page?: string },
+  overrides: Partial<Record<"role" | "view" | "q" | "page", string | null>>,
+): string {
+  const params = new URLSearchParams();
+  const merged = { ...current, ...overrides };
+  for (const [k, v] of Object.entries(merged)) {
+    if (v === null || v === undefined || v === "") continue;
+    params.set(k, v);
+  }
+  return params.toString();
+}
+
+function PageLink({
+  href,
+  disabled,
+  label,
+  direction,
+}: {
+  href: string;
+  disabled: boolean;
+  label: string;
+  direction: "prev" | "next";
+}) {
+  if (disabled) {
+    return (
+      <span className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border px-2 py-1 text-muted-foreground/50">
+        {direction === "prev" && <ChevronLeft className="h-3.5 w-3.5" aria-hidden />}
+        {label}
+        {direction === "next" && <ChevronRight className="h-3.5 w-3.5" aria-hidden />}
+      </span>
+    );
+  }
+  return (
+    <a
+      href={href}
+      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 transition-colors hover:border-primary/40 hover:text-foreground"
+    >
+      {direction === "prev" && <ChevronLeft className="h-3.5 w-3.5" aria-hidden />}
+      {label}
+      {direction === "next" && <ChevronRight className="h-3.5 w-3.5" aria-hidden />}
+    </a>
   );
 }
 

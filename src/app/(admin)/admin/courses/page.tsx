@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ContentLink as Link } from "@/components/admin/content-link";
 import { BookOpen, Plus } from "lucide-react";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";

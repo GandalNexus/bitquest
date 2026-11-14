@@ -43,3 +43,52 @@ export async function PATCH(
 
   return Response.json({ ok: true, quest });
 }
+
+/**
+ * DELETE /api/admin/quests/[code] — supprime une quête.
+ *
+ * Refuse si la quête est référencée par un chapitre (ChapterQuest.quest a
+ * `onDelete: Restrict`). L'admin doit délier les chapitres avant. Les
+ * `UserQuestProgress` et `QuizQuestion` se cascade-cleanent.
+ *
+ * Side-effects acceptés :
+ *   - Les badges `QUEST_COMPLETE` qui ciblaient cette quête par `code`
+ *     ne seront plus décernables (`evaluateBadges` renverra false).
+ *   - Les `BitLabProof` / `MissionAttempt` référençant `questCode` restent
+ *     en base mais pointent vers une ancre morte (trace d'audit historique).
+ */
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ code: string }> },
+) {
+  const guard = await requireRoleAndCsrf(req, "EDITOR");
+  if (!guard.ok) return guard.response;
+
+  const { code } = await params;
+  const existing = await db.quest.findUnique({
+    where: { code },
+    select: { id: true, title: true, code: true },
+  });
+  if (!existing) {
+    return Response.json({ error: "Quête introuvable." }, { status: 404 });
+  }
+
+  const linkedChapters = await db.chapterQuest.count({ where: { questId: existing.id } });
+  if (linkedChapters > 0) {
+    return Response.json(
+      {
+        error: `Impossible de supprimer : cette quête est liée à ${linkedChapters} chapitre${linkedChapters > 1 ? "s" : ""}. Détache-la d'abord.`,
+      },
+      { status: 409 },
+    );
+  }
+
+  await db.quest.delete({ where: { id: existing.id } });
+
+  await logAdminAction(guard.user.id, "QUEST_DELETE", `quest:${existing.id}`, {
+    code: existing.code,
+    title: existing.title,
+  });
+
+  return Response.json({ ok: true });
+}

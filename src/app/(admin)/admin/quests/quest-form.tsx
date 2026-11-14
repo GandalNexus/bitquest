@@ -3,6 +3,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
+import { useContentBasePath } from "@/lib/admin/base-path";
 
 const TRACKS = ["INITIATION", "INTERMEDIATE", "ADVANCED", "SPECIAL"] as const;
 type Track = (typeof TRACKS)[number];
@@ -26,10 +27,35 @@ interface QuestInitial {
  */
 export function QuestForm({ initial }: { initial: QuestInitial }) {
   const router = useRouter();
+  const basePath = useContentBasePath();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [state, setState] = useState<QuestInitial>(initial);
+
+  const onDelete = async () => {
+    if (
+      !confirm(
+        `Supprimer définitivement la quête « ${initial.title} » ?\n\nLes progressions utilisateurs liées seront aussi effacées (cascade). Les badges QUEST_COMPLETE ciblant ${initial.code} ne seront plus décernables.`,
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    const csrf = readCookie("bq_csrf");
+    try {
+      const res = await fetch(`/api/admin/quests/${initial.code}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: csrf ? { "X-CSRF-Token": csrf } : {},
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? `Erreur ${res.status}`);
+      startTransition(() => router.push(`${basePath}/quests`));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inconnue.");
+    }
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -195,7 +221,15 @@ export function QuestForm({ initial }: { initial: QuestInitial }) {
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between pt-2">
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={pending}
+          className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-60"
+        >
+          Supprimer la quête
+        </button>
         <button
           type="submit"
           disabled={pending}

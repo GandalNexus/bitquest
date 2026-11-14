@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdminOrDenied } from "../_require-admin";
+import { BadgesFilterBar } from "./badges-filter-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +15,35 @@ const rarityStyles: Record<string, string> = {
   EPIC: "border-violet-500/40 bg-violet-500/10 text-violet-500",
 };
 
-export default async function AdminBadgesPage() {
+const RARITIES = ["COMMON", "RARE", "EPIC"] as const;
+
+export default async function AdminBadgesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ q?: string; rarity?: string }>;
+}) {
   const gate = await requireAdminOrDenied();
   if (!gate.ok) return gate.element;
 
+  const sp = (await searchParams) ?? {};
+  const query = (sp.q ?? "").trim().slice(0, 60);
+  const rarityFilter =
+    sp.rarity && (RARITIES as readonly string[]).includes(sp.rarity) ? sp.rarity : null;
+
+  type BadgeWhere = NonNullable<Parameters<typeof db.badge.findMany>[0]>["where"];
+  const andClauses: NonNullable<BadgeWhere>[] = [];
+  if (rarityFilter) andClauses.push({ rarity: rarityFilter });
+  if (query.length > 0) {
+    andClauses.push({
+      OR: [
+        { name: { contains: query, mode: "insensitive" } },
+        { code: { contains: query, mode: "insensitive" } },
+      ],
+    });
+  }
+
   const badges = await db.badge.findMany({
+    where: andClauses.length > 0 ? { AND: andClauses } : undefined,
     orderBy: [{ rarity: "asc" }, { name: "asc" }],
     include: { _count: { select: { users: true } } },
   });
@@ -29,9 +54,12 @@ export default async function AdminBadgesPage() {
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Badges</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {badges.length} badge{badges.length > 1 ? "s" : ""} configuré
-            {badges.length > 1 ? "s" : ""} · attribués automatiquement par le moteur
-            <code className="ml-1 rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
+            {badges.length} badge{badges.length > 1 ? "s" : ""} affiché
+            {badges.length > 1 ? "s" : ""}
+            {query ? ` · filtre « ${query} »` : ""}
+            {rarityFilter ? ` · ${rarityFilter}` : ""}
+            {" · attribués automatiquement par "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
               evaluateBadges()
             </code>
           </p>
@@ -43,6 +71,8 @@ export default async function AdminBadgesPage() {
           </Link>
         </Button>
       </header>
+
+      <BadgesFilterBar initialQuery={query} initialRarity={rarityFilter} />
 
       {badges.length === 0 ? (
         <Card>

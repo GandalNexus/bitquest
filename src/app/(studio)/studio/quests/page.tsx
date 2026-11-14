@@ -1,7 +1,8 @@
-import Link from "next/link";
-import { ChevronRight, Coins, Map, Star } from "lucide-react";
+import { ContentLink as Link } from "@/components/admin/content-link";
+import { ChevronRight, Coins, Map, Plus, Star } from "lucide-react";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
@@ -30,11 +31,19 @@ export default async function StudioQuestsPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-2xl font-bold tracking-tight">Quêtes</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Éditer les métadonnées, la théorie, le quiz et la configuration de mission BitLab.
-        </p>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Quêtes</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Créer une quête ou éditer ses métadonnées, sa théorie, son quiz et sa mission.
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/admin/quests/new">
+            <Plus className="h-4 w-4" aria-hidden />
+            Nouvelle quête
+          </Link>
+        </Button>
       </header>
 
       {grouped.length === 0 ? (

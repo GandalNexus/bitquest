@@ -3,6 +3,13 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
+import {
+  LnInvoiceForm,
+  MineNonceForm,
+  MultisigForm,
+  NoConfigHint,
+  TxBuilderForm,
+} from "./mission-type-forms";
 
 const MISSION_TYPES = [
   "block_explorer",
@@ -29,11 +36,14 @@ const TYPE_LABELS: Record<MissionType, string> = {
 };
 
 /**
- * Éditeur mission : type + brief + hint + config JSON.
+ * Éditeur mission : type + brief + hint + config typé (ou JSON brut).
  *
- * La config type-spécifique (target, feeRates, policy, difficulty, …) est
- * éditée comme JSON brut. Pas d'éditeur par type cette étape — un builder
- * dédié pourra arriver plus tard sans invalider cette page.
+ * - 4 missions typées ont un sous-form structuré : tx_builder, mine_nonce,
+ *   ln_invoice, multisig_sign.
+ * - 4 missions sans config renvoient juste un hint (le défi est généré
+ *   aléatoirement à chaque session).
+ * - Un toggle « JSON avancé » reste disponible pour les clés custom non
+ *   prévues par les builders (générateurs UI custom, flags expérimentaux).
  */
 export function MissionEditor({
   code,
@@ -55,9 +65,13 @@ export function MissionEditor({
   const [missionType, setMissionType] = useState<MissionType>(initial.missionType);
   const [brief, setBrief] = useState(initial.brief);
   const [hint, setHint] = useState(initial.hint);
+  const [config, setConfig] = useState<Record<string, unknown>>(initial.config);
+  const [advancedMode, setAdvancedMode] = useState(false);
   const [configText, setConfigText] = useState(() => JSON.stringify(initial.config, null, 2));
 
+  // Validation JSON pour le mode avancé — silencieux si mode structuré.
   const configError = useMemo<string | null>(() => {
+    if (!advancedMode) return null;
     if (configText.trim().length === 0) return null;
     try {
       const parsed = JSON.parse(configText);
@@ -68,7 +82,27 @@ export function MissionEditor({
     } catch (e) {
       return e instanceof Error ? e.message : "JSON invalide.";
     }
-  }, [configText]);
+  }, [configText, advancedMode]);
+
+  // Toggle mode : on resynchronise les deux représentations avant de
+  // basculer, pour ne pas perdre les modifications en cours.
+  const toggleAdvanced = () => {
+    if (advancedMode) {
+      // Avancé → structuré : on reparse ce qui vient du textarea.
+      try {
+        const parsed = JSON.parse(configText || "{}");
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          setConfig(parsed as Record<string, unknown>);
+        }
+      } catch {
+        // garde le state actuel si parse échoue
+      }
+    } else {
+      // Structuré → avancé : serialize la config courante.
+      setConfigText(JSON.stringify(config, null, 2));
+    }
+    setAdvancedMode((v) => !v);
+  };
 
   const onSave = async () => {
     setError(null);
@@ -77,7 +111,11 @@ export function MissionEditor({
       setError("Corrige le JSON de la config avant d'enregistrer.");
       return;
     }
-    const config = configText.trim() ? (JSON.parse(configText) as Record<string, unknown>) : {};
+    const nextConfig = advancedMode
+      ? configText.trim()
+        ? (JSON.parse(configText) as Record<string, unknown>)
+        : {}
+      : config;
     const csrf = readCookie("bq_csrf");
     try {
       const res = await fetch(`/api/admin/quests/${code}/mission`, {
@@ -87,7 +125,7 @@ export function MissionEditor({
           "Content-Type": "application/json",
           ...(csrf ? { "X-CSRF-Token": csrf } : {}),
         },
-        body: JSON.stringify({ missionType, brief, hint, config }),
+        body: JSON.stringify({ missionType, brief, hint, config: nextConfig }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((data as { error?: string }).error ?? `Erreur ${res.status}`);
@@ -95,6 +133,24 @@ export function MissionEditor({
       startTransition(() => router.refresh());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue.");
+    }
+  };
+
+  const renderTypedForm = () => {
+    switch (missionType) {
+      case "tx_builder":
+        return <TxBuilderForm config={config} onChange={setConfig} />;
+      case "mine_nonce":
+        return <MineNonceForm config={config} onChange={setConfig} />;
+      case "ln_invoice":
+        return <LnInvoiceForm config={config} onChange={setConfig} />;
+      case "multisig_sign":
+        return <MultisigForm config={config} onChange={setConfig} />;
+      case "block_explorer":
+      case "key_forge":
+      case "ln_channel":
+      case "taproot_tweak":
+        return <NoConfigHint label={TYPE_LABELS[missionType]} />;
     }
   };
 
@@ -140,21 +196,37 @@ export function MissionEditor({
         />
       </label>
 
-      <label className="block text-sm">
-        <span className="block font-medium">Config JSON (avancé)</span>
-        <textarea
-          rows={10}
-          value={configText}
-          onChange={(e) => setConfigText(e.target.value)}
-          spellCheck={false}
-          className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 font-mono text-xs"
-        />
-        <span className="mt-1 block text-xs text-muted-foreground">
-          Objet JSON transmis à <code>generateMission({missionType}, config)</code>. Les clés
-          <code> brief </code> et <code> hint </code> sont injectées automatiquement par le serveur
-          — inutile de les mettre ici.
-        </span>
-      </label>
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="block text-sm font-medium">Config mission</span>
+          <button
+            type="button"
+            onClick={toggleAdvanced}
+            className="rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+            aria-pressed={advancedMode}
+          >
+            {advancedMode ? "Vue structurée" : "JSON avancé"}
+          </button>
+        </div>
+        {advancedMode ? (
+          <>
+            <textarea
+              rows={10}
+              value={configText}
+              onChange={(e) => setConfigText(e.target.value)}
+              spellCheck={false}
+              className="w-full rounded-md border bg-background px-2 py-1.5 font-mono text-xs"
+            />
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Objet JSON transmis à <code>generateMission({missionType}, config)</code>. Les clés
+              <code> brief </code> et <code> hint </code> sont injectées automatiquement par le serveur
+              — inutile de les mettre ici.
+            </span>
+          </>
+        ) : (
+          renderTypedForm()
+        )}
+      </div>
       {configError && (
         <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           JSON invalide : {configError}

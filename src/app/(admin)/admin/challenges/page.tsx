@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flame, Plus } from "lucide-react";
 import { db } from "@/lib/db";
 import { todayUtc } from "@/lib/bitquest/challenges";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { requireAdminOrDenied } from "../_require-admin";
 
 export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 25;
 
 function classify(date: string, today: string): "past" | "today" | "future" {
   if (date === today) return "today";
@@ -26,15 +28,46 @@ const classifyLabels: Record<"past" | "today" | "future", string> = {
   future: "À venir",
 };
 
-export default async function AdminChallengesPage() {
+export default async function AdminChallengesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ when?: string; page?: string }>;
+}) {
   const gate = await requireAdminOrDenied();
   if (!gate.ok) return gate.element;
 
+  const sp = (await searchParams) ?? {};
+  const whenFilter =
+    sp.when === "past" || sp.when === "today" || sp.when === "future" ? sp.when : null;
+  const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
+
   const today = todayUtc();
-  const challenges = await db.dailyChallenge.findMany({
-    orderBy: { date: "desc" },
-    include: { _count: { select: { completions: true } } },
-  });
+  const dateFilter = (() => {
+    if (whenFilter === "today") return { date: today };
+    if (whenFilter === "past") return { date: { lt: today } };
+    if (whenFilter === "future") return { date: { gt: today } };
+    return undefined;
+  })();
+
+  const [challenges, totalCount] = await Promise.all([
+    db.dailyChallenge.findMany({
+      where: dateFilter,
+      orderBy: { date: "desc" },
+      include: { _count: { select: { completions: true } } },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    db.dailyChallenge.count({ where: dateFilter }),
+  ]);
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const qs = (patch: Record<string, string | null>) => {
+    const params = new URLSearchParams();
+    const merged: Record<string, string | null> = { when: whenFilter, page: null, ...patch };
+    for (const [k, v] of Object.entries(merged)) {
+      if (v) params.set(k, v);
+    }
+    return params.toString();
+  };
 
   return (
     <div className="space-y-6">
@@ -42,8 +75,9 @@ export default async function AdminChallengesPage() {
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Défis du jour</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Un défi pédagogique léger par journée UTC. La tuile côté dashboard affiche
-            automatiquement celui du jour.
+            {totalCount} défi{totalCount > 1 ? "s" : ""}
+            {whenFilter ? ` · ${classifyLabels[whenFilter]}` : ""}
+            {pageCount > 1 ? ` · page ${page}/${pageCount}` : ""}
           </p>
         </div>
         <Button asChild>
@@ -53,6 +87,13 @@ export default async function AdminChallengesPage() {
           </Link>
         </Button>
       </header>
+
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrer par période">
+        <FilterChip href={`/admin/challenges?${qs({ when: null })}`} active={whenFilter === null} label="Tous" />
+        <FilterChip href={`/admin/challenges?${qs({ when: "past" })}`} active={whenFilter === "past"} label="Passés" />
+        <FilterChip href={`/admin/challenges?${qs({ when: "today" })}`} active={whenFilter === "today"} label="Aujourd'hui" />
+        <FilterChip href={`/admin/challenges?${qs({ when: "future" })}`} active={whenFilter === "future"} label="À venir" />
+      </div>
 
       {challenges.length === 0 ? (
         <Card>
@@ -98,6 +139,60 @@ export default async function AdminChallengesPage() {
           })}
         </ul>
       )}
+
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between border-t px-4 py-2 text-xs text-muted-foreground">
+          <span>
+            Page {page} sur {pageCount}
+          </span>
+          <div className="flex items-center gap-1">
+            {page > 1 ? (
+              <Link
+                href={`/admin/challenges?${qs({ page: String(page - 1) })}`}
+                className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:border-primary/40 hover:text-foreground"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                Précédente
+              </Link>
+            ) : (
+              <span className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border px-2 py-1 text-muted-foreground/50">
+                <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                Précédente
+              </span>
+            )}
+            {page < pageCount ? (
+              <Link
+                href={`/admin/challenges?${qs({ page: String(page + 1) })}`}
+                className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:border-primary/40 hover:text-foreground"
+              >
+                Suivante
+                <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+              </Link>
+            ) : (
+              <span className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border px-2 py-1 text-muted-foreground/50">
+                Suivante
+                <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function FilterChip({ href, active, label }: { href: string; active: boolean; label: string }) {
+  return (
+    <Link
+      href={href}
+      aria-pressed={active}
+      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+        active
+          ? "border-primary/50 bg-primary/10 text-primary"
+          : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
+      }`}
+    >
+      {label}
+    </Link>
   );
 }

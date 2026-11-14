@@ -17,7 +17,9 @@ const ACTIONS = [
   "LESSON_CREATE",
   "LESSON_UPDATE",
   "LESSON_DELETE",
+  "QUEST_CREATE",
   "QUEST_UPDATE",
+  "QUEST_DELETE",
   "QUEST_THEORY_UPDATE",
   "QUEST_QUIZ_UPDATE",
   "QUEST_MISSION_UPDATE",
@@ -27,6 +29,9 @@ const ACTIONS = [
   "CHALLENGE_CREATE",
   "CHALLENGE_UPDATE",
   "CHALLENGE_DELETE",
+  "TEAM_MEMBER_CREATE",
+  "TEAM_MEMBER_UPDATE",
+  "TEAM_MEMBER_DELETE",
   "USER_PURGE",
 ] as const;
 
@@ -43,7 +48,9 @@ const actionStyles: Record<string, string> = {
   LESSON_CREATE: "border-emerald-500/40 bg-emerald-500/10 text-emerald-500",
   LESSON_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
   LESSON_DELETE: "border-destructive/40 bg-destructive/10 text-destructive",
+  QUEST_CREATE: "border-emerald-500/40 bg-emerald-500/10 text-emerald-500",
   QUEST_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
+  QUEST_DELETE: "border-destructive/40 bg-destructive/10 text-destructive",
   QUEST_THEORY_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
   QUEST_QUIZ_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
   QUEST_MISSION_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
@@ -53,6 +60,9 @@ const actionStyles: Record<string, string> = {
   CHALLENGE_CREATE: "border-emerald-500/40 bg-emerald-500/10 text-emerald-500",
   CHALLENGE_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
   CHALLENGE_DELETE: "border-destructive/40 bg-destructive/10 text-destructive",
+  TEAM_MEMBER_CREATE: "border-emerald-500/40 bg-emerald-500/10 text-emerald-500",
+  TEAM_MEMBER_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
+  TEAM_MEMBER_DELETE: "border-destructive/40 bg-destructive/10 text-destructive",
   USER_PURGE: "border-destructive/40 bg-destructive/10 text-destructive",
 };
 

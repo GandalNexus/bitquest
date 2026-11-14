@@ -1,13 +1,13 @@
 import { db } from "@/lib/db";
-import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
-import { requireRole } from "@/lib/auth/roles";
+import { requireRoleAndCsrf } from "@/lib/auth/guard";
 import { logAdminAction } from "@/lib/auth/audit";
 import { adminChangeRoleSchema, parseJsonBody } from "@/lib/validation/schemas";
 
 /**
  * Change le rôle d'un utilisateur. Réservé aux ADMIN.
  *
- * - Si authentifié par cookie → CSRF enforcé.
+ * - Si authentifié par cookie → CSRF enforcé via `requireRoleAndCsrf`
+ *   (même pattern que /purge pour cohérence).
  * - Un ADMIN ne peut PAS se retirer son propre rôle ADMIN (self-lockout
  *   prevention — la bascule doit passer par un autre admin ou par la DB).
  * - Rote le token de la cible pour invalider ses sessions en cours
@@ -18,14 +18,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireRole(req, "ADMIN");
-  if (!auth.ok) return auth.response;
-  const actor = auth.user;
-
-  if (isCookieAuthenticated(req)) {
-    const csrf = requireCsrf(req, actor.token);
-    if (!csrf.ok) return csrf.response;
-  }
+  const guard = await requireRoleAndCsrf(req, "ADMIN");
+  if (!guard.ok) return guard.response;
+  const actor = guard.user;
 
   const parsed = await parseJsonBody(req, adminChangeRoleSchema);
   if (!parsed.ok) return parsed.response;

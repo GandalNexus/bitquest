@@ -167,9 +167,64 @@ export const adminLessonUpdateSchema = z.object({
 
 export type AdminLessonUpdateBody = z.infer<typeof adminLessonUpdateSchema>;
 
-/* ---------- /api/admin/quests/[code] ---------- */
+/* ---------- /api/admin/quests + /api/admin/quests/[code] ---------- */
 
 export const QUEST_TRACKS = ["INITIATION", "INTERMEDIATE", "ADVANCED", "SPECIAL"] as const;
+
+export const QUEST_MISSION_KINDS = ["SIMULATED", "BITLAB_PROOF"] as const;
+
+/**
+ * Déclaré ici (avant `adminQuestCreateSchema`) pour éviter une dépendance
+ * forward au bloc mission plus bas. Dupliqué dans `/api/admin/quests/
+ * [code]/mission` export ci-dessous — valeur canonique, on réexporte.
+ */
+export const MISSION_TYPES = [
+  "block_explorer",
+  "key_forge",
+  "tx_builder",
+  "mine_nonce",
+  "ln_channel",
+  "ln_invoice",
+  "multisig_sign",
+  "taproot_tweak",
+] as const;
+
+/** Code quête : identifiant stable public (kebab-case ASCII, 2-60 chars). */
+const questCodeSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(2, "Le code doit contenir au moins 2 caractères.")
+  .max(60, "Le code est trop long (60 max).")
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Le code doit être en kebab-case (ex. tx-basics).");
+
+/**
+ * Création d'une quête (POST /api/admin/quests). Seule une shape minimale
+ * est exigée ; les parties riches (théorie, quiz, mission config) se
+ * remplissent ensuite via les builders dédiés.
+ *
+ * - `code` doit être unique en base (409 sinon).
+ * - `theorySections` est semi-optionnel : non fourni → `[]` sérialisé.
+ * - `missionConfig` est semi-optionnel : non fourni → `{ brief: "", hint: "" }`.
+ * - `missionKind` par défaut `SIMULATED` (BITLAB_PROOF s'enclenche quand
+ *   la mission est explicitement reliée à une preuve on-chain).
+ */
+export const adminQuestCreateSchema = z.object({
+  code: questCodeSchema,
+  track: z.enum(QUEST_TRACKS),
+  order: z.number().int().nonnegative().max(1_000),
+  title: z.string().trim().min(2).max(120),
+  subtitle: z.string().trim().min(2).max(240),
+  description: z.string().trim().min(2).max(2000),
+  intro: z.string().trim().min(2).max(2000),
+  xpReward: z.number().int().nonnegative().max(10_000).default(0),
+  satsReward: z.number().int().nonnegative().max(1_000_000).default(0),
+  requiredLevel: z.number().int().positive().max(10).default(1),
+  missionType: z.enum(MISSION_TYPES),
+  missionKind: z.enum(QUEST_MISSION_KINDS).default("SIMULATED"),
+});
+
+export type AdminQuestCreateBody = z.infer<typeof adminQuestCreateSchema>;
 
 /**
  * Patch des métadonnées d'une quête.
@@ -257,16 +312,9 @@ export type QuizQuestionInput = z.infer<typeof quizQuestionSchema>;
 
 /* ---------- /api/admin/quests/[code]/mission ---------- */
 
-export const MISSION_TYPES = [
-  "block_explorer",
-  "key_forge",
-  "tx_builder",
-  "mine_nonce",
-  "ln_channel",
-  "ln_invoice",
-  "multisig_sign",
-  "taproot_tweak",
-] as const;
+// MISSION_TYPES est désormais défini en tête de section quests (ligne ~180)
+// pour satisfaire la référence depuis `adminQuestCreateSchema`. On garde
+// un commentaire ici pour pointer vers l'endroit canonique.
 
 /**
  * Configuration mission : type + texte (brief, hint) + bag JSON type-spécifique.
@@ -292,6 +340,42 @@ export const adminQuestMissionSchema = z
   );
 
 export type AdminQuestMissionBody = z.infer<typeof adminQuestMissionSchema>;
+
+/* ---------- /api/admin/team-members ---------- */
+
+/**
+ * Validation CRUD membres de l'équipe GandalNexus (landing publique).
+ * - `initials` : 1 à 4 caractères (fallback avatar).
+ * - `avatarUrl` : URL http(s) optionnelle.
+ * - `publishedAt` : ISO string | null (brouillon).
+ */
+const teamMemberCoreSchema = z.object({
+  name: z.string().trim().min(2, "Nom trop court.").max(80, "Nom trop long."),
+  role: z.string().trim().min(2).max(120),
+  contribution: z.string().trim().min(2).max(1000),
+  initials: z
+    .string()
+    .trim()
+    .min(1, "Initiales requises.")
+    .max(4, "Max 4 caractères."),
+  avatarUrl: z
+    .string()
+    .trim()
+    .url("URL invalide.")
+    .max(500)
+    .nullable()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : null)),
+  order: z.number().int().nonnegative().max(1_000).default(0),
+  publishedAt: z.string().datetime().nullable().optional(),
+});
+
+export const adminTeamMemberCreateSchema = teamMemberCoreSchema;
+
+export const adminTeamMemberUpdateSchema = teamMemberCoreSchema.partial();
+
+export type AdminTeamMemberCreateBody = z.infer<typeof adminTeamMemberCreateSchema>;
+export type AdminTeamMemberUpdateBody = z.infer<typeof adminTeamMemberUpdateSchema>;
 
 /* ---------- /api/admin/badges ---------- */
 
