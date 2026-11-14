@@ -3,6 +3,7 @@ import {
   Activity,
   BookOpen,
   ClipboardList,
+  Flag,
   Flame,
   FlaskConical,
   LayoutDashboard,
@@ -46,6 +47,7 @@ const NAV: NavItem[] = [
   { href: "/admin/team-members", label: "Équipe", icon: UsersRound, minRole: "ADMIN" },
   { href: "/admin/bitlab/attempts", label: "BitLab preuves", icon: FlaskConical, minRole: "ADMIN" },
   { href: "/admin/lightning-rewards", label: "Lightning rewards", icon: Zap, minRole: "ADMIN" },
+  { href: "/admin/feature-flags", label: "Feature flags", icon: Flag, minRole: "ADMIN" },
   { href: "/admin/audit", label: "Audit log", icon: ClipboardList, minRole: "ADMIN" },
   { href: "/admin/health", label: "État service", icon: Activity, minRole: "ADMIN" },
 ];

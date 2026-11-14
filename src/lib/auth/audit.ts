@@ -42,6 +42,7 @@ export type AuditAction =
   | "TEAM_MEMBER_DELETE"
   | "CHAPTER_QUEST_ATTACH"
   | "CHAPTER_QUEST_DETACH"
+  | "FEATURE_FLAG_UPDATE"
   | "USER_PURGE";
 
 export async function logAdminAction(
