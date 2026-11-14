@@ -199,6 +199,57 @@ async function main() {
     `Académie : ${academyCoursesSeed.length} cours · ${totalChapters} chapitres · ${totalLessons} leçons`,
   );
 
+  /* ---- ChapterQuest : liens pédagogiques (gate LOT 16) ---- */
+  // Chaque entrée : chapitre N+1 est débloqué après complétion de la
+  // quête thématiquement liée au chapitre N. Chapitre 1 reste ouvert
+  // (entry point). On n'ajoute PAS de gate sur le cours Wolof `saytu-nexus`
+  // dont le contenu est un squelette.
+  const chapterQuestLinks: {
+    courseSlug: string;
+    chapterSlug: string;
+    questCode: string;
+    order: number;
+    note?: string;
+  }[] = [
+    {
+      courseSlug: "fondamentaux-bitcoin",
+      chapterSlug: "propriete-numerique",
+      questCode: "genesis",
+      order: 1,
+      note: "Valide ta compréhension du bloc avant d'aborder la propriété numérique.",
+    },
+    {
+      courseSlug: "fondamentaux-bitcoin",
+      chapterSlug: "blockchain-et-consensus",
+      questCode: "keys",
+      order: 1,
+      note: "Valide ta compréhension des clés avant d'aborder la blockchain.",
+    },
+  ];
+  let chapterQuestSeeded = 0;
+  for (const link of chapterQuestLinks) {
+    const course = await db.course.findUnique({ where: { slug: link.courseSlug } });
+    if (!course) continue;
+    const chapter = await db.chapter.findUnique({
+      where: { courseId_slug: { courseId: course.id, slug: link.chapterSlug } },
+    });
+    if (!chapter) continue;
+    const quest = await db.quest.findUnique({ where: { code: link.questCode } });
+    if (!quest) continue;
+    await db.chapterQuest.upsert({
+      where: { chapterId_questId: { chapterId: chapter.id, questId: quest.id } },
+      update: { order: link.order, note: link.note ?? null },
+      create: {
+        chapterId: chapter.id,
+        questId: quest.id,
+        order: link.order,
+        note: link.note ?? null,
+      },
+    });
+    chapterQuestSeeded += 1;
+  }
+  console.log(`ChapterQuest : ${chapterQuestSeeded} liens pédagogiques seedés`);
+
   /* ---- Défis du jour (fenêtre glissante 7 jours à partir d'aujourd'hui) ---- */
   const today = new Date().toISOString().slice(0, 10);
   for (const c of dailyChallengesSeed) {

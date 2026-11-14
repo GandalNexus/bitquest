@@ -36,16 +36,14 @@ l'audit ont été refermés par le LOT 14 :
 - Reste : seeder des entrées `ChapterQuest` pour activer la feature
   (la table est vide en dev actuel).
 
-### BitQuest · Auto-trigger Lightning reward à la complétion quête
+### ~~BitQuest · Auto-trigger Lightning reward à la complétion quête~~ → **résolu LOT 15**
 
-- **Problème** : V1 oblige l'apprenant à aller sur `/rewards` et coller
-  son invoice manuellement. UX friction massive.
-- **Impact** : les sats réels livrés par la plateforme sont très peu
-  claim-és (hypothèse à vérifier via analytics).
-- **Action** : brancher `event-bus.ts:QUEST_COMPLETED` → écran de
-  redemption contextuelle « Tu as gagné X sats, colle une invoice ».
-  Ne PAS auto-générer l'invoice (ça rendrait BitQuest custodial). Juste
-  rediriger vers `/rewards?from=<questCode>`.
+- CTA « Réclamer en sats réels ⚡ » sur `RewardsStep` quand
+  `sats.granted > 0` → navigation vers `/rewards?from=<questCode>`.
+- Bannière contextuelle côté `/rewards` avec regex strict anti-injection
+  (`parseQuestCodeHint`).
+- Décision conservatrice : pas d'auto-génération d'invoice côté serveur
+  — l'utilisateur colle toujours son propre BOLT11 (non custodial).
 
 ### BitQuest · Wolof incomplet (138/410 = 34%)
 
@@ -121,10 +119,10 @@ l'audit ont été refermés par le LOT 14 :
 
 - **Rôles historiques** (point 4) : harmoniser quand l'occasion se
   présente.
-- **`SECURITY_CHECKLIST.md`** mentionne encore « mot de passe 6+ chars »
-  → à mettre à jour.
-- **`BITQUEST_AUDIT.md`** liste « mot de passe 6+ chars (trop faible) »
-  comme problème → maintenant résolu, à acter.
+- ~~`SECURITY_CHECKLIST.md` mentionne encore « mot de passe 6+ chars »~~
+  → résolu LOT 19 (ligne « ≥ 10 caractères (LOT 14) » ajoutée).
+- ~~`BITQUEST_AUDIT.md` liste « mot de passe 6+ chars (trop faible) »~~
+  → résolu LOT 19 (prose mise à jour « ≥ 10 chars (bumped LOT 14) »).
 
 ## 6. Dépendances externes critiques
 

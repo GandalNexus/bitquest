@@ -17,6 +17,7 @@ publique de divulgation).
 | SameSite=Lax + Secure (prod)         | ✅     | `buildSessionCookie()`                          |
 | Token rotation sur login/logout/pwd | ✅     | auth route + `/api/me/password` (1.2a + account)|
 | Mot de passe scrypt + salt 16 B      | ✅     | `/api/auth` register                            |
+| Mot de passe ≥ 10 caractères (LOT 14) | ✅     | `src/lib/validation/schemas.ts:21`              |
 | `timingSafeEqual` sur verify         | ✅     | `/api/auth` login + `/api/me/password`          |
 | Rate limit 5/min sur password change | ✅     | `src/app/api/me/password/route.ts`              |
 | Rate limit 10/min guest signup/IP    | ✅     | `/api/auth` guest branch                        |
