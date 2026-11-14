@@ -32,6 +32,8 @@ const ALLOWLIST: Record<string, string> = {
     "Idempotent, rote le token côté serveur. Un attaquant qui déconnecte n'exfiltre rien. Documenté dans le header du fichier.",
   "health/route.ts": "Health check en lecture seule (pas de mutation réelle).",
   "route.ts": "Index API GET-only.",
+  "cron/purge-expired-attempts/route.ts":
+    "Route batch appelée par cron système. Auth via header X-Cron-Secret (CRON_SECRET env, ≥ 16 chars, comparaison timing-safe). Refuse 503 si CRON_SECRET absent. Pas de session user → CSRF sans objet. Documenté dans le header + docs/POSTGRES_PROD.md §4.",
 };
 
 function listRouteFiles(dir: string, acc: string[] = []): string[] {

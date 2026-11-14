@@ -107,6 +107,36 @@ FORCE=1 npm run db:restore -- backups/latest.dump.gz
 objets existants avant de restaurer. À utiliser avec précaution sur une DB
 contenant des données qu'on veut conserver (créer un backup avant).
 
+### Cron purge MissionAttempt expirés (LOT 22)
+
+Les tentatives BitLab (`MissionAttempt`) ont un TTL de 2h. Les transitions
+atomiques côté API mettent déjà à EXPIRED à la consommation, mais les
+attempts jamais consommés (user ferme son onglet) restent en `IN_PROGRESS`
+indéfiniment. Un batch côté serveur nettoie cette file.
+
+**Endpoint** : `POST /api/cron/purge-expired-attempts`
+
+**Auth** : header `X-Cron-Secret` qui matche `process.env.CRON_SECRET`
+(≥ 16 caractères, comparaison timing-safe).
+
+**Cron système recommandé** (toutes les 10 minutes) :
+
+```cron
+# /etc/cron.d/bitquest-purge-attempts — toutes les 10 min
+*/10 * * * * curl -fsS -X POST -H "X-Cron-Secret: $CRON_SECRET" \
+  http://localhost:3000/api/cron/purge-expired-attempts \
+  >> /var/log/bitquest-purge.log 2>&1
+```
+
+**Réponse** :
+```json
+{ "ok": true, "expired": 3, "elapsedMs": 12 }
+```
+
+- `503` si `CRON_SECRET` absent ou trop court (route fermée).
+- `401` si header manquant / incorrect.
+- Idempotent : rejouer la requête = 0 expired après le premier run.
+
 ---
 
 ## 5. Variables d'environnement
@@ -120,6 +150,7 @@ contenant des données qu'on veut conserver (créer un backup avant).
 | `BACKUP_DIR` | `backups` | Dossier de sortie des dumps |
 | `RETENTION` | `7` | Nombre de backups à conserver (rotation) |
 | `FORCE` | `0` | Si `1`, skip le prompt de confirmation (restore) |
+| `CRON_SECRET` | — | Header `X-Cron-Secret` pour routes `/api/cron/*` (≥ 16 chars, requis en prod sinon routes 503). |
 
 ---
 

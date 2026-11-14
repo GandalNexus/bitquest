@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
-import { AlertTriangle, Zap } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, TrendingUp, XCircle, Zap } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireRoleSsr } from "@/lib/auth/server";
 import { isFeatureEnabled } from "@/lib/feature-flag";
 import { db } from "@/lib/db";
 import { RedeemForm } from "./redeem-form";
 import { parseQuestCodeHint } from "./from-param";
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const dynamic = "force-dynamic";
 
@@ -42,22 +44,56 @@ export default async function RewardsPage({
   // d'une quête complétée. Normalise strictement (slug) via helper testé.
   const fromQuestCode = parseQuestCodeHint(sp.from);
 
-  const history = enabled
-    ? await db.lightningReward.findMany({
-        where: { userId: user.id },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-        select: {
-          id: true,
-          status: true,
-          amountMsat: true,
-          feeMsat: true,
-          failureReason: true,
-          createdAt: true,
-          paidAt: true,
-        },
-      })
-    : [];
+  // Page SSR async — Date.now() au moment du request est déterministe
+  // pour cette requête. L'eslint rule « react-hooks/purity » vise les
+  // composants React render, pas les server actions async.
+  // eslint-disable-next-line react-hooks/purity
+  const since30d = new Date(Date.now() - THIRTY_DAYS_MS);
+  const [history, stats30dRaw, topFailuresRaw] = enabled
+    ? await Promise.all([
+        db.lightningReward.findMany({
+          where: { userId: user.id },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+          select: {
+            id: true,
+            status: true,
+            amountMsat: true,
+            feeMsat: true,
+            failureReason: true,
+            createdAt: true,
+            paidAt: true,
+          },
+        }),
+        db.lightningReward.groupBy({
+          by: ["status"],
+          where: { userId: user.id, createdAt: { gte: since30d } },
+          _count: { _all: true },
+          _sum: { amountMsat: true, feeMsat: true },
+        }),
+        db.lightningReward.groupBy({
+          by: ["failureReason"],
+          where: {
+            userId: user.id,
+            status: "FAILED",
+            createdAt: { gte: since30d },
+            failureReason: { not: null },
+          },
+          _count: { _all: true },
+          orderBy: { _count: { failureReason: "desc" } },
+          take: 3,
+        }),
+      ])
+    : [[], [], []] as const;
+
+  const paid30d = stats30dRaw.find((s) => s.status === "PAID");
+  const failed30d = stats30dRaw.find((s) => s.status === "FAILED");
+  const pending30d = stats30dRaw.find((s) => s.status === "PENDING");
+  const paidCount = paid30d?._count._all ?? 0;
+  const paidSats = Math.floor((paid30d?._sum.amountMsat ?? 0) / 1000);
+  const feeSats = Math.floor((paid30d?._sum.feeMsat ?? 0) / 1000);
+  const failedCount = failed30d?._count._all ?? 0;
+  const pendingCount = pending30d?._count._all ?? 0;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
@@ -108,6 +144,68 @@ export default async function RewardsPage({
               </span>
             </div>
           )}
+
+          {/* Dashboard 30j */}
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <SummaryTile
+              label="Payées 30j"
+              value={paidCount.toLocaleString("fr-FR")}
+              hint={paidSats > 0 ? `${paidSats.toLocaleString("fr-FR")} sats reçus` : "—"}
+              Icon={CheckCircle2}
+              tone="success"
+            />
+            <SummaryTile
+              label="Frais LN 30j"
+              value={feeSats.toLocaleString("fr-FR")}
+              hint={feeSats > 0 ? "sats de routage" : "—"}
+              Icon={TrendingUp}
+              tone="neutral"
+            />
+            <SummaryTile
+              label="Refusées 30j"
+              value={failedCount.toLocaleString("fr-FR")}
+              hint={failedCount > 0 ? "voir top raisons" : "—"}
+              Icon={XCircle}
+              tone={failedCount > 0 ? "danger" : "neutral"}
+            />
+            <SummaryTile
+              label="En attente"
+              value={pendingCount.toLocaleString("fr-FR")}
+              hint={pendingCount > 0 ? "paiement en cours côté LND" : "—"}
+              Icon={Clock}
+              tone={pendingCount > 0 ? "warning" : "neutral"}
+            />
+          </section>
+
+          {topFailuresRaw.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Top raisons de refus (30j)</CardTitle>
+                <CardDescription>
+                  Les codes d&apos;erreur les plus fréquents côté serveur — utile pour
+                  ajuster ton invoice ou patienter si c&apos;est un plafond.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-1.5">
+                  {topFailuresRaw.map((f) => (
+                    <li
+                      key={f.failureReason ?? "unknown"}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                        {f.failureReason ?? "—"}
+                      </code>
+                      <span className="tabular-nums text-muted-foreground">
+                        {f._count._all}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Envoyer une récompense</CardTitle>
@@ -173,6 +271,39 @@ export default async function RewardsPage({
           </Card>
         </>
       )}
+    </div>
+  );
+}
+
+function SummaryTile({
+  label,
+  value,
+  hint,
+  Icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  Icon: typeof Zap;
+  tone: "success" | "warning" | "danger" | "neutral";
+}) {
+  const tones = {
+    success: "border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400",
+    warning: "border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400",
+    danger: "border-destructive/30 bg-destructive/5 text-destructive",
+    neutral: "border-border bg-card text-muted-foreground",
+  } as const;
+  return (
+    <div className={`rounded-md border px-3 py-2.5 ${tones[tone]}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-medium uppercase tracking-wider opacity-80">
+          {label}
+        </span>
+        <Icon className="h-3.5 w-3.5" aria-hidden />
+      </div>
+      <div className="mt-1 font-display text-2xl font-bold tabular-nums">{value}</div>
+      <div className="mt-0.5 text-[11px] opacity-75">{hint}</div>
     </div>
   );
 }
