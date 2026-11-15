@@ -1,8 +1,12 @@
 import { expireStaleAttempts } from "@/lib/bitlab/attempt";
 import { logger } from "@/lib/log";
+import { captureBusinessWarning } from "@/lib/obs/sentry";
 import crypto from "crypto";
 
 const log = logger("cron-purge-attempts");
+
+/** Seuil au-delà duquel une purge est anormale (incident à investiguer). */
+const PURGE_ANOMALY_THRESHOLD = 100;
 
 /**
  * POST /api/cron/purge-expired-attempts
@@ -43,6 +47,15 @@ export async function POST(req: Request): Promise<Response> {
   const expired = await expireStaleAttempts();
   const elapsedMs = Date.now() - start;
   log.info({ expired, elapsedMs }, "mission attempts purge batch");
+  if (expired > PURGE_ANOMALY_THRESHOLD) {
+    // LOT 31 : surveillance ops — à ce volume, probablement un incident
+    // (BitLab down ? grosse vague utilisateurs abandonnant leur quête ?).
+    captureBusinessWarning(
+      "mission attempts purge above threshold",
+      { scope: "cron-purge-attempts", outcome: "ANOMALY" },
+      { expired, elapsedMs, threshold: PURGE_ANOMALY_THRESHOLD },
+    );
+  }
   return Response.json({ ok: true, expired, elapsedMs });
 }
 

@@ -3,6 +3,7 @@ import { logger } from "@/lib/log";
 import { isFeatureEnabled } from "@/lib/feature-flag";
 import { decodeInvoice } from "@/lib/bitlab/bolt11";
 import { getLndConfig, type LndConfig } from "@/lib/bitlab/lnd";
+import { captureBusinessWarning } from "@/lib/obs/sentry";
 import { lndRouterSend } from "./rewards-lnd";
 
 const log = logger("lightning-rewards");
@@ -217,6 +218,14 @@ export async function sendReward(input: SendRewardInput): Promise<SendRewardResu
       data: { status: "FAILED", failureReason: outcome.reason },
     });
     log.warn({ userId, rewardId: row.id, reason: outcome.reason }, "lightning reward failed");
+    // LOT 31 : capturer dans Sentry — un échec LND après avoir passé
+    // toutes les gardes (flag, plafonds, live-mode) est anormal et
+    // mérite une inspection ops.
+    captureBusinessWarning(
+      "lightning reward LND failure",
+      { scope: "lightning-rewards", outcome: "LND_FAILURE" },
+      { userId, rewardId: row.id, reason: outcome.reason, amountMsat },
+    );
     return {
       status: "FAILED",
       rewardId: row.id,

@@ -29,3 +29,25 @@ export function captureMessage(message: string, context: Record<string, unknown>
     /* silent */
   }
 }
+
+/**
+ * Signale un événement business anormal (reward FAILED, cron anomalie,
+ * verification forgée…). Niveau `warning` : surveiller sans
+ * alerter en PagerDuty. Utiliser des `tags` pour grouper dans l'UI
+ * Sentry.
+ */
+export function captureBusinessWarning(
+  message: string,
+  tags: Record<string, string>,
+  context: Record<string, unknown> = {},
+): void {
+  if (!sentryEnabled) return;
+  try {
+    Sentry.withScope((scope) => {
+      Object.entries(tags).forEach(([k, v]) => scope.setTag(k, v));
+      Sentry.captureMessage(message, { level: "warning", extra: context });
+    });
+  } catch {
+    /* silent */
+  }
+}
