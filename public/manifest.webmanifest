@@ -1,0 +1,39 @@
+{
+  "name": "BitQuest — Apprends Bitcoin, quête après quête",
+  "short_name": "BitQuest",
+  "description": "Plateforme apprendre → pratiquer → gagner dédiée à la communauté Bitcoin : quêtes gamifiées, missions BitLab, XP, badges et satoshis pédagogiques.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0b14",
+  "theme_color": "#F7931A",
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": ["education", "finance"],
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mon dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard"
+    },
+    {
+      "name": "Académie",
+      "short_name": "Académie",
+      "url": "/academy"
+    },
+    {
+      "name": "Vérifier un certificat",
+      "short_name": "Vérifier",
+      "url": "/verify"
+    }
+  ]
+}

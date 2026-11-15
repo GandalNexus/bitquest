@@ -75,6 +75,7 @@
 | `PHASE_3_BITLAB.md` | ✅ | État Phase 3 historique. |
 | `OPS_RUNBOOK.md` | ✅ (LOT 78) | Secrets, cron, dashboards, incidents. |
 | `public/openapi.yaml` | ✅ (LOT 79) | OpenAPI 3.1 des 4 routes publiques (verify, version, nostr.json, health). |
+| `public/manifest.webmanifest` | ✅ (LOT 80) | PWA installable (standalone, theme Bitcoin, 3 shortcuts). |
 
 ## 6. Blockers hors-scope v1
 

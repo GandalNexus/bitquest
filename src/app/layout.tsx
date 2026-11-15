@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Orbitron, Exo_2, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -39,6 +39,14 @@ export const metadata: Metadata = {
   authors: [{ name: "BitQuest" }],
   icons: {
     icon: "/logo.svg",
+    apple: "/logo.svg",
+  },
+  manifest: "/manifest.webmanifest",
+  applicationName: "BitQuest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "BitQuest",
   },
   openGraph: {
     title: "BitQuest — Apprends Bitcoin, quête après quête",
@@ -47,6 +55,16 @@ export const metadata: Metadata = {
     siteName: "BitQuest",
     type: "website",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F7931A" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0b14" },
+  ],
 };
 
 export default async function RootLayout({
