@@ -447,6 +447,9 @@ export default async function GandalNexusLandingPage() {
             <a href={BITLAB_URL} rel="noopener" className="hover:text-foreground">
               BitLab
             </a>
+            <Link href="/verify" className="hover:text-foreground">
+              Vérifier un certificat
+            </Link>
           </div>
         </div>
       </footer>
