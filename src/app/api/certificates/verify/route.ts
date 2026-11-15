@@ -1,5 +1,6 @@
 import { verifyCertificate } from "@/lib/certificates/sign";
 import { clientIp, rateLimit } from "@/lib/bitquest/session";
+import { jsonWithProtocolVersion } from "@/lib/bitlab/response";
 
 /**
  * GET /api/certificates/verify?blob=<signed>
@@ -23,7 +24,7 @@ import { clientIp, rateLimit } from "@/lib/bitquest/session";
  */
 export async function GET(req: Request): Promise<Response> {
   if (!(await rateLimit(`cert-verify-ip:${clientIp(req)}`, 60, 60_000))) {
-    return Response.json(
+    return jsonWithProtocolVersion(
       { error: "Trop de requêtes depuis cette IP." },
       { status: 429 },
     );
@@ -32,7 +33,7 @@ export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const blob = url.searchParams.get("blob")?.trim() ?? "";
   if (blob.length < 10 || blob.length > 8192) {
-    return Response.json(
+    return jsonWithProtocolVersion(
       { ok: false, error: "Paramètre blob manquant ou invalide." },
       { status: 400 },
     );
@@ -40,9 +41,9 @@ export async function GET(req: Request): Promise<Response> {
 
   try {
     const payload = verifyCertificate(blob);
-    return Response.json({ ok: true, payload });
+    return jsonWithProtocolVersion({ ok: true, payload });
   } catch (err) {
-    return Response.json(
+    return jsonWithProtocolVersion(
       {
         ok: false,
         error: err instanceof Error ? err.message : "Vérification échouée.",
