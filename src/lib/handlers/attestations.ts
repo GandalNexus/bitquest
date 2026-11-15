@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { logger } from "@/lib/log";
 import { on } from "@/lib/event-bus";
+import { captureBusinessWarning } from "@/lib/obs/sentry";
 
 const log = logger("attestations");
 
@@ -57,13 +58,26 @@ async function createQuestAttestation(payload: QuestCompletedPayload): Promise<s
       );
       return null;
     }
+    const errMessage = err instanceof Error ? err.message : String(err);
     log.warn(
       {
         userId: payload.userId,
         questCode: payload.questCode,
-        err: err instanceof Error ? err.message : String(err),
+        prismaCode: code,
+        err: errMessage,
       },
       "création attestation QUEST échouée (ignorée)",
+    );
+    // LOT 38 : erreurs non-P2002 (P1001 DB down, throw arbitraire…) =
+    // incident ops à investiguer. On remonte dans Sentry sans bloquer.
+    captureBusinessWarning(
+      "attestation QUEST create failed",
+      { scope: "attestations", outcome: "CREATE_FAILED", prismaCode: code ?? "unknown" },
+      {
+        userId: payload.userId,
+        questCode: payload.questCode,
+        errMessage,
+      },
     );
     return null;
   }
