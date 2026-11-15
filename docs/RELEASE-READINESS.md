@@ -123,7 +123,29 @@ NEXT_PUBLIC_BITQUEST_HOST=bitquest.example.com  # pour le champ `issuer`
 NODE_ENV=production
 ```
 
-## 8bis. Smoke test routes (LOT 40)
+## 7bis. Endpoints d'auto-découverte publics (LOT 44)
+
+Les intégrations tierces (BitLab, portfolio Nostr future, relay NIP-11)
+peuvent pinger ces endpoints lecture seule sans auth :
+
+| Endpoint | Rôle | LOT |
+|---|---|---|
+| `GET /api/version` | `{ protocolVersion, certificateVersion, release, commitHash, issuer, builtAt }` | 44 |
+| `GET /api/health` | DB + Redis status | 5.1a |
+| `GET /api/certificates/verify?blob=<signed>` | Vérifie un Certificate HMAC | 29 |
+| `GET /verify` | Page HTML vérification pour un humain | 30 |
+
+**Headers transversaux** (LOT 42/43) sur les réponses JSON :
+- `X-Protocol-Version: 1`
+- `X-Certificate-Version: 1`
+
+Client pattern :
+```ts
+const { protocolVersion } = await fetch(`${issuer}/api/version`).then((r) => r.json());
+if (protocolVersion > 1) throw new Error("Downgrade required");
+```
+
+## 8bis. Smoke test routes (LOT 40, +LOT 44)
 
 Script `scripts/smoke-routes.sh` vérifie en ~5s les 21 routes exposées
 (public + API + auth-required + admin) : codes de réponse attendus.
