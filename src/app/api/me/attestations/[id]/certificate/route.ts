@@ -2,6 +2,10 @@ import { authenticate, unauthorized } from "@/lib/bitquest/session";
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { db } from "@/lib/db";
 import { signCertificate, type CertificatePayload } from "@/lib/certificates/sign";
+import {
+  hasInstanceSchnorrKey,
+  signCertificateSchnorr,
+} from "@/lib/certificates/schnorr";
 import { logger } from "@/lib/log";
 
 const log = logger("certificate-issue");
@@ -85,7 +89,12 @@ export async function POST(
     log.info({ userId: user.id, certificateId, attestationId }, "certificate émis");
   }
 
-  const payload: CertificatePayload = {
+  // LOT 71 : si une clé Schnorr est configurée, on émet aussi la v2
+  // (vérifiable offline via NIP-11). On renvoie TOUJOURS la v1 HMAC
+  // pour la compatibilité ascendante.
+  const useSchnorr = hasInstanceSchnorrKey();
+
+  const payloadV1: CertificatePayload = {
     v: 1,
     certificateId,
     attestationId: attestation.id,
@@ -98,7 +107,18 @@ export async function POST(
     pseudo: user.pseudo,
     issuer,
   };
-  const signedBlob = signCertificate(payload);
+  const signedBlob = signCertificate(payloadV1);
 
-  return Response.json({ certificateId, signedBlob, payload });
+  let signedBlobV2: string | null = null;
+  if (useSchnorr) {
+    const payloadV2 = { ...payloadV1, v: 2 as const };
+    signedBlobV2 = await signCertificateSchnorr(payloadV2);
+  }
+
+  return Response.json({
+    certificateId,
+    signedBlob,
+    signedBlobV2,
+    payload: payloadV1,
+  });
 }

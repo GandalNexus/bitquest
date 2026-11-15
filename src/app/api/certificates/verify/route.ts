@@ -1,4 +1,5 @@
 import { verifyCertificate } from "@/lib/certificates/sign";
+import { verifyCertificateSchnorr } from "@/lib/certificates/schnorr";
 import { clientIp, rateLimit } from "@/lib/bitquest/session";
 import { jsonWithProtocolVersion } from "@/lib/bitlab/response";
 
@@ -39,9 +40,13 @@ export async function GET(req: Request): Promise<Response> {
     );
   }
 
+  // LOT 71 : détection v1 vs v2 par préfixe.
+  const isV2 = blob.startsWith("v2.");
   try {
-    const payload = verifyCertificate(blob);
-    return jsonWithProtocolVersion({ ok: true, payload });
+    const payload = isV2
+      ? await verifyCertificateSchnorr(blob)
+      : verifyCertificate(blob);
+    return jsonWithProtocolVersion({ ok: true, version: isV2 ? 2 : 1, payload });
   } catch (err) {
     return jsonWithProtocolVersion(
       {
