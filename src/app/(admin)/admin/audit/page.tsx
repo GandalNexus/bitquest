@@ -32,6 +32,9 @@ const ACTIONS = [
   "TEAM_MEMBER_CREATE",
   "TEAM_MEMBER_UPDATE",
   "TEAM_MEMBER_DELETE",
+  "CHAPTER_QUEST_ATTACH",
+  "CHAPTER_QUEST_DETACH",
+  "FEATURE_FLAG_UPDATE",
   "USER_PURGE",
 ] as const;
 
@@ -63,6 +66,9 @@ const actionStyles: Record<string, string> = {
   TEAM_MEMBER_CREATE: "border-emerald-500/40 bg-emerald-500/10 text-emerald-500",
   TEAM_MEMBER_UPDATE: "border-blue-500/40 bg-blue-500/10 text-blue-500",
   TEAM_MEMBER_DELETE: "border-destructive/40 bg-destructive/10 text-destructive",
+  CHAPTER_QUEST_ATTACH: "border-amber-500/40 bg-amber-500/10 text-amber-600",
+  CHAPTER_QUEST_DETACH: "border-amber-500/40 bg-amber-500/10 text-amber-600",
+  FEATURE_FLAG_UPDATE: "border-violet-500/40 bg-violet-500/10 text-violet-500",
   USER_PURGE: "border-destructive/40 bg-destructive/10 text-destructive",
 };
 
