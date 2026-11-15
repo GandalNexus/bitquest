@@ -33,11 +33,11 @@ describe("translate", () => {
 
   it("retombe sur FR pour une clé WO non définie", () => {
     // La clé existe en FR mais pas en WO : doit retourner le FR.
-    // `questMap.title` reste parmi les ~185 clés WO à traduire.
-    expect(translate("wo", "questMap.title")).toBe(translate("fr", "questMap.title"));
+    // `player.loading` reste parmi les clés WO à traduire.
+    expect(translate("wo", "player.loading")).toBe(translate("fr", "player.loading"));
     // On vérifie aussi que la valeur n'est pas vide (sinon test
     // trivial qui pourrait passer même si la clé disparaît du FR).
-    expect(translate("wo", "questMap.title").length).toBeGreaterThan(0);
+    expect(translate("wo", "player.loading").length).toBeGreaterThan(0);
   });
 
   it("retombe sur FR pour une clé EN non définie", () => {
