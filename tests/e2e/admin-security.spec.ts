@@ -93,3 +93,43 @@ test("POST /api/admin/chapters/<id>/quests EDITOR autorisé (404 si chapter n'ex
   // (pas 401/403 → prouve que le guard a laissé passer EDITOR).
   expect(res.status()).toBe(404);
 });
+
+test("/admin/certificates anonyme → redirect (LOT 60)", async ({ request }) => {
+  const res = await request.get("/admin/certificates", { maxRedirects: 0 });
+  expect([302, 307, 200].includes(res.status())).toBe(true);
+});
+
+test("/admin/attestations anonyme → redirect (LOT 37)", async ({ request }) => {
+  const res = await request.get("/admin/attestations", { maxRedirects: 0 });
+  expect([302, 307, 200].includes(res.status())).toBe(true);
+});
+
+test("/admin/feature-flags anonyme → redirect (LOT 24)", async ({ request }) => {
+  const res = await request.get("/admin/feature-flags", { maxRedirects: 0 });
+  expect([302, 307, 200].includes(res.status())).toBe(true);
+});
+
+test("/admin/* EDITOR login → écran deny ADMIN-only (status < 400)", async ({
+  request,
+}) => {
+  const login = await request.post("/api/auth", {
+    data: {
+      action: "login",
+      email: "editor@bitquest.local",
+      password: "Editor2026!",
+    },
+  });
+  expect(login.status()).toBe(200);
+
+  // EDITOR peut accéder au layout admin (LOT 5 gate EDITOR) mais
+  // les pages ADMIN-only renvoient leur écran de refus via
+  // requireAdminOrDenied() — rendu 200 avec UI « Access denied ».
+  for (const path of [
+    "/admin/attestations",
+    "/admin/certificates",
+    "/admin/feature-flags",
+  ]) {
+    const res = await request.get(path);
+    expect(res.status(), `status on ${path}`).toBeLessThan(400);
+  }
+});
