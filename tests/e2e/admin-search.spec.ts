@@ -1,25 +1,35 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type BrowserContext } from "@playwright/test";
 
 /**
  * Smoke test LOT 15 — les 5 pages admin/CRUD exposent désormais une
  * barre de recherche (champ `name="q"` géré par CrudSearchBar).
  *
- * On ne vérifie pas le résultat Postgres (ILIKE, pagination, etc.) :
- * ce test a pour seul objet d'attester que la barre est rendue et que
- * `?q=foo` arrive sans erreur côté SSR (pas de crash, status < 400).
- *
- * Cas particulier : /admin/users utilise déjà un composant distinct
- * (`UsersSearchForm`) mais expose la même convention `q=`.
+ * LOT 75 fix : login admin via APIRequestContext, puis transfert
+ * des cookies vers le BrowserContext du `page` pour que page.goto
+ * voie bien la session admin (sinon redirect vers /).
  */
 
 const ADMIN_EMAIL = "admin@bitquest.local";
 const ADMIN_PWD = "Admin2026!";
 
-async function loginAsAdmin(request: import("@playwright/test").APIRequestContext) {
+async function loginAsAdminIntoBrowser(
+  context: BrowserContext,
+  request: import("@playwright/test").APIRequestContext,
+) {
   const res = await request.post("/api/auth", {
     data: { action: "login", email: ADMIN_EMAIL, password: ADMIN_PWD },
   });
   expect(res.status()).toBe(200);
+  const state = await request.storageState();
+  // Reporte les cookies dans le BrowserContext pour que page.goto
+  // soit authentifié.
+  await context.addCookies(
+    state.cookies.map((c) => ({
+      ...c,
+      // L'URL de base est http://localhost:3000, on s'aligne.
+      domain: c.domain || "localhost",
+    })),
+  );
 }
 
 const PAGES = [
@@ -31,8 +41,8 @@ const PAGES = [
 ];
 
 test.describe("admin search bars", () => {
-  test.beforeEach(async ({ request }) => {
-    await loginAsAdmin(request);
+  test.beforeEach(async ({ context, request }) => {
+    await loginAsAdminIntoBrowser(context, request);
   });
 
   for (const path of PAGES) {

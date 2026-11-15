@@ -38,6 +38,12 @@ async function upsertTestUser({ email, pseudo, role, password }) {
 
 (async () => {
   await upsertTestUser({
+    email: "admin@bitquest.local",
+    pseudo: "admin-test",
+    role: "ADMIN",
+    password: "Admin2026!",
+  });
+  await upsertTestUser({
     email: "editor@bitquest.local",
     pseudo: "editor-test",
     role: "EDITOR",
