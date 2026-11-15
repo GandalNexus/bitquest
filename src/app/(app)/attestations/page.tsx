@@ -61,11 +61,42 @@ export default async function MyAttestationsPage() {
           Mes attestations
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Chaque quête complétée génère une attestation immuable. Elles
-          formeront le socle des certificats exportables (Nostr / NIP)
-          dans la prochaine phase.
+          Chaque quête complétée génère une attestation immuable. Tu peux
+          télécharger un certificat signé par le serveur ou copier un
+          lien partageable que n&apos;importe qui peut vérifier sur{" "}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">/verify</code>.
         </p>
       </header>
+
+      {rows.length > 0 && (
+        <section className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+          <div className="mb-1 font-medium text-foreground">
+            Comment exporter ta preuve ?
+          </div>
+          <ol className="list-decimal space-y-0.5 pl-4 leading-relaxed">
+            <li>
+              Clique <strong>« Exporter »</strong> sur une attestation pour
+              télécharger un fichier <code>.txt</code> signé HMAC-SHA256.
+            </li>
+            <li>
+              Ou clique <strong>« Lien »</strong> pour copier une URL
+              <code className="mx-1">/verify?blob=…</code> directement
+              partageable (recruteur, portfolio, Nostr).
+            </li>
+            <li>
+              Le certificat ne quitte jamais tes mains — c&apos;est à toi
+              de le stocker/diffuser. Format{" "}
+              <a
+                href="/docs/CERTIFICATES_V1"
+                className="underline-offset-2 hover:underline"
+              >
+                CERTIFICATES_V1
+              </a>{" "}
+              documenté pour les intégrateurs.
+            </li>
+          </ol>
+        </section>
+      )}
 
       {rows.length === 0 ? (
         <Card>
