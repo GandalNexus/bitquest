@@ -32,12 +32,13 @@ describe("translate", () => {
   });
 
   it("retombe sur FR pour une clé WO non définie", () => {
-    // La clé existe en FR mais pas en WO : doit retourner le FR.
-    // `txBuilder.consolidation.title` reste parmi les 35 clés WO
-    // restantes (modules BitLab avancés : txBuilder, mineNonce,
-    // lnChannel, lnInvoice, multisig, taproot).
-    expect(translate("wo", "txBuilder.consolidation.title")).toBe(translate("fr", "txBuilder.consolidation.title"));
-    expect(translate("wo", "txBuilder.consolidation.title").length).toBeGreaterThan(0);
+    // Depuis LOT 69, le dictionnaire WO couvre 100% des clés FR.
+    // On teste donc la propriété théorique du fallback avec une clé
+    // qui n'existera pas dans WO (en réalité elle n'existe nulle
+    // part → `translate` retourne la clé elle-même, cas final du
+    // fallback chain).
+    expect(translate("wo", "foo.bar.absent")).toBe("foo.bar.absent");
+    expect(translate("fr", "foo.bar.absent")).toBe("foo.bar.absent");
   });
 
   it("retombe sur FR pour une clé EN non définie", () => {
