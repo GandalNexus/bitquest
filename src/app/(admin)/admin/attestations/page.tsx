@@ -52,6 +52,7 @@ export default async function AdminAttestationsPage({
         kind: true,
         targetCode: true,
         issuedAt: true,
+        user: { select: { pseudo: true } },
       },
     }),
     db.attestation.count({ where }),
@@ -60,18 +61,6 @@ export default async function AdminAttestationsPage({
       _count: { _all: true },
     }),
   ]);
-
-  // Lookup pseudos en batch (pas de relation Prisma Attestation → User
-  // dans le schéma : additif à faire si besoin, pour l'instant on bat
-  // la requête distinct).
-  const userIds = Array.from(new Set(rows.map((r) => r.userId)));
-  const users = userIds.length
-    ? await db.user.findMany({
-        where: { id: { in: userIds } },
-        select: { id: true, pseudo: true },
-      })
-    : [];
-  const pseudoById = new Map(users.map((u) => [u.id, u.pseudo]));
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const qs = (patch: Record<string, string | null>) => {
@@ -166,7 +155,7 @@ export default async function AdminAttestationsPage({
                       </code>
                     </td>
                     <td className="px-4 py-2 text-xs text-muted-foreground">
-                      @{pseudoById.get(r.userId) ?? "—"}
+                      @{r.user?.pseudo ?? "—"}
                       <code className="ml-1.5 text-[10px]">{r.userId}</code>
                     </td>
                     <td className="px-4 py-2 text-xs text-muted-foreground tabular-nums">

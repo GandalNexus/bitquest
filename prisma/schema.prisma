@@ -36,6 +36,7 @@ model User {
   bitLabProofs BitLabProof[]
   missionAttempts MissionAttempt[]
   lightningRewards LightningReward[]
+  attestations    Attestation[]
 }
 
 model Quest {
@@ -385,6 +386,7 @@ model FeatureFlag {
 model Attestation {
   id          String        @id @default(cuid())
   userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   kind        String
   targetCode  String
   metadata    String        @default("{}")
@@ -393,6 +395,7 @@ model Attestation {
 
   @@unique([userId, kind, targetCode])
   @@index([userId, issuedAt])
+  @@index([userId, kind])
   @@index([kind, targetCode])
 }
 
