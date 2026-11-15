@@ -1,6 +1,6 @@
 # RELEASE READINESS — GandalNexus v1
 
-> Checklist de mise en production. État **2026-11-15 · LOT 14 → 33**.
+> Checklist de mise en production. État **2026-11-15 · LOT 14 → 69**.
 > Statuts : ✅ prêt · ⚠️ partiel · ❌ bloquant · ➖ hors scope v1.
 
 ## 1. Sécurité
