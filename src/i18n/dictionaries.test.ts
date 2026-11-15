@@ -33,7 +33,9 @@ describe("translate", () => {
 
   it("retombe sur FR pour une clé WO non définie", () => {
     // La clé existe en FR mais pas en WO : doit retourner le FR.
-    expect(translate("wo", "leaderboard.title")).toBe("Classement des aventuriers");
+    // `profile.*` reste majoritairement non traduit en WO (34 clés) —
+    // on prend donc une clé genuinement absente.
+    expect(translate("wo", "profile.title")).toBe(translate("fr", "profile.title"));
   });
 
   it("retombe sur FR pour une clé EN non définie", () => {
