@@ -415,6 +415,7 @@ model Certificate {
   issuedAt      DateTime    @default(now())
 
   @@index([attestationId])
+  @@index([attestationId, format]) // idempotence lookup LOT 28
 }
 
 /**
@@ -473,4 +474,6 @@ model LightningReward {
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([userId, status, createdAt]) // dashboard rewards 30j LOT 21 + caps LOT 14
+  @@index([failureReason, createdAt]) // top failure reasons admin LOT 16
 }
