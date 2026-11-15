@@ -183,6 +183,38 @@ export default async function VerifyPage({
           </CardContent>
         </Card>
       )}
+
+      <section className="rounded-md border bg-muted/20 p-4 text-xs text-muted-foreground">
+        <h2 className="mb-2 font-display text-sm font-semibold text-foreground">
+          Comment ça marche ?
+        </h2>
+        <ul className="space-y-1.5 leading-relaxed">
+          <li>
+            • Un certificat BitQuest est la trace immuable d&apos;une quête
+            Bitcoin complétée par un apprenant sur la plateforme.
+          </li>
+          <li>
+            • Il contient : type (QUEST), code pédagogique, titre humain,
+            pseudo du titulaire, date d&apos;émission, XP/sats earned.
+          </li>
+          <li>
+            • Le blob est signé <strong>HMAC-SHA256</strong> par l&apos;instance
+            émettrice (version <code>v1</code>). Cette page re-calcule la
+            signature avec le secret serveur pour confirmer l&apos;authenticité
+            sans jamais exposer le secret.
+          </li>
+          <li>
+            • Une évolution future <code>v2</code> utilisera Schnorr-secp256k1
+            pour permettre la vérification offline par n&apos;importe quel
+            relay Nostr (NIP-11 auto-découverte).
+          </li>
+          <li>
+            • Le certificat ne quitte pas l&apos;utilisateur — c&apos;est à
+            lui de le partager (fichier <code>.txt</code>, URL
+            <code>?blob=…</code>, email).
+          </li>
+        </ul>
+      </section>
     </div>
   );
 }
