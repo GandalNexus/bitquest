@@ -54,9 +54,11 @@ l'audit ont été refermés par le LOT 14 :
   bitlabProof, missionPanel, blockExplorer, keyForge, feeOpt,
   txBuilder, mineNonce, lnChannel, lnInvoice, multisig, taproot.
 - +268 clés WO ajoutées sans régression (898/898 tests verts).
-- **Réserve** : la couverture est mécanique. Le ton pédagogique
-  Wolof mériterait une relecture par un locuteur natif (hors scope
-  v1 — relève de la gouvernance éditoriale).
+- **Qualité littéraire** : LOT 73 a documenté le glossaire wolof
+  dans `docs/I18N_WOLOF_GLOSSAIRE.md` avec vocabulaire technique
+  harmonisé, process contrib et marquage ⚠️/✅ par bloc. Les blocs
+  ⚠️ (~315 clés) relèvent de la gouvernance éditoriale : relecture
+  native pour affiner le ton pédagogique, hors scope v1 code.
 
 ## 3. Mineur (P2 — si temps disponible)
 
