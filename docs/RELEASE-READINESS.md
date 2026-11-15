@@ -123,6 +123,21 @@ NEXT_PUBLIC_BITQUEST_HOST=bitquest.example.com  # pour le champ `issuer`
 NODE_ENV=production
 ```
 
+## 8bis. Smoke test routes (LOT 40)
+
+Script `scripts/smoke-routes.sh` vérifie en ~5s les 21 routes exposées
+(public + API + auth-required + admin) : codes de réponse attendus.
+
+```bash
+BASE=http://localhost:3000 ./scripts/smoke-routes.sh
+# ou contre staging :
+BASE=https://staging.bitquest.example.com ./scripts/smoke-routes.sh
+```
+
+Sortie : `PASS: 21  FAIL: 0` si tout est vert (anonymous + no-auth
+paths uniquement — pour les scenarios authentifiés, Playwright
+E2E).
+
 ## 8. Checklist jour-J
 
 - [ ] Backup Postgres pre-release testé.
