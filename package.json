@@ -18,6 +18,7 @@
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:install": "playwright install --with-deps chromium",
+    "e2e:api": "playwright test tests/e2e/auth.spec.ts tests/e2e/challenge.spec.ts tests/e2e/health.spec.ts tests/e2e/admin-gate.spec.ts tests/e2e/quest-flow.spec.ts tests/e2e/certificate-flow.spec.ts tests/e2e/discoverability.spec.ts tests/e2e/admin-security.spec.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:push": "prisma db push --accept-data-loss",
