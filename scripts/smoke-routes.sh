@@ -77,6 +77,25 @@ for path in /admin /admin/feature-flags /admin/attestations /admin/audit /admin/
 done
 
 echo ""
+echo "=== Security headers (LOT 82) ==="
+check_header() {
+  local path="$1" header="$2" expected="$3"
+  local value
+  value=$(curl -sI "$BASE$path" | grep -i "^$header:" | sed -E 's/^[^:]+:[[:space:]]*//I' | tr -d '\r\n')
+  if [[ "$value" == *"$expected"* ]]; then
+    echo "  OK   $header on $path = $value"
+    PASS=$((PASS+1))
+  else
+    echo "  FAIL $header on $path (got: '$value', want substring: '$expected')"
+    FAIL=$((FAIL+1))
+  fi
+}
+check_header "/" "X-Content-Type-Options" "nosniff"
+check_header "/" "X-Frame-Options" "DENY"
+check_header "/" "Referrer-Policy" "strict-origin-when-cross-origin"
+check_header "/" "Permissions-Policy" "camera=()"
+
+echo ""
 echo "=== SOMMAIRE ==="
 echo "PASS: $PASS"
 echo "FAIL: $FAIL"

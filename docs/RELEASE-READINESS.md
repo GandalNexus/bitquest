@@ -7,6 +7,7 @@
 
 | Item | Statut | Commentaire |
 |---|---|---|
+| Security headers (XCTO, XFO, Referrer-Policy, Permissions-Policy) | ✅ (LOT 82) | HSTS 1 an en prod seulement. CSP strict reporté (nonces à wire). |
 | Cookie session HttpOnly + Lax + Secure | ✅ | Secure actif si NODE_ENV=production. |
 | CSRF HMAC double-submit | ✅ | 26/29 routes mutation (3 exemptes documentées). |
 | Password hashing scrypt + salt 16B + timing-safe | ✅ | |
