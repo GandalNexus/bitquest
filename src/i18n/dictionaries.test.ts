@@ -33,11 +33,11 @@ describe("translate", () => {
 
   it("retombe sur FR pour une clé WO non définie", () => {
     // La clé existe en FR mais pas en WO : doit retourner le FR.
-    // `missionPanel.frame.submit` reste parmi les clés WO à traduire.
-    expect(translate("wo", "missionPanel.frame.submit")).toBe(translate("fr", "missionPanel.frame.submit"));
-    // On vérifie aussi que la valeur n'est pas vide (sinon test
-    // trivial qui pourrait passer même si la clé disparaît du FR).
-    expect(translate("wo", "missionPanel.frame.submit").length).toBeGreaterThan(0);
+    // `txBuilder.consolidation.title` reste parmi les 35 clés WO
+    // restantes (modules BitLab avancés : txBuilder, mineNonce,
+    // lnChannel, lnInvoice, multisig, taproot).
+    expect(translate("wo", "txBuilder.consolidation.title")).toBe(translate("fr", "txBuilder.consolidation.title"));
+    expect(translate("wo", "txBuilder.consolidation.title").length).toBeGreaterThan(0);
   });
 
   it("retombe sur FR pour une clé EN non définie", () => {
