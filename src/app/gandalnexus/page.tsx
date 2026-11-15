@@ -159,23 +159,23 @@ export default async function GandalNexusLandingPage() {
 
       {/* Topbar légère */}
       <header className="relative z-10 border-b bg-card/60 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-y-2 gap-x-3 px-4 py-3">
           <Link href="/gandalnexus" className="flex items-center gap-2 font-display font-bold">
             <Sparkles className="h-5 w-5 text-primary" aria-hidden />
             <span>
               Gandal<span className="text-primary">Nexus</span>
             </span>
           </Link>
-          <nav className="flex items-center gap-2 text-sm">
-            <Button asChild variant="ghost" size="sm">
+          <nav className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm">
+            <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
               <Link href="/">BitQuest</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
               <a href={BITLAB_URL} rel="noopener">
                 BitLab
               </a>
             </Button>
-            <Button asChild size="sm">
+            <Button asChild size="sm" className="px-2 sm:px-3">
               <Link href="/">
                 Commencer
                 <ArrowRight className="h-4 w-4" aria-hidden />
