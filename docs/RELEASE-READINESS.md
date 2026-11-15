@@ -1,6 +1,6 @@
 # RELEASE READINESS — GandalNexus v1
 
-> Checklist de mise en production. État 2026-11-14 · LOT 14.
+> Checklist de mise en production. État **2026-11-15 · LOT 14 → 33**.
 > Statuts : ✅ prêt · ⚠️ partiel · ❌ bloquant · ➖ hors scope v1.
 
 ## 1. Sécurité
@@ -36,11 +36,11 @@
 
 | Item | Statut | Commentaire |
 |---|---|---|
-| Tests vitest | ✅ | **824/824 verts** (BitQuest) + 139/139 (BitLab). |
+| Tests vitest | ✅ | **888/888 verts** (BitQuest) + 154/154 (BitLab). |
 | Typecheck tsc | ✅ | Exit 0 des deux côtés. |
-| ESLint | ✅ | Exit 0 des deux côtés. |
+| ESLint | ✅ | Exit 0 BitQuest, 1 warning connu BitLab (cross-origin logout). |
 | Coverage CSRF / Zod / logger (gel) | ✅ | Tests de propriété. |
-| E2E Playwright | ⚠️ | 6 scénarios smoke ; pas de flow mission. Voir `TECHNICAL-DEBT.md` section mineure. |
+| E2E Playwright | ⚠️ | 8 scénarios (6 smoke + quest-flow + admin-search). Pas de flow mission COMPLETED. |
 
 ## 4. Observabilité
 
@@ -48,9 +48,12 @@
 |---|---|---|
 | Logger structuré pino | ✅ | Scopes catégorisés (bitlab-proof, lightning-rewards, audit, …). |
 | Sentry opt-in via DSN | ✅ | Guide ops `SENTRY_OPS.md`. |
+| Sentry business warnings (LOT 31) | ✅ | Wire reward LND failure + cron purge > 100. |
 | Dashboards Sentry configurés | ➖ | Décision ops à prendre ; guide fourni (alerte >10 err/min). |
 | Health endpoint | ✅ | `/api/health` + `/admin/health`. |
 | Analytics admin (completion %, friction) | ✅ | Queries live Prisma. |
+| Alerting admin ops 24h (LOT 16) | ✅ | BitLab proof outcomes + Lightning rewards sur `/admin`. |
+| Admin audit log 29 actions (LOT 33) | ✅ | Filtres par kind, inclut ChapterQuest + FeatureFlag. |
 
 ## 5. Documentation
 
@@ -63,7 +66,7 @@
 | `RELEASE-READINESS.md` | ✅ (LOT 14) | Ce document. |
 | `BITQUEST_ARCHITECTURE.md` | ✅ | Historique. |
 | `BITQUEST_ROADMAP.md` | ✅ | Phases 0-5. |
-| `SECURITY_CHECKLIST.md` | ⚠️ | À mettre à jour (6→10 chars). |
+| `SECURITY_CHECKLIST.md` | ✅ (LOT 19) | ≥ 10 chars + ligne dédiée. |
 | `POSTGRES_PROD.md` | ✅ | Procédure backup/restore. |
 | `SENTRY_OPS.md` | ✅ | Activation Sentry + RGPD. |
 | `DOCKER_DEVELOPMENT.md` | ✅ | Dev avec compose. |
@@ -73,11 +76,13 @@
 
 ## 6. Blockers hors-scope v1
 
-- ❌ Pas de chiffrement at-rest des clés BitLab → **v1 testnet-only**.
-  Pour passer mainnet il faut d'abord régler cette dette (voir
-  `TECHNICAL-DEBT.md` §2).
-- ❌ Pas de certification vérifiable (NIP-attestation) → modèle posé,
-  UI absente.
+- ⚠️ Chiffrement at-rest des clés BitLab : **backup opt-in livré
+  (LOT 18/20)**, migration complète IndexedDB plaintext → ciphertext
+  reste à faire pour passer mainnet. V1 testnet-only acceptable.
+- ✅ Certification vérifiable : socle livré (LOT 25-30) — Attestation
+  auto + Certificate HMAC + route publique verify + page /verify.
+  V2 Schnorr-secp256k1 pour NIP/Nostr cross-origin offline reste à
+  faire si on veut l'interop Nostr native.
 
 ## 7. Variables d'environnement requises en prod
 
@@ -106,6 +111,13 @@ SENTRY_TRACES_SAMPLE_RATE=0.1
 LND_REST_URL=https://lnd:8080
 LND_MACAROON_HEX=<hex>
 LND_SEND_REWARDS_LIVE=0  # 1 pour activer les paiements réels
+
+# Cron ops (LOT 22)
+CRON_SECRET=<32+ random bytes>  # X-Cron-Secret pour /api/cron/*
+
+# Certificates (LOT 28)
+CERT_SIGN_SECRET=<32+ random bytes>  # optionnel, fallback sur CSRF_SECRET
+NEXT_PUBLIC_BITQUEST_HOST=bitquest.example.com  # pour le champ `issuer`
 
 # Node
 NODE_ENV=production

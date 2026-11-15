@@ -1,6 +1,6 @@
 # FEATURES INVENTORY — GandalNexus (BitQuest + BitLab)
 
-> Snapshot audit **2026-11-14 · LOT 14**. À réconcilier avec le code via
+> Snapshot audit **2026-11-15 · LOT 14 → 33**. À réconcilier avec le code via
 > les tests avant toute affirmation « DONE ». Statuts :
 >
 > - **DONE** : implémenté + testé + vérifié bout-en-bout.
@@ -66,12 +66,28 @@
 | Isolation stricte sim / réel (tests) | DONE | `rewards.test.ts` | Vérifie absence d'écriture `User.sats`, `WalletTransaction`, `UserEvent`. |
 | Auto-trigger à la complétion d'une quête | TODO | — | V1 : redemption manuelle uniquement. |
 
+### Attestations & certificats (LOT 25-30)
+
+| Fonctionnalité | Statut | Fichiers | Notes |
+|---|---|---|---|
+| Handler event-bus `quest.completed` → Attestation auto | DONE | `src/lib/handlers/attestations.ts`, `instrumentation.ts` | Idempotent (P2002), fail-closed non bloquant. |
+| API GET `/api/me/attestations` | DONE | `src/app/api/me/attestations/route.ts` + tests | Scope user strict, enrichi targetTitle. |
+| Page apprenant `/attestations` | DONE | `src/app/(app)/attestations/page.tsx` | Nav item LOT 32. |
+| Tuile dashboard « Mes attestations » | DONE | `src/components/bitquest/dashboard.tsx` | Masquée si count=0. |
+| Export Certificate HMAC signé | DONE | `src/lib/certificates/sign.ts`, `src/app/api/me/attestations/[id]/certificate/route.ts` | PBKDF2 pas requis — HMAC-SHA256. V2 Schnorr pour NIP Nostr. |
+| Route publique `/api/certificates/verify` | DONE | `src/app/api/certificates/verify/route.ts` | Rate-limit IP 60/60s. |
+| Page publique `/verify` | DONE | `src/app/verify/page.tsx` | Share link copy depuis `/attestations`. |
+
 ### Industrialisation
 
 | Fonctionnalité | Statut | Fichiers | Notes |
 |---|---|---|---|
 | Postgres 16 prod + 8 migrations | DONE | `prisma/migrations/*` + `docker-compose.yml` | Scripts backup/restore. |
 | Logger pino structuré + redaction + Sentry relay | DONE | `src/lib/log.ts`, `src/lib/obs/sentry.ts` | Opt-in via DSN. |
+| Sentry business warnings (LOT 31) | DONE | `src/lib/obs/sentry.ts:captureBusinessWarning` | Wire : reward LND failure + cron purge anomalie. |
+| Cron purge MissionAttempt (LOT 22) | DONE | `src/app/api/cron/purge-expired-attempts/route.ts` | X-Cron-Secret timing-safe. |
+| Admin feature-flags toggle UI (LOT 24) | DONE | `src/app/(admin)/admin/feature-flags/*` | ADMIN only, audit `FEATURE_FLAG_UPDATE`. |
+| Admin audit log complet (LOT 33) | DONE | `src/app/(admin)/admin/audit/page.tsx` | +3 actions LOT 23/24. |
 | Instrumentation Next.js 15 | DONE | `instrumentation.ts` | Remplace les 3 anciens `sentry.*.config.ts`. |
 | A11y focus-visible + skip-link | DONE (LOT 13) | `src/app/globals.css` + `layout.tsx` | |
 | i18n FR (410) / EN (410) | DONE | `src/i18n/messages/{fr,en}.json` | |
@@ -137,11 +153,12 @@
 | Bloc | DONE | PARTIAL | VERIFY | TODO |
 |---|---:|---:|---:|---:|
 | Auth & sécurité | 9 | 0 | 0 | 0 |
-| Académie | 6 | 1 | 0 | 1 |
+| Académie (gate LOT 16/17 inclus) | 7 | 1 | 0 | 0 |
 | BitLab proof flow | 11 | 0 | 0 | 0 |
-| Récompenses Lightning | 8 | 0 | 0 | 1 |
-| Industrialisation | 10 | 1 | 0 | 0 |
-| BitLab wallet | 3 | 0 | 0 | 1 |
+| Récompenses Lightning | 9 | 0 | 0 | 0 |
+| Attestations & certificats (LOT 25-30) | 7 | 0 | 0 | 0 |
+| Industrialisation (LOT 22/24/31/33) | 14 | 1 | 0 | 0 |
+| BitLab wallet (LOT 18/20 inclus) | 4 | 0 | 0 | 1 |
 | BitLab TX | 3 | 0 | 0 | 0 |
 | BitLab Lightning | 5 | 0 | 0 | 0 |
 | BitLab modules | 3 | 0 | 0 | 0 |
