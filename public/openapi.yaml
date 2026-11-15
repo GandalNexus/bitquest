@@ -1,0 +1,395 @@
+openapi: 3.1.0
+info:
+  title: BitQuest Public API
+  version: "1.0.0"
+  summary: API publique de vérification des Certificates et de découverte de l'instance BitQuest.
+  description: |
+    Cette spec couvre **uniquement les endpoints publics** exposés par une
+    instance BitQuest — ceux qu'un client tiers (portfolio, relay Nostr,
+    page de vérification, LB ops) peut consommer sans authentification.
+
+    Les routes privées (`/api/me/**`, `/api/admin/**`, `/api/bitlab/**`
+    JWT-authenticated) ne sont pas documentées ici : leur contrat est
+    interne au couple BitQuest ↔ BitLab et peut évoluer entre versions.
+
+    ## Modèles de signatures Certificates
+
+    - **v1** : HMAC-SHA256 symétrique. Format `v1.<payloadBase64>.<sigHex>`.
+      Nécessite un appel au serveur (`/api/certificates/verify`) pour vérifier.
+    - **v2** : Schnorr-secp256k1 BIP-340 asymétrique (LOT 71).
+      Format `v2.<payloadBase64>.<sig128hex>`. Pubkey publiée via
+      `/.well-known/nostr.json` → vérification offline possible.
+
+    ## Ressources associées
+
+    - NIP-11 Relay Information Document : `GET /.well-known/nostr.json`
+    - Dashboard ops (voir `docs/OPS_RUNBOOK.md`).
+  license:
+    name: AGPL-3.0-only
+    url: https://www.gnu.org/licenses/agpl-3.0.en.html
+  contact:
+    name: BitQuest ops
+    url: https://github.com/your-username/bitquest
+
+servers:
+  - url: https://bitquest.example.com
+    description: Instance de production (remplacer par l'hôte réel).
+  - url: http://localhost:3000
+    description: Dev local.
+
+tags:
+  - name: certificates
+    description: Vérification des Certificates émis par l'instance.
+  - name: discovery
+    description: Découverte d'instance (NIP-11, version, pubkey).
+  - name: ops
+    description: Health check pour LB / monitoring externe.
+
+paths:
+  /api/certificates/verify:
+    get:
+      tags: [certificates]
+      summary: Vérifie un Certificate signé
+      description: |
+        Vérifie la signature d'un Certificate exporté. Accepte v1 (HMAC)
+        et v2 (Schnorr) — le préfixe du blob (`v1.` ou `v2.`) détermine
+        l'algorithme.
+
+        **Rate-limit** : 60 requêtes / 60 secondes par IP source
+        (anti-pumping). Le dépassement renvoie `429` sans écrire en DB.
+
+        Le serveur ne stocke pas les blobs reçus.
+      operationId: verifyCertificate
+      parameters:
+        - in: query
+          name: blob
+          required: true
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 8192
+          description: Blob certificat signé (format `v1.*.*` ou `v2.*.*`).
+      responses:
+        "200":
+          description: Vérification réussie.
+          headers:
+            X-Protocol-Version:
+              $ref: "#/components/headers/XProtocolVersion"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyOkResponse"
+              examples:
+                v2:
+                  summary: Vérification Schnorr v2
+                  value:
+                    ok: true
+                    version: 2
+                    payload:
+                      issuer: bitquest.example.com
+                      questId: quest_bitcoin_101
+                      learnerId: usr_abc
+                      issuedAt: "2026-11-14T10:22:00.000Z"
+        "400":
+          description: Blob manquant, mal formé ou signature invalide.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyErrorResponse"
+        "429":
+          description: Rate-limit dépassé pour cette IP.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitResponse"
+
+  /api/version:
+    get:
+      tags: [discovery]
+      summary: Métadonnées de l'instance
+      description: |
+        Renvoie les versions de protocole + certificat, la pubkey Schnorr
+        (si configurée) et quelques informations de release. Utilisable
+        pour :
+
+        - détecter qu'un hôte est une instance BitQuest ;
+        - découvrir la pubkey (hex x-only BIP-340) pour vérifier v2 offline ;
+        - vérifier la compatibilité du contrat BitQuest ↔ BitLab.
+
+        Lecture statique (pas de requête DB) — aucun rate-limit dédié.
+      operationId: getVersion
+      responses:
+        "200":
+          description: Métadonnées statiques de l'instance.
+          headers:
+            X-Protocol-Version:
+              $ref: "#/components/headers/XProtocolVersion"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionResponse"
+
+  /.well-known/nostr.json:
+    get:
+      tags: [discovery]
+      summary: NIP-11 Relay Information Document (LOT 71)
+      description: |
+        Variante NIP-11 pour BitQuest : expose la pubkey Schnorr qui
+        signe les Certificates v2 ainsi que les endpoints de
+        vérification. Permet à un client Nostr ou un portfolio de
+        valider une attestation sans appeler BitQuest.
+
+        Servi via un `rewrite` Next.js depuis `/api/nostr-json`.
+        La pubkey est publiable par design — aucun secret exposé.
+      operationId: getNostrInfo
+      responses:
+        "200":
+          description: Document NIP-11 enrichi.
+          headers:
+            X-Protocol-Version:
+              $ref: "#/components/headers/XProtocolVersion"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NostrInfoResponse"
+
+  /api/health:
+    get:
+      tags: [ops]
+      summary: Health check (LB / readiness)
+      description: |
+        Agrège l'état DB + Redis. `200` si l'instance est
+        opérationnelle (status `ok` ou `degraded`), `503` si la DB est
+        inaccessible (`down`).
+
+        Convient aux sondes Kubernetes readiness/liveness et aux
+        services externes type Pingdom / UptimeRobot (fréquence
+        recommandée : 1 min).
+      operationId: getHealth
+      responses:
+        "200":
+          description: Instance opérationnelle (ok ou degraded).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReport"
+        "503":
+          description: Service indisponible (DB down).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthReport"
+
+components:
+  headers:
+    XProtocolVersion:
+      description: Version du contrat d'intégration BitQuest ↔ BitLab.
+      schema:
+        type: integer
+        example: 1
+
+  schemas:
+    CertificatePayload:
+      type: object
+      additionalProperties: true
+      required: [issuer, questId, learnerId, issuedAt]
+      properties:
+        issuer:
+          type: string
+          description: Hôte de l'instance BitQuest qui a émis le certificat.
+          example: bitquest.example.com
+        questId:
+          type: string
+          description: Identifiant canonique de la quête.
+          example: quest_bitcoin_101
+        learnerId:
+          type: string
+          description: Identifiant opaque de l'apprenant.
+          example: usr_abc
+        issuedAt:
+          type: string
+          format: date-time
+          description: Instant d'émission du certificat (ISO-8601).
+
+    VerifyOkResponse:
+      type: object
+      required: [ok, version, payload]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        version:
+          type: integer
+          enum: [1, 2]
+          description: Version du schéma de signature utilisée.
+        payload:
+          $ref: "#/components/schemas/CertificatePayload"
+
+    VerifyErrorResponse:
+      type: object
+      required: [ok, error]
+      properties:
+        ok:
+          type: boolean
+          const: false
+        error:
+          type: string
+          example: Signature invalide.
+
+    RateLimitResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Trop de requêtes depuis cette IP.
+
+    VersionResponse:
+      type: object
+      required:
+        - protocolVersion
+        - certificateVersion
+        - certificateVersions
+        - signatureAlgos
+        - release
+        - issuer
+      properties:
+        protocolVersion:
+          type: integer
+          description: Version du contrat BitQuest ↔ BitLab.
+          example: 1
+        certificateVersion:
+          type: integer
+          description: Version par défaut des nouveaux certificats émis.
+          example: 2
+        certificateVersions:
+          type: array
+          description: Toutes les versions vérifiables par cette instance.
+          items:
+            type: integer
+          example: [1, 2]
+        signatureAlgos:
+          type: array
+          description: Algorithmes supportés pour la vérification.
+          items:
+            type: string
+            enum: [hmac-sha256, schnorr-secp256k1]
+          example: [hmac-sha256, schnorr-secp256k1]
+        publicKey:
+          type: [string, "null"]
+          description: |
+            Pubkey Schnorr x-only BIP-340 (32 octets hex, compat NIP-19).
+            `null` si l'instance n'a pas de clé Schnorr configurée.
+          example: 79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
+        release:
+          type: string
+          description: Version du package npm au build.
+          example: 0.3.0
+        commitHash:
+          type: [string, "null"]
+          description: SHA du commit git si injecté au build (`BITQUEST_COMMIT_SHA`).
+        issuer:
+          type: string
+          description: Hostname déclaré de l'instance (`NEXT_PUBLIC_BITQUEST_HOST`).
+          example: bitquest.example.com
+        builtAt:
+          type: [string, "null"]
+          format: date-time
+          description: Instant du build (`BITQUEST_BUILT_AT`).
+
+    NostrInfoResponse:
+      type: object
+      required:
+        - name
+        - description
+        - pubkey
+        - supported_nips
+        - software
+        - version
+        - bitquest
+      properties:
+        name:
+          type: string
+          example: "BitQuest · bitquest.example.com"
+        description:
+          type: string
+        pubkey:
+          type: [string, "null"]
+          description: Pubkey Schnorr x-only BIP-340 (hex 32B) ou `null` si non configurée.
+        contact:
+          type: [string, "null"]
+        supported_nips:
+          type: array
+          items:
+            type: integer
+          example: [11, 19]
+        software:
+          type: string
+          format: uri
+        version:
+          type: string
+          example: 0.3.0
+        bitquest:
+          type: object
+          description: Extension spécifique BitQuest.
+          required: [issuer, certificateVersions, verifyEndpoint, verifyUi]
+          properties:
+            issuer:
+              type: string
+            certificateVersions:
+              type: array
+              items:
+                type: integer
+              example: [1, 2]
+            verifyEndpoint:
+              type: string
+              format: uri
+              description: URL de l'endpoint programmatique.
+              example: https://bitquest.example.com/api/certificates/verify
+            verifyUi:
+              type: string
+              format: uri
+              description: URL humaine (page web avec paste-blob).
+              example: https://bitquest.example.com/verify
+
+    HealthReport:
+      type: object
+      required: [status, db, redis, uptime, env, version, now]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+        db:
+          type: object
+          required: [status, latencyMs, error]
+          properties:
+            status:
+              type: string
+              enum: [ok, error]
+            latencyMs:
+              type: [integer, "null"]
+            error:
+              type: [string, "null"]
+        redis:
+          type: object
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [ok, error, skipped]
+            latencyMs:
+              type: [integer, "null"]
+            error:
+              type: [string, "null"]
+        uptime:
+          type: integer
+          description: Secondes depuis le démarrage du process.
+        env:
+          type: string
+          example: production
+        version:
+          type: string
+          example: 0.3.0
+        now:
+          type: string
+          format: date-time

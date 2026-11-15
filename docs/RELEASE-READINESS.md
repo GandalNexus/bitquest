@@ -73,6 +73,8 @@
 | `DOCKER_LND.md` | ✅ | LND testnet opt-in. |
 | `I18N_WOLOF.md` | ✅ | Guide i18n Wolof. |
 | `PHASE_3_BITLAB.md` | ✅ | État Phase 3 historique. |
+| `OPS_RUNBOOK.md` | ✅ (LOT 78) | Secrets, cron, dashboards, incidents. |
+| `public/openapi.yaml` | ✅ (LOT 79) | OpenAPI 3.1 des 4 routes publiques (verify, version, nostr.json, health). |
 
 ## 6. Blockers hors-scope v1
 
