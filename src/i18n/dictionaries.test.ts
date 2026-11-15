@@ -33,11 +33,11 @@ describe("translate", () => {
 
   it("retombe sur FR pour une clé WO non définie", () => {
     // La clé existe en FR mais pas en WO : doit retourner le FR.
-    // `bitlabProof.title` reste parmi les clés WO à traduire.
-    expect(translate("wo", "bitlabProof.title")).toBe(translate("fr", "bitlabProof.title"));
+    // `missionPanel.frame.submit` reste parmi les clés WO à traduire.
+    expect(translate("wo", "missionPanel.frame.submit")).toBe(translate("fr", "missionPanel.frame.submit"));
     // On vérifie aussi que la valeur n'est pas vide (sinon test
     // trivial qui pourrait passer même si la clé disparaît du FR).
-    expect(translate("wo", "bitlabProof.title").length).toBeGreaterThan(0);
+    expect(translate("wo", "missionPanel.frame.submit").length).toBeGreaterThan(0);
   });
 
   it("retombe sur FR pour une clé EN non définie", () => {
