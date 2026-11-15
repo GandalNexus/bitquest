@@ -14,6 +14,7 @@ import { verifyChallengeOrRespond } from "@/lib/bitlab/jwt";
 import { fireProofAttempt, type ProofOutcome } from "@/lib/bitlab/audit";
 import { transitionAttempt, getAttemptForUser } from "@/lib/bitlab/attempt";
 import { bitlabProofSchema, parseJsonBody } from "@/lib/validation/schemas";
+import { jsonWithProtocolVersion } from "@/lib/bitlab/response";
 import { logger } from "@/lib/log";
 
 const log = logger("bitlab-proof");
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   const startedAt = Date.now();
   // Rate-limit IP AVANT auth (anti-DoS), ratio × 4 du userId limit.
   if (!(await rateLimit(`bitlab-proof-ip:${clientIp(req)}`, 80, 60_000))) {
-    return Response.json({ error: "Trop de requêtes depuis cette IP." }, { status: 429 });
+    return jsonWithProtocolVersion({ error: "Trop de requêtes depuis cette IP." }, { status: 429 });
   }
   const user = await authenticate(req);
   if (!user) return unauthorized();
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
       outcome: "RATE_LIMITED",
       startedAt,
     });
-    return Response.json({ error: "Trop de tentatives, patiente une minute." }, { status: 429 });
+    return jsonWithProtocolVersion({ error: "Trop de tentatives, patiente une minute." }, { status: 429 });
   }
 
   const parsed = await parseJsonBody(req, bitlabProofSchema);
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
   });
   if (!quest) {
     audit("BAD_REQUEST", "quest inconnue");
-    return Response.json({ error: "Quête inconnue." }, { status: 404 });
+    return jsonWithProtocolVersion({ error: "Quête inconnue." }, { status: 404 });
   }
 
   // JWT challenge obligatoire : vérifie signature + expiry + consomme le nonce.
@@ -93,7 +94,7 @@ export async function POST(req: Request) {
   const claims = chk.claims;
   if (claims.userId !== user.id || claims.questCode !== questCode || claims.kind !== kind) {
     audit("INVALID_JWT", "mismatch user/quest/kind");
-    return Response.json(
+    return jsonWithProtocolVersion(
       { error: "JWT bitlab : paire (user, quest, kind) ne correspond pas." },
       { status: 400 },
     );
@@ -108,7 +109,7 @@ export async function POST(req: Request) {
     attemptSnapshot = await getAttemptForUser(attemptId, user.id);
     if (!attemptSnapshot) {
       audit("BAD_REQUEST", "attemptId inconnu");
-      return Response.json(
+      return jsonWithProtocolVersion(
         { error: "Tentative BitLab introuvable." },
         { status: 404 },
       );
@@ -119,7 +120,7 @@ export async function POST(req: Request) {
       attemptSnapshot.network !== network
     ) {
       audit("BAD_REQUEST", "attempt mismatch quest/kind/network");
-      return Response.json(
+      return jsonWithProtocolVersion(
         { error: "Tentative BitLab : quête, kind ou network ne correspond pas." },
         { status: 400 },
       );
@@ -129,7 +130,7 @@ export async function POST(req: Request) {
     // ré-ouverture du lien de retour.
     if (attemptSnapshot.state === "COMPLETED") {
       audit("DUPLICATE", "attempt déjà COMPLETED");
-      return Response.json({
+      return jsonWithProtocolVersion({
         ok: true,
         idempotent: true,
         attempt: {
@@ -150,7 +151,7 @@ export async function POST(req: Request) {
     });
     if (!tr.ok && tr.reason === "EXPIRED") {
       audit("BAD_REQUEST", "attempt expiré");
-      return Response.json(
+      return jsonWithProtocolVersion(
         { error: "Tentative BitLab expirée. Relance la mission depuis BitQuest." },
         { status: 410 },
       );
@@ -199,7 +200,7 @@ export async function POST(req: Request) {
   ) => {
     audit(outcome, reason ?? undefined);
     await failAttempt(reason ?? outcome);
-    return Response.json(body, { status });
+    return jsonWithProtocolVersion(body, { status });
   };
 
   // Vérif explorateur selon le kind.
@@ -377,7 +378,7 @@ export async function POST(req: Request) {
     });
   }
 
-  return Response.json({
+  return jsonWithProtocolVersion({
     ok: true,
     proof: {
       id: proof.id,

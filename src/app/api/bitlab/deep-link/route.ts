@@ -5,6 +5,7 @@ import { buildBitlabDeepLink, signDeepLinkPayload } from "@/lib/bitlab/deep-link
 import { PROTOCOL_VERSION } from "@/lib/bitlab/protocol";
 import { createAttempt } from "@/lib/bitlab/attempt";
 import { issueLaunchToken } from "@/lib/auth/launch-token";
+import { jsonWithProtocolVersion } from "@/lib/bitlab/response";
 import { db } from "@/lib/db";
 
 function getSignSecret(): string | null {
@@ -56,7 +57,7 @@ function extractMissionHints(quest: {
 export async function POST(req: Request) {
   // Rate-limit IP AVANT auth (anti-DoS), ratio × 4 du userId limit.
   if (!(await rateLimit(`bitlab-deep-link-ip:${clientIp(req)}`, 120, 60_000))) {
-    return Response.json({ error: "Trop de requêtes depuis cette IP." }, { status: 429 });
+    return jsonWithProtocolVersion({ error: "Trop de requêtes depuis cette IP." }, { status: 429 });
   }
   const user = await authenticate(req);
   if (!user) return unauthorized();
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
     if (!csrf.ok) return csrf.response;
   }
   if (!(await rateLimit(`bitlab-deep-link:${user.id}`, 30, 60_000))) {
-    return Response.json({ error: "Trop de requêtes, patiente une minute." }, { status: 429 });
+    return jsonWithProtocolVersion({ error: "Trop de requêtes, patiente une minute." }, { status: 429 });
   }
 
   const parsed = await parseJsonBody(req, bitlabDeepLinkSchema);
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
     select: { id: true, title: true, missionConfig: true },
   });
   if (!quest) {
-    return Response.json({ error: "Quête inconnue." }, { status: 404 });
+    return jsonWithProtocolVersion({ error: "Quête inconnue." }, { status: 404 });
   }
 
   // Crée la tentative durable AVANT de signer l'URL (survit aux
@@ -142,7 +143,7 @@ export async function POST(req: Request) {
     extra,
   });
 
-  return Response.json({
+  return jsonWithProtocolVersion({
     ok: true,
     url,
     signed,

@@ -6,6 +6,7 @@ import {
 } from "@/lib/auth/launch-token";
 import { parseJsonBody, verifyLaunchTokenSchema } from "@/lib/validation/schemas";
 import { db } from "@/lib/db";
+import { jsonWithProtocolVersion } from "@/lib/bitlab/response";
 
 /**
  * POST /api/auth/verify-launch-token — vérifie un launch token émis par
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
   const extraHeaders = corsHeaders(origin);
   // Rate-limit IP strict : la route est publique.
   if (!(await rateLimit(`verify-launch-ip:${clientIp(req)}`, 60, 60_000))) {
-    return Response.json(
+    return jsonWithProtocolVersion(
       { error: "Trop de requêtes depuis cette IP." },
       { status: 429, headers: extraHeaders },
     );
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
     // parseJsonBody renvoie déjà la Response — on la laisse telle quelle
     // mais on ajoute les headers CORS pour que BitLab puisse lire l'erreur.
     const body = await parsed.response.clone().json().catch(() => ({}));
-    return Response.json(body, {
+    return jsonWithProtocolVersion(body, {
       status: parsed.response.status,
       headers: extraHeaders,
     });
@@ -69,7 +70,10 @@ export async function POST(req: Request) {
   const chk = await verifyLaunchTokenOrRespond(token);
   if (!chk.ok) {
     const body = await chk.response.clone().json().catch(() => ({}));
-    return Response.json(body, { status: chk.response.status, headers: extraHeaders });
+    return jsonWithProtocolVersion(body, {
+      status: chk.response.status,
+      headers: extraHeaders,
+    });
   }
 
   const { userId } = chk.claims;
@@ -88,7 +92,7 @@ export async function POST(req: Request) {
     },
   });
   if (!user || user.deletedAt !== null) {
-    return Response.json(
+    return jsonWithProtocolVersion(
       { error: "Utilisateur introuvable ou supprimé." },
       { status: 404, headers: extraHeaders },
     );
@@ -102,7 +106,7 @@ export async function POST(req: Request) {
     role: user.role,
   });
 
-  return Response.json(
+  return jsonWithProtocolVersion(
     {
       ok: true,
       user: {

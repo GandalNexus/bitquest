@@ -2,6 +2,7 @@ import { authenticate, clientIp, rateLimit, unauthorized } from "@/lib/bitquest/
 import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
 import { bitlabDeepLinkVerifySchema, parseJsonBody } from "@/lib/validation/schemas";
 import { verifyDeepLinkPayload } from "@/lib/bitlab/deep-link";
+import { jsonWithProtocolVersion } from "@/lib/bitlab/response";
 
 function getSignSecret(): string | null {
   return process.env.BITLAB_SIGN_SECRET?.trim() || null;
@@ -18,7 +19,7 @@ function getSignSecret(): string | null {
 export async function POST(req: Request) {
   // Rate-limit IP AVANT auth (anti-DoS), ratio × 4 du userId limit.
   if (!(await rateLimit(`bitlab-dl-verify-ip:${clientIp(req)}`, 240, 60_000))) {
-    return Response.json({ error: "Trop de requêtes depuis cette IP." }, { status: 429 });
+    return jsonWithProtocolVersion({ error: "Trop de requêtes depuis cette IP." }, { status: 429 });
   }
   const user = await authenticate(req);
   if (!user) return unauthorized();
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     if (!csrf.ok) return csrf.response;
   }
   if (!(await rateLimit(`bitlab-dl-verify:${user.id}`, 60, 60_000))) {
-    return Response.json({ error: "Trop de requêtes, patiente une minute." }, { status: 429 });
+    return jsonWithProtocolVersion({ error: "Trop de requêtes, patiente une minute." }, { status: 429 });
   }
 
   const parsed = await parseJsonBody(req, bitlabDeepLinkVerifySchema);
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
 
   const secret = getSignSecret();
   if (!secret) {
-    return Response.json({ ok: true, enforced: false });
+    return jsonWithProtocolVersion({ ok: true, enforced: false });
   }
 
   const valid = verifyDeepLinkPayload({
@@ -50,5 +51,5 @@ export async function POST(req: Request) {
     v,
   });
 
-  return Response.json({ ok: valid, enforced: true });
+  return jsonWithProtocolVersion({ ok: valid, enforced: true });
 }
