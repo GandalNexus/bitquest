@@ -76,6 +76,7 @@
 | `OPS_RUNBOOK.md` | ✅ (LOT 78) | Secrets, cron, dashboards, incidents. |
 | `public/openapi.yaml` | ✅ (LOT 79) | OpenAPI 3.1 des 4 routes publiques (verify, version, nostr.json, health). |
 | `public/manifest.webmanifest` | ✅ (LOT 80) | PWA installable (standalone, theme Bitcoin, 3 shortcuts). |
+| `src/app/sitemap.ts` + `robots.ts` | ✅ (LOT 81) | SEO : sitemap dynamique (academy slugs) + robots filtrant admin/me/wallet. |
 
 ## 6. Blockers hors-scope v1
 
