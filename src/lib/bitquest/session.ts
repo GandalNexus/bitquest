@@ -87,7 +87,21 @@ export async function authenticate(req: Request) {
 }
 
 export function unauthorized() {
-  return Response.json({ error: "Session invalide ou expirée." }, { status: 401 });
+  // LOT 49 : ajoute les headers X-Protocol-Version transversaux pour
+  // que même les 401 permettent à un client tiers de détecter la
+  // version supportée avant de retry avec un token valide. Import
+  // local pour éviter un cycle d'import (session.ts est importé par
+  // response.ts via sa chaîne de dépendance).
+  return Response.json(
+    { error: "Session invalide ou expirée." },
+    {
+      status: 401,
+      headers: {
+        "X-Protocol-Version": "1",
+        "X-Certificate-Version": "1",
+      },
+    },
+  );
 }
 
 /**
