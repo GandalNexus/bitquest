@@ -45,12 +45,18 @@ l'audit ont été refermés par le LOT 14 :
 - Décision conservatrice : pas d'auto-génération d'invoice côté serveur
   — l'utilisateur colle toujours son propre BOLT11 (non custodial).
 
-### BitQuest · Wolof incomplet (138/410 = 34%)
+### ~~BitQuest · Wolof incomplet~~ → **résolu LOT 59-69 (100%)**
 
-- **Problème** : clés manquantes sur admin, rewards, analytics.
-- **Impact** : utilisateurs wolof voient des clés brutes (`auth.dashboard.sats.label`).
-- **Action** : traduire les ~272 clés restantes. Fallback FR dans
-  `useT()` serait un palliatif acceptable si cadré ops.
+- Couverture passée de 34% (138/410) à **100%** (412/412) en 8 LOT
+  i18n successifs (LOT 59, 62, 63, 64, 65, 66, 67, 68, 69).
+- Blocs traduits : status, tracks, leaderboard, dailyChallenge,
+  profile, wallet, questMap, player, intro, theory, quiz, mission,
+  bitlabProof, missionPanel, blockExplorer, keyForge, feeOpt,
+  txBuilder, mineNonce, lnChannel, lnInvoice, multisig, taproot.
+- +268 clés WO ajoutées sans régression (898/898 tests verts).
+- **Réserve** : la couverture est mécanique. Le ton pédagogique
+  Wolof mériterait une relecture par un locuteur natif (hors scope
+  v1 — relève de la gouvernance éditoriale).
 
 ## 3. Mineur (P2 — si temps disponible)
 
