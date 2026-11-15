@@ -301,6 +301,7 @@
   "rewards.badges.title": "Badges unlocked",
   "rewards.backToMap": "Back to the map",
   "rewards.dashboard": "Dashboard",
+  "nav.attestations": "My attestations",
   "rewards.lightning.cta.label": "Claim as real sats ⚡",
   "rewards.lightning.cta.hint": "Lightning testnet / signet",
   "rewards.lightning.from.banner": "You just completed quest « {code} » — paste a BOLT11 invoice to receive your real sats.",

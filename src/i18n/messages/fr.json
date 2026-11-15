@@ -301,6 +301,7 @@
   "rewards.badges.title": "Badges débloqués",
   "rewards.backToMap": "Retour à la carte",
   "rewards.dashboard": "Tableau de bord",
+  "nav.attestations": "Mes attestations",
   "rewards.lightning.cta.label": "Réclamer en sats réels ⚡",
   "rewards.lightning.cta.hint": "Lightning testnet / signet",
   "rewards.lightning.from.banner": "Tu viens de compléter la quête « {code} » — colle une invoice BOLT11 pour recevoir tes sats réels.",

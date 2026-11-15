@@ -135,6 +135,7 @@
   "rewards.status.PAID": "Fey",
   "rewards.status.PENDING": "Di xaar",
   "rewards.status.FAILED": "Faale",
+  "nav.attestations": "Sama seede",
   "rewards.lightning.cta.label": "Jot ni sats yu dëgg ⚡",
   "rewards.lightning.cta.hint": "Lightning testnet / signet",
   "rewards.lightning.from.banner": "Nga nopp mandat « {code} » — jox ab invoice BOLT11 ngir am sa sats yu dëgg.",

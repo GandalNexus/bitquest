@@ -10,6 +10,7 @@ import { XpBar } from "./ui-bits";
 import { OrbiteMark, QuestBubble } from "./brand";
 import { formatSats } from "@/lib/bitquest/client";
 import {
+  Award,
   LayoutDashboard,
   Map,
   User,
@@ -42,6 +43,7 @@ const NAV: { view: View; href: string; labelKey: string; icon: LucideIcon }[] = 
   { view: "profile", href: "/profile", labelKey: "nav.profile", icon: User },
   { view: "wallet", href: "/wallet", labelKey: "nav.wallet", icon: Wallet },
   { view: "leaderboard", href: "/leaderboard", labelKey: "nav.leaderboard", icon: Trophy },
+  { view: "attestations", href: "/attestations", labelKey: "nav.attestations", icon: Award },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

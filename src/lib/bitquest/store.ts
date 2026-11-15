@@ -4,7 +4,13 @@ import { create } from "zustand";
 import type { PublicUser } from "./client";
 import { clearStoredSession, storeSession } from "./client";
 
-export type View = "dashboard" | "quests" | "profile" | "wallet" | "leaderboard";
+export type View =
+  | "dashboard"
+  | "quests"
+  | "profile"
+  | "wallet"
+  | "leaderboard"
+  | "attestations";
 
 interface BitQuestStore {
   /* Session */
