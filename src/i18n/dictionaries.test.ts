@@ -33,11 +33,11 @@ describe("translate", () => {
 
   it("retombe sur FR pour une clé WO non définie", () => {
     // La clé existe en FR mais pas en WO : doit retourner le FR.
-    // `player.loading` reste parmi les clés WO à traduire.
-    expect(translate("wo", "player.loading")).toBe(translate("fr", "player.loading"));
+    // `theory.section.count` reste parmi les clés WO à traduire.
+    expect(translate("wo", "theory.section.count")).toBe(translate("fr", "theory.section.count"));
     // On vérifie aussi que la valeur n'est pas vide (sinon test
     // trivial qui pourrait passer même si la clé disparaît du FR).
-    expect(translate("wo", "player.loading").length).toBeGreaterThan(0);
+    expect(translate("wo", "theory.section.count").length).toBeGreaterThan(0);
   });
 
   it("retombe sur FR pour une clé EN non définie", () => {
