@@ -91,7 +91,7 @@
 | Instrumentation Next.js 15 | DONE | `instrumentation.ts` | Remplace les 3 anciens `sentry.*.config.ts`. |
 | A11y focus-visible + skip-link | DONE (LOT 13) | `src/app/globals.css` + `layout.tsx` | |
 | i18n FR (410) / EN (410) | DONE | `src/i18n/messages/{fr,en}.json` | |
-| i18n Wolof (138 keys = 34%) | PARTIAL | `src/i18n/messages/wo.json` | Fallback FR non automatique. |
+| i18n Wolof (**412 clés = 100%** — LOT 59-69) | DONE | `src/i18n/messages/wo.json` | Fallback FR dispo via `dictionaries.ts:translate()`. Qualité littéraire = hors scope v1. |
 | Analytics admin (completion %, friction) | DONE (LOT 13) | `src/app/(admin)/admin/page.tsx` | Prisma `groupBy` live. |
 | Playwright E2E (6 scénarios) | PARTIAL | `tests/e2e/*.spec.ts` | Smoke uniquement. Pas de flow mission. |
 | Tests unitaires (vitest) | DONE | 812+ tests | Coverage CSRF, Zod, logger figés. |
