@@ -19,7 +19,7 @@
  * extension pg_trgm ou passer à Meilisearch/Postgres FTS.
  */
 import { db } from "@/lib/db";
-import { requireRoleAndCsrf } from "@/lib/auth/guard";
+import { requireRole } from "@/lib/auth/roles";
 
 const ALLOWED = ["course", "chapter", "lesson", "quest", "challenge"] as const;
 type ContentType = (typeof ALLOWED)[number];
@@ -29,7 +29,9 @@ function isContentType(v: string): v is ContentType {
 }
 
 export async function GET(req: Request) {
-  const guard = await requireRoleAndCsrf(req, "EDITOR");
+  // GET search read-only — pas de CSRF nécessaire (opération idempotente).
+  // requireRole suffit : vérifie session + rôle EDITOR+.
+  const guard = await requireRole(req, "EDITOR");
   if (!guard.ok) return guard.response;
 
   const url = new URL(req.url);

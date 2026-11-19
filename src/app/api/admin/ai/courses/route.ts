@@ -3,10 +3,11 @@
  * Retourne slug + title + chapters count. Rôle EDITOR+.
  */
 import { db } from "@/lib/db";
-import { requireRoleAndCsrf } from "@/lib/auth/guard";
+import { requireRole } from "@/lib/auth/roles";
 
 export async function GET(req: Request) {
-  const guard = await requireRoleAndCsrf(req, "EDITOR");
+  // GET read-only — pas de CSRF (opération idempotente).
+  const guard = await requireRole(req, "EDITOR");
   if (!guard.ok) return guard.response;
 
   const courses = await db.course.findMany({

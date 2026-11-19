@@ -4,11 +4,13 @@
  */
 import { db } from "@/lib/db";
 import { requireRoleAndCsrf } from "@/lib/auth/guard";
+import { requireRole } from "@/lib/auth/roles";
 import { logAdminAction } from "@/lib/auth/audit";
 import { DRAFT_TYPES, isDraftType } from "@/lib/ai/schemas";
 
 export async function GET(req: Request) {
-  const guard = await requireRoleAndCsrf(req, "EDITOR");
+  // GET read-only — pas de CSRF.
+  const guard = await requireRole(req, "EDITOR");
   if (!guard.ok) return guard.response;
 
   const rows = await db.aIGenerationConfig.findMany();
