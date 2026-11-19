@@ -176,17 +176,25 @@ export function SearchableSelect({
           {displayText || <span className="text-muted-foreground">{placeholder}</span>}
         </span>
         {selectedItem && !disabled && (
-          <button
-            type="button"
+          <span
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
               clear();
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                clear();
+              }
+            }}
             aria-label="Effacer la sélection"
-            className="text-muted-foreground hover:text-foreground"
+            className="inline-flex cursor-pointer text-muted-foreground hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </span>
         )}
         <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
       </button>
