@@ -107,10 +107,18 @@ export async function POST(
   }
   const warnings = issues.filter((i) => i.severity === "warning");
 
+  // Injection de meta pour que l'approve crée automatiquement la liaison
+  // ChapterQuest (QUEST uniquement — les CHALLENGE ne sont pas rattachées).
+  // `_bitquestMeta` est strip-é côté approve avant la validation Zod.
+  const payloadWithMeta =
+    kind === "QUEST"
+      ? { ...result.draft, _bitquestMeta: { linkChapterId: chapter.id } }
+      : result.draft;
+
   const draft = await db.aIDraft.create({
     data: {
       type: kind,
-      payload: JSON.stringify(result.draft),
+      payload: JSON.stringify(payloadWithMeta),
       aiModel: result.model,
       tokensInput: result.usage.input + result.usage.cacheRead + result.usage.cacheCreated,
       tokensOutput: result.usage.output,

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LessonForm } from "./lesson-form";
+import { LessonEnrichPanel } from "./enrich-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,13 @@ export default async function EditLessonPage({
           Retour au chapitre « {lesson.chapter.title} »
         </Link>
       </Button>
+
+      <LessonEnrichPanel
+        lessonId={lesson.id}
+        lessonTitle={lesson.title}
+        chapterTitle={lesson.chapter.title}
+        courseTitle={lesson.chapter.course.title}
+      />
 
       <Card>
         <CardHeader>

@@ -46,9 +46,21 @@ export async function POST(
       ? { ...raw, ...(body.overrides as Record<string, unknown>) }
       : raw;
 
+  // Extrait la meta BitQuest (injectée par certains endpoints — ex: related
+  // depuis une page chapitre pour auto-link). Pop AVANT Zod car Zod en strict
+  // mode strip les champs inconnus mais on garde l'info côté serveur ici.
+  const meta = extractMeta(merged);
+  delete merged._bitquestMeta;
+
   const type = draft.type as DraftType;
   try {
     const result = await applyDraft(type, merged);
+
+    // Auto-link QUEST → chapter si meta fournie.
+    const linked: { chapterId: string; order: number } | null =
+      type === "QUEST" && meta?.linkChapterId
+        ? await linkQuestToChapter(result.publishedId, meta.linkChapterId)
+        : null;
 
     await db.aIDraft.update({
       where: { id },
@@ -63,14 +75,68 @@ export async function POST(
     await logAdminAction(guard.user.id, "AI_DRAFT_APPROVE", `ai_draft:${id}`, {
       type,
       publishedId: result.publishedId,
+      linkedChapterId: linked?.chapterId ?? null,
     });
 
-    return Response.json({ ok: true, ...result.response }, { status: 201 });
+    return Response.json(
+      { ok: true, ...result.response, linked },
+      { status: 201 },
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur inconnue.";
     const status = /conflit|utilise déjà|existe déjà|introuvable/i.test(message) ? 409 : 400;
     return Response.json({ error: message }, { status });
   }
+}
+
+interface BitquestMeta {
+  linkChapterId?: string;
+}
+
+/** Extrait et supprime `_bitquestMeta` du payload. Null si absent/invalide. */
+function extractMeta(obj: Record<string, unknown>): BitquestMeta | null {
+  const m = obj._bitquestMeta;
+  if (typeof m !== "object" || m === null) return null;
+  const linkChapterId = (m as { linkChapterId?: unknown }).linkChapterId;
+  if (typeof linkChapterId === "string" && linkChapterId.length >= 20) {
+    return { linkChapterId };
+  }
+  return null;
+}
+
+/**
+ * Lie une quête à un chapitre via ChapterQuest. Idempotent : si la relation
+ * existe déjà (PK composite), retourne la ligne existante. Order auto = max+1.
+ */
+async function linkQuestToChapter(
+  questId: string,
+  chapterId: string,
+): Promise<{ chapterId: string; order: number }> {
+  const chapter = await db.chapter.findUnique({
+    where: { id: chapterId },
+    select: { id: true },
+  });
+  if (!chapter) {
+    // Chapitre a pu être supprimé entre génération et approve — pas bloquant.
+    return { chapterId, order: -1 };
+  }
+
+  const existing = await db.chapterQuest.findUnique({
+    where: { chapterId_questId: { chapterId, questId } },
+  });
+  if (existing) return { chapterId, order: existing.order };
+
+  const last = await db.chapterQuest.findFirst({
+    where: { chapterId },
+    orderBy: { order: "desc" },
+    select: { order: true },
+  });
+  const order = (last?.order ?? -1) + 1;
+
+  await db.chapterQuest.create({
+    data: { chapterId, questId, order },
+  });
+  return { chapterId, order };
 }
 
 async function applyDraft(

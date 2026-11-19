@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   CheckCircle2,
   Clock,
   Flame,
@@ -11,6 +12,7 @@ import {
   Map as MapIcon,
   Play,
   Plus,
+  RotateCcw,
   Sparkles,
   Trash2,
   XCircle,
@@ -87,6 +89,15 @@ export function ChapterCascadePanel({
   );
   const [objective, setObjective] = useState("");
   const [busy, setBusy] = useState<{ kind: string; label?: string } | null>(null);
+  /**
+   * Erreurs par titre depuis le dernier run (local state → perdu au refresh,
+   * mais la cascade est idempotente donc rejouer "Générer les N restantes"
+   * finirait par retenter. Le bouton explicite "Retry errors" évite d'attendre
+   * de deviner quoi relancer et n'invoque Claude que sur les titres en erreur.
+   */
+  const [lastRunErrors, setLastRunErrors] = useState<
+    Array<{ title: string; reason: string }>
+  >([]);
 
   // Map statuses par titre (normalisé) pour affichage.
   const statusByTitle = useMemo(() => {
@@ -155,17 +166,23 @@ export function ChapterCascadePanel({
       const item = data.result?.items[0];
       if (item?.status === "generated") {
         toast({ title: `Leçon « ${title} » générée`, description: "Visible dans /admin/ai-review." });
+        setLastRunErrors((errs) => errs.filter((e) => e.title !== title));
       } else if (item?.status.startsWith("skipped")) {
         toast({
           title: "Skippée",
           description: item.status === "skipped_lesson_published" ? "Leçon publiée existe déjà." : "Brouillon déjà en review.",
         });
+        setLastRunErrors((errs) => errs.filter((e) => e.title !== title));
       } else if (item?.status === "error") {
         toast({
           title: "Erreur sur cette leçon",
           description: item.reason ?? "Inconnue.",
           variant: "destructive",
         });
+        setLastRunErrors((errs) => [
+          ...errs.filter((e) => e.title !== title),
+          { title, reason: item.reason ?? "Erreur inconnue." },
+        ]);
       }
       startTransition(() => router.refresh());
     } catch (e) {
@@ -211,6 +228,7 @@ export function ChapterCascadePanel({
           skipped: number;
           errored: number;
           totalPlan: number;
+          items: Array<{ title: string; status: string; reason?: string }>;
         };
       };
       if (!res.ok) throw new Error(data.error ?? `Erreur ${res.status}`);
@@ -220,10 +238,76 @@ export function ChapterCascadePanel({
         description: `Générées : ${r.generated} · Skippées : ${r.skipped} · Erreurs : ${r.errored} (sur ${r.totalPlan})`,
         variant: r.errored > 0 ? "destructive" : undefined,
       });
+      // Met à jour la liste d'erreurs locales pour permettre le retry.
+      const newErrors = r.items
+        .filter((i) => i.status === "error")
+        .map((i) => ({ title: i.title, reason: i.reason ?? "Erreur inconnue." }));
+      const successTitles = new Set(
+        r.items
+          .filter((i) => i.status === "generated" || i.status.startsWith("skipped"))
+          .map((i) => i.title),
+      );
+      setLastRunErrors((errs) => [
+        ...errs.filter((e) => !successTitles.has(e.title) && !newErrors.some((n) => n.title === e.title)),
+        ...newErrors,
+      ]);
       startTransition(() => router.refresh());
     } catch (e) {
       toast({
         title: "Cascade impossible",
+        description: e instanceof Error ? e.message : "Erreur inconnue.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const retryErrors = async () => {
+    const titles = lastRunErrors.map((e) => e.title);
+    if (titles.length === 0) return;
+    setBusy({ kind: "retry" });
+    try {
+      const csrf = readCookie("bq_csrf");
+      const res = await fetch(`/api/admin/ai/chapters/${chapterId}/cascade`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+        },
+        body: JSON.stringify({
+          titles,
+          audience,
+          objective: objective.trim() || undefined,
+          skipExisting: true, // sécurité : si entre-temps un draft existe, skip
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        result?: {
+          generated: number;
+          skipped: number;
+          errored: number;
+          items: Array<{ title: string; status: string; reason?: string }>;
+        };
+      };
+      if (!res.ok) throw new Error(data.error ?? `Erreur ${res.status}`);
+      const r = data.result!;
+      toast({
+        title: "Retry terminé",
+        description: `Générées : ${r.generated} · Skippées : ${r.skipped} · Erreurs restantes : ${r.errored}`,
+        variant: r.errored > 0 ? "destructive" : undefined,
+      });
+      // Reconstruit la liste erreurs à partir du retry seul (ignore l'ancien état).
+      const remainingErrors = r.items
+        .filter((i) => i.status === "error")
+        .map((i) => ({ title: i.title, reason: i.reason ?? "Erreur inconnue." }));
+      setLastRunErrors(remainingErrors);
+      startTransition(() => router.refresh());
+    } catch (e) {
+      toast({
+        title: "Retry impossible",
         description: e instanceof Error ? e.message : "Erreur inconnue.",
         variant: "destructive",
       });
@@ -429,6 +513,36 @@ export function ChapterCascadePanel({
             />
           </div>
         </div>
+
+        {/* Erreurs du dernier run — retry granular */}
+        {lastRunErrors.length > 0 && (
+          <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                {lastRunErrors.length} erreur{lastRunErrors.length > 1 ? "s" : ""} au dernier run
+              </div>
+              <PendingButton
+                type="button"
+                pending={busy?.kind === "retry"}
+                pendingLabel="Retry…"
+                onClick={retryErrors}
+                disabled={!!busy && busy.kind !== "retry"}
+                className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground hover:opacity-90"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Retenter {lastRunErrors.length}
+              </PendingButton>
+            </div>
+            <ul className="space-y-0.5 text-xs text-destructive/80">
+              {lastRunErrors.map((e, i) => (
+                <li key={i} className="truncate">
+                  • <strong>{e.title}</strong> — {e.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
