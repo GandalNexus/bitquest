@@ -191,13 +191,16 @@ export function SearchableSelect({
         <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
       </button>
 
-      {/* Popup — opaque, flotte au-dessus. `isolation: isolate` + z-[100] pour
-          garantir qu'aucun ancêtre avec `overflow-hidden` ou `transform` ne
-          clippe la popup, ni qu'un autre composant ne s'affiche au-dessus. */}
+      {/* Popup — opaque, flotte au-dessus et s'élargit au-delà de son conteneur
+          (grille) si besoin. `min-w-full` suit la largeur du trigger ; une
+          largeur fixe plus confortable (480px ou viewport - padding) évite
+          qu'un contenu voisin (colonne droite d'une grille) soit visible et
+          perturbe la lecture. `isolation: isolate` empêche le clipping par
+          un ancêtre overflow-hidden / transform. */}
       {open && (
         <div
-          style={{ isolation: "isolate" }}
-          className="absolute left-0 right-0 top-full z-[100] mt-1 overflow-hidden rounded-md border border-border bg-background text-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10"
+          style={{ isolation: "isolate", width: "min(480px, calc(100vw - 2rem))" }}
+          className="absolute left-0 top-full z-[100] mt-1 min-w-full overflow-hidden rounded-md border border-border bg-background text-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10"
         >
           <div className="border-b bg-background p-2">
             <div className="relative">
