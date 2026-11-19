@@ -1,21 +1,18 @@
 /**
- * Collectes les taxonomies courantes (quests, lessons, chapters, challenges)
- * pour alimenter les prompts de génération. Fonctions pures côté DB.
+ * Collecte la taxonomie courante par type pour alimenter les prompts.
  */
 import { db } from "@/lib/db";
 import type { DraftType } from "./schemas";
-import type { GenerationContext } from "./generate";
+import type { TaxonomyContext } from "./generate";
 
-export async function loadGenerationContext<T extends DraftType>(
-  type: T,
-): Promise<GenerationContext[T]> {
+export async function loadTaxonomy<T extends DraftType>(type: T): Promise<TaxonomyContext[T]> {
   switch (type) {
     case "QUEST": {
       const quests = await db.quest.findMany({
         select: { code: true, track: true, order: true, title: true, missionType: true },
         orderBy: [{ track: "asc" }, { order: "asc" }],
       });
-      return quests as GenerationContext[T];
+      return quests as TaxonomyContext[T];
     }
     case "LESSON": {
       const lessons = await db.lesson.findMany({
@@ -32,7 +29,7 @@ export async function loadGenerationContext<T extends DraftType>(
         slug: l.slug,
         title: l.title,
         order: l.order,
-      })) as GenerationContext[T];
+      })) as TaxonomyContext[T];
     }
     case "CHAPTER": {
       const chapters = await db.chapter.findMany({
@@ -49,7 +46,7 @@ export async function loadGenerationContext<T extends DraftType>(
         slug: c.slug,
         title: c.title,
         order: c.order,
-      })) as GenerationContext[T];
+      })) as TaxonomyContext[T];
     }
     case "CHALLENGE": {
       const challenges = await db.dailyChallenge.findMany({
@@ -60,10 +57,10 @@ export async function loadGenerationContext<T extends DraftType>(
       return challenges.map((c) => ({
         date: c.date,
         title: c.title,
-      })) as GenerationContext[T];
+      })) as TaxonomyContext[T];
     }
   }
   throw new Error(`Type non supporté : ${type as string}`);
 }
 
-export type { GenerationContext } from "./generate";
+export type { TaxonomyContext } from "./generate";

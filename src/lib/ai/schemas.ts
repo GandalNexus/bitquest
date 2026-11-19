@@ -1,13 +1,21 @@
 /**
- * Schémas Zod pour tous les types de contenu générés par IA.
+ * Schémas Zod v2 — génération IA guidée par brief structuré.
  *
- * Chaque type a : un schéma Zod strict (output_config.format), un system prompt
- * dédié, et une fonction de rendering contextuel (taxonomie / contraintes).
+ * Input : `GenerationBrief` (sujet, audience, objectif, concepts, contraintes,
+ * ciblage cours/chapitre optionnel).
+ *
+ * Output : schéma Zod riche par type — sections, objectives, exemples,
+ * keypoints, scénario, critères de réussite. L'approve-route transforme ces
+ * champs riches en colonnes DB (lesson.content en MDX, quest.theorySections,
+ * quest.missionConfig, etc.).
+ *
+ * Les minimums sont conservés bas (300 car. pour une leçon) pour que le
+ * draft reste utilisable même si l'IA génère court ; l'admin complète à la review.
  */
 import { z } from "zod";
 
 /* ============================================================
- * QUEST
+ * ENUMS PARTAGÉS
  * ============================================================ */
 export const TRACKS = ["INITIATION", "INTERMEDIATE", "ADVANCED", "SPECIAL"] as const;
 export const MISSION_TYPES = [
@@ -21,18 +29,65 @@ export const MISSION_TYPES = [
   "taproot_tweak",
 ] as const;
 
+export const AUDIENCES = ["BEGINNER", "INTERMEDIATE", "ADVANCED"] as const;
+export type Audience = (typeof AUDIENCES)[number];
+
+export const CHALLENGE_FORMATS = ["QUESTION", "QUIZ", "MINI_TASK", "OBSERVATION"] as const;
+export type ChallengeFormat = (typeof CHALLENGE_FORMATS)[number];
+
+export const DRAFT_TYPES = ["QUEST", "LESSON", "CHAPTER", "CHALLENGE"] as const;
+export type DraftType = (typeof DRAFT_TYPES)[number];
+
+export const MODES = ["NEW", "COURSE_FILL", "ENRICH", "DAILY"] as const;
+export type GenerationMode = (typeof MODES)[number];
+
+/* ============================================================
+ * INPUT — GenerationBrief
+ * ============================================================ */
+export const GenerationBriefSchema = z.object({
+  type: z.enum(DRAFT_TYPES),
+  mode: z.enum(MODES).default("NEW"),
+  /** Idée principale fournie par l'admin — champ obligatoire. */
+  subject: z.string().min(5, "L'idée principale doit faire au moins 5 caractères.").max(500),
+  /** Public cible. Default BEGINNER. */
+  audience: z.enum(AUDIENCES).default("BEGINNER"),
+  /** Objectif pédagogique explicite (facultatif, mais recommandé). */
+  objective: z.string().max(300).optional(),
+  /** Notions à aborder (facultatif, séparées par virgule côté UI). */
+  concepts: z.array(z.string().min(1).max(60)).max(10).default([]),
+  /** Contraintes libres : ton, style, longueur, références à éviter. */
+  constraints: z.string().max(500).optional(),
+  /** Cours ciblé (slug) pour modes COURSE_FILL et ENRICH. */
+  courseSlug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(60).optional(),
+  /** Chapitre ciblé (slug) pour cibler une leçon dans un chapitre précis. */
+  chapterSlug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(60).optional(),
+  /** Pour les défis quotidiens : format préféré. */
+  challengeFormat: z.enum(CHALLENGE_FORMATS).optional(),
+});
+export type GenerationBrief = z.infer<typeof GenerationBriefSchema>;
+
+/* ============================================================
+ * OUTPUT — QUEST (riche)
+ * ============================================================ */
 export const QuestDraftSchema = z.object({
-  code: z
-    .string()
-    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
-    .min(3)
-    .max(40),
+  code: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).min(3).max(40),
   track: z.enum(TRACKS),
   order: z.number().int().min(0).max(999),
   title: z.string().min(4).max(80),
   subtitle: z.string().min(10).max(160),
+  /** Scénario motivant qui pose le contexte narratif (2-3 phrases). */
+  scenario: z.string().min(40).max(400),
   description: z.string().min(40).max(300),
-  intro: z.string().min(100).max(1200),
+  /** Mission concrète que l'apprenant doit accomplir dans BitLab. */
+  mission: z.string().min(30).max(300),
+  /** Objectifs pédagogiques — 2 à 5 bullets. */
+  objectives: z.array(z.string().min(10).max(200)).min(2).max(5),
+  /** Étapes concrètes pour accomplir la mission. */
+  steps: z.array(z.string().min(10).max(250)).min(2).max(8),
+  /** Critères de réussite vérifiables. */
+  successCriteria: z.array(z.string().min(10).max(250)).min(1).max(5),
+  /** Introduction pédagogique narrée (≠ scenario). */
+  intro: z.string().min(100).max(1500),
   xpReward: z.number().int().min(10).max(500),
   satsReward: z.number().int().min(0).max(2000),
   requiredLevel: z.number().int().min(1).max(10),
@@ -42,49 +97,83 @@ export const QuestDraftSchema = z.object({
 export type QuestDraft = z.infer<typeof QuestDraftSchema>;
 
 /* ============================================================
- * LESSON (contenu MDX court rattaché à un chapitre)
+ * OUTPUT — LESSON (riche)
  * ============================================================ */
+export const LessonSectionSchema = z.object({
+  heading: z.string().min(2).max(120),
+  body: z.string().min(50).max(2000),
+  /** Exemple concret rattaché à la section (facultatif). */
+  example: z.string().max(600).optional(),
+});
+
 export const LessonDraftSchema = z.object({
   chapterSlug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).min(3).max(60),
   slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).min(3).max(60),
   title: z.string().min(4).max(80),
   summary: z.string().min(20).max(240),
-  content: z.string().min(300).max(5000),
+  /** Introduction d'ouverture. */
+  intro: z.string().min(50).max(800),
+  /** Objectifs d'apprentissage (bullets). */
+  objectives: z.array(z.string().min(10).max(200)).min(2).max(5),
+  /** Sections principales enchaînées. */
+  sections: z.array(LessonSectionSchema).min(2).max(6),
+  /** Points essentiels à retenir. */
+  keypoints: z.array(z.string().min(10).max(200)).min(2).max(6),
+  /** Conclusion / ouverture. */
+  conclusion: z.string().min(40).max(500),
+  /** Questions de compréhension (optionnel). */
+  comprehensionQuestions: z
+    .array(
+      z.object({
+        question: z.string().min(10).max(300),
+        answer: z.string().min(5).max(500),
+      }),
+    )
+    .max(5)
+    .optional(),
   estimatedMinutes: z.number().int().min(2).max(30),
   order: z.number().int().min(0).max(999),
 });
 export type LessonDraft = z.infer<typeof LessonDraftSchema>;
 
 /* ============================================================
- * CHAPTER (regroupement de leçons dans un cours)
+ * OUTPUT — CHAPTER (riche)
  * ============================================================ */
 export const ChapterDraftSchema = z.object({
   courseSlug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).min(3).max(60),
   slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).min(3).max(60),
   title: z.string().min(4).max(80),
   summary: z.string().min(20).max(240),
+  /** Objectif pédagogique global du chapitre. */
+  objective: z.string().min(20).max(300),
+  /** Progression suggérée : titres des leçons à créer, dans l'ordre. */
+  lessonsPlan: z.array(z.string().min(5).max(120)).min(2).max(8),
   order: z.number().int().min(0).max(999),
 });
 export type ChapterDraft = z.infer<typeof ChapterDraftSchema>;
 
 /* ============================================================
- * CHALLENGE (défi quotidien, 1 jour = 1 défi)
+ * OUTPUT — CHALLENGE (riche)
  * ============================================================ */
 export const ChallengeDraftSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   title: z.string().min(4).max(80),
-  prompt: z.string().min(50).max(800),
+  /** Format du défi — guide le rendu UI. */
+  format: z.enum(CHALLENGE_FORMATS),
+  /** Consigne complète. Peut contenir des markdown léger. */
+  prompt: z.string().min(50).max(1000),
+  /** Attendu / réponse de référence (admin-only, utile pour review). */
+  expectedAnswer: z.string().min(5).max(400).optional(),
+  /** Difficulté. */
+  difficulty: z.enum(AUDIENCES),
   xpReward: z.number().int().min(5).max(200),
   satsReward: z.number().int().min(0).max(500),
 });
 export type ChallengeDraft = z.infer<typeof ChallengeDraftSchema>;
 
 /* ============================================================
- * Discriminated union exposé à l'API.
+ * MAP + GUARDS
  * ============================================================ */
-export const DRAFT_TYPES = ["QUEST", "LESSON", "CHAPTER", "CHALLENGE"] as const;
-export type DraftType = (typeof DRAFT_TYPES)[number];
-
 export const DRAFT_SCHEMA_BY_TYPE = {
   QUEST: QuestDraftSchema,
   LESSON: LessonDraftSchema,

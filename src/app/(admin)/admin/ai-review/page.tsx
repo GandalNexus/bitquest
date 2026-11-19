@@ -8,13 +8,13 @@ import { AIReviewPanel } from "./ai-review-panel";
 export const dynamic = "force-dynamic";
 
 /**
- * Admin — Review des brouillons générés par IA.
+ * Admin — Review IA v2.
  *
- * Liste tous les drafts PENDING + les 10 derniers traités (approved/rejected)
- * pour l'audit visuel. Le panel client gère génération + approbation/rejet.
+ * Interface brief-driven : mode + sujet + options → Claude → draft.
+ * Les cours sont chargés server-side pour alimenter le picker.
  */
 export default async function AIReviewPage() {
-  const [pending, history] = await Promise.all([
+  const [pending, history, courses] = await Promise.all([
     db.aIDraft.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "desc" },
@@ -25,9 +25,21 @@ export default async function AIReviewPage() {
       orderBy: { reviewedAt: "desc" },
       take: 10,
     }),
+    db.course.findMany({
+      orderBy: [{ order: "asc" }, { title: "asc" }],
+      select: {
+        slug: true,
+        title: true,
+        publishedAt: true,
+        chapters: {
+          orderBy: { order: "asc" },
+          select: { slug: true, title: true },
+        },
+      },
+    }),
   ]);
 
-  const serializable = [...pending, ...history].map((d) => ({
+  const serializableDrafts = [...pending, ...history].map((d) => ({
     id: d.id,
     type: d.type,
     status: d.status,
@@ -41,6 +53,13 @@ export default async function AIReviewPage() {
     tokensOutput: d.tokensOutput,
   }));
 
+  const serializableCourses = courses.map((c) => ({
+    slug: c.slug,
+    title: c.title,
+    published: c.publishedAt !== null,
+    chapters: c.chapters,
+  }));
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -50,7 +69,8 @@ export default async function AIReviewPage() {
             Review IA
           </h1>
           <p className="text-sm text-muted-foreground">
-            Brouillons générés par Claude. Approuve pour publier, rejette pour archiver.
+            Génère du contenu pédagogique guidé — Claude analyse ton brief et la taxonomie
+            existante, tu valides avant publication.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -58,10 +78,10 @@ export default async function AIReviewPage() {
             {pending.length} en attente
           </Badge>
           <Link
-            href="/admin"
+            href="/admin/ai-usage"
             className="rounded-md border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
           >
-            ← Admin
+            Usage & scheduler →
           </Link>
         </div>
       </header>
@@ -71,21 +91,19 @@ export default async function AIReviewPage() {
           <CardHeader>
             <CardTitle>Aucun brouillon en attente</CardTitle>
             <CardDescription>
-              Génère un premier brouillon ci-dessous. Le modèle (Claude Opus 4.7) rédige
-              une quête cohérente avec la taxonomie existante ; tu la valides ou l&apos;édites
-              avant publication.
+              Décris ton idée ci-dessous. Claude Opus 4.7 analyse la taxonomie BitQuest
+              (cours, chapitres, leçons existants) et génère un contenu structuré prêt à relire.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Requiert les variables d&apos;environnement <code>ANTHROPIC_API_KEY</code>{" "}
-              et <code>AI_GENERATION_ENABLED=1</code>.
+              Requiert <code>ANTHROPIC_API_KEY</code> + <code>AI_GENERATION_ENABLED=1</code>.
             </p>
           </CardContent>
         </Card>
       )}
 
-      <AIReviewPanel drafts={serializable} />
+      <AIReviewPanel drafts={serializableDrafts} courses={serializableCourses} />
     </div>
   );
 }

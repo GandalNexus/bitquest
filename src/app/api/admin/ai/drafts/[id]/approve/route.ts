@@ -1,11 +1,14 @@
 /**
- * POST /api/admin/ai/drafts/[id]/approve — publie un brouillon IA en créant
- * la ressource réelle correspondante.
+ * POST /api/admin/ai/drafts/[id]/approve — publie un brouillon IA v2.
  *
- * Switch par `draft.type` → Quest | Lesson | Chapter | DailyChallenge.
- * L'admin peut surcharger des champs via `overrides` dans le body ; la
- * validation Zod re-tourne sur le payload mergé pour refuser une édition
- * incohérente.
+ * Mapping riche → DB :
+ *   - QUEST : scenario+description → subtitle+description. objectives+steps+successCriteria
+ *     → theorySections. mission+steps → missionConfig (brief/hint).
+ *   - LESSON : intro+objectives+sections+keypoints+conclusion rendus en MDX
+ *     stocké dans Lesson.content. questions → ignore (hors scope DB V1).
+ *   - CHAPTER : objective ignoré (pas de colonne), lessonsPlan stocké dans
+ *     summary (suffixe).
+ *   - CHALLENGE : format+difficulty+expectedAnswer intégrés dans prompt.
  */
 import { db } from "@/lib/db";
 import { requireRoleAndCsrf } from "@/lib/auth/guard";
@@ -65,7 +68,7 @@ export async function POST(
     return Response.json({ ok: true, ...result.response }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur inconnue.";
-    const status = /conflit|utilise déjà|existe déjà/i.test(message) ? 409 : 400;
+    const status = /conflit|utilise déjà|existe déjà|introuvable/i.test(message) ? 409 : 400;
     return Response.json({ error: message }, { status });
   }
 }
@@ -79,6 +82,28 @@ async function applyDraft(
       const data = QuestDraftSchema.parse(merged);
       const existing = await db.quest.findUnique({ where: { code: data.code } });
       if (existing) throw new Error("Une quête utilise déjà ce code.");
+
+      // Mapping rich → DB.
+      // theorySections : 1 section "Contexte" (scenario+objectives) + 1 section
+      // "Étapes" (steps+successCriteria) + intro détaillée.
+      const theorySections = [
+        {
+          title: "Contexte",
+          body: data.scenario,
+          keypoints: data.objectives,
+        },
+        {
+          title: "Déroulé",
+          body: data.steps.map((s, i) => `${i + 1}. ${s}`).join("\n"),
+          keypoints: data.successCriteria,
+        },
+      ];
+      const missionConfig = {
+        brief: data.mission,
+        hint: data.steps[0] ?? "",
+        successCriteria: data.successCriteria,
+      };
+
       const quest = await db.quest.create({
         data: {
           code: data.code,
@@ -88,17 +113,18 @@ async function applyDraft(
           subtitle: data.subtitle,
           description: data.description,
           intro: data.intro,
-          theorySections: "[]",
+          theorySections: JSON.stringify(theorySections),
           xpReward: data.xpReward,
           satsReward: data.satsReward,
           requiredLevel: data.requiredLevel,
           missionType: data.missionType,
-          missionConfig: JSON.stringify({ brief: "", hint: "" }),
+          missionConfig: JSON.stringify(missionConfig),
           missionKind: data.missionKind,
         },
       });
       return { publishedId: quest.id, response: { quest } };
     }
+
     case "LESSON": {
       const data = LessonDraftSchema.parse(merged);
       const chapter = await db.chapter.findFirst({ where: { slug: data.chapterSlug } });
@@ -107,19 +133,24 @@ async function applyDraft(
         where: { chapterId_slug: { chapterId: chapter.id, slug: data.slug } },
       });
       if (existing) throw new Error("Une leçon existe déjà avec ce slug dans ce chapitre.");
+
+      // Mapping rich → MDX dans Lesson.content.
+      const mdx = renderLessonToMDX(data);
+
       const lesson = await db.lesson.create({
         data: {
           chapterId: chapter.id,
           slug: data.slug,
           title: data.title,
           summary: data.summary,
-          content: data.content,
+          content: mdx,
           estimatedMinutes: data.estimatedMinutes,
           order: data.order,
         },
       });
       return { publishedId: lesson.id, response: { lesson } };
     }
+
     case "CHAPTER": {
       const data = ChapterDraftSchema.parse(merged);
       const course = await db.course.findFirst({ where: { slug: data.courseSlug } });
@@ -128,26 +159,47 @@ async function applyDraft(
         where: { courseId_slug: { courseId: course.id, slug: data.slug } },
       });
       if (existing) throw new Error("Un chapitre existe déjà avec ce slug dans ce cours.");
+
+      // Mapping : objective + plan intégrés dans summary (séparateur \n\n).
+      const summary = [
+        data.summary,
+        "",
+        `**Objectif :** ${data.objective}`,
+        "",
+        "**Plan de leçons :**",
+        ...data.lessonsPlan.map((l, i) => `${i + 1}. ${l}`),
+      ].join("\n");
+
       const chapter = await db.chapter.create({
         data: {
           courseId: course.id,
           slug: data.slug,
           title: data.title,
-          summary: data.summary,
+          summary,
           order: data.order,
         },
       });
       return { publishedId: chapter.id, response: { chapter } };
     }
+
     case "CHALLENGE": {
       const data = ChallengeDraftSchema.parse(merged);
       const existing = await db.dailyChallenge.findUnique({ where: { date: data.date } });
       if (existing) throw new Error(`Un défi existe déjà pour le ${data.date}.`);
+
+      // Prompt enrichi avec format + difficulté. expectedAnswer gardé hors DB
+      // (visible uniquement côté admin review via AIDraft.payload).
+      const prompt = [
+        `**[${data.format}]** ${data.prompt}`,
+        "",
+        `_Difficulté : ${data.difficulty}_`,
+      ].join("\n");
+
       const challenge = await db.dailyChallenge.create({
         data: {
           date: data.date,
           title: data.title,
-          prompt: data.prompt,
+          prompt,
           xpReward: data.xpReward,
           satsReward: data.satsReward,
         },
@@ -155,4 +207,39 @@ async function applyDraft(
       return { publishedId: challenge.id, response: { challenge } };
     }
   }
+}
+
+/** Rend un LessonDraft riche en MDX stable (ordre fixe des sections). */
+function renderLessonToMDX(l: ReturnType<typeof LessonDraftSchema.parse>): string {
+  const parts: string[] = [];
+  parts.push(l.intro);
+  parts.push("");
+  parts.push("## Objectifs d'apprentissage");
+  for (const o of l.objectives) parts.push(`- ${o}`);
+  parts.push("");
+  for (const section of l.sections) {
+    parts.push(`## ${section.heading}`);
+    parts.push("");
+    parts.push(section.body);
+    if (section.example) {
+      parts.push("");
+      parts.push(`> **Exemple :** ${section.example}`);
+    }
+    parts.push("");
+  }
+  parts.push("## À retenir");
+  for (const k of l.keypoints) parts.push(`- ${k}`);
+  parts.push("");
+  parts.push("## Conclusion");
+  parts.push(l.conclusion);
+  if (l.comprehensionQuestions && l.comprehensionQuestions.length > 0) {
+    parts.push("");
+    parts.push("## Questions de compréhension");
+    for (const q of l.comprehensionQuestions) {
+      parts.push(`**Q :** ${q.question}`);
+      parts.push(`**R :** ${q.answer}`);
+      parts.push("");
+    }
+  }
+  return parts.join("\n");
 }

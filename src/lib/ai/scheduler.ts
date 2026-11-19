@@ -1,18 +1,13 @@
 /**
- * Scheduler IA — exécute un "tick" qui :
- *   1. Lit `AIGenerationConfig` pour chaque type.
- *   2. Pour chaque config `enabled` dont la cadence est écoulée, génère
- *      `maxPerRun` brouillons.
- *   3. Met à jour `lastRunAt` (et `lastError` si échec).
- *
- * Idempotent : si le kill-switch env est off, retourne immédiatement.
- * Non-bloquant : erreurs par-type logguées mais ne cassent pas la boucle.
+ * Scheduler IA — exécute un tick qui génère les brouillons dûs selon
+ * `AIGenerationConfig`. Utilise un brief minimal basé sur le hint persisté.
  */
 import { db } from "@/lib/db";
 import { isAIGenerationLive } from "./anthropic-client";
-import { loadGenerationContext } from "./context";
+import { loadTaxonomy } from "./context";
 import { generateDraft } from "./generate";
-import { isDraftType, type DraftType } from "./schemas";
+import { checkConformity } from "./validate";
+import { GenerationBriefSchema, isDraftType, type DraftType } from "./schemas";
 
 export interface TickResult {
   skippedReason?: "kill_switch" | "no_configs";
@@ -56,12 +51,43 @@ export async function runSchedulerTick(): Promise<TickResult> {
 
     let generated = 0;
     let lastError: string | null = null;
+
+    // Brief automatique : utilise le hint config comme sujet, mode NEW,
+    // audience BEGINNER par défaut. L'admin peut raffiner dans AIGenerationConfig.
+    const briefParse = GenerationBriefSchema.safeParse({
+      type,
+      mode: "NEW",
+      subject: cfg.hint ?? `Génération automatique ${type}`,
+      audience: "BEGINNER",
+      concepts: [],
+    });
+    if (!briefParse.success) {
+      runs.push({
+        type,
+        generated: 0,
+        error: `Brief auto invalide : ${briefParse.error.issues[0]?.message ?? "unknown"}`,
+      });
+      await db.aIGenerationConfig.update({
+        where: { type },
+        data: { lastRunAt: new Date(now), lastError: "brief auto invalide" },
+      });
+      continue;
+    }
+    const brief = briefParse.data;
+
     try {
-      const ctx = await loadGenerationContext(type);
+      const taxonomy = await loadTaxonomy(type);
       for (let i = 0; i < Math.max(1, Math.min(cfg.maxPerRun, 5)); i++) {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const result = await generateDraft({ type, context: ctx as any, hint: cfg.hint ?? undefined });
+          const result = await generateDraft({ type, brief, taxonomy: taxonomy as any });
+          const issues = checkConformity(type, result.draft);
+          const errors = issues.filter((i) => i.severity === "error");
+          if (errors.length > 0) {
+            lastError = `Conformity errors: ${errors.map((e) => e.code).join(", ")}`;
+            break;
+          }
+          const warnings = issues.filter((i) => i.severity === "warning");
           await db.aIDraft.create({
             data: {
               type,
@@ -70,12 +96,15 @@ export async function runSchedulerTick(): Promise<TickResult> {
               tokensInput:
                 result.usage.input + result.usage.cacheRead + result.usage.cacheCreated,
               tokensOutput: result.usage.output,
+              rejectReason:
+                warnings.length > 0
+                  ? warnings.map((w) => `⚠ ${w.message}`).join(" | ")
+                  : null,
             },
           });
           generated++;
         } catch (err) {
           lastError = err instanceof Error ? err.message : String(err);
-          // On ne propage pas : garde ce qui a été généré avant l'erreur.
           break;
         }
       }
