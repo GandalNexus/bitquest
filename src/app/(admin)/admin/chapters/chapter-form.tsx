@@ -4,6 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
 import { useContentBasePath } from "@/lib/admin/base-path";
+import { PendingButton } from "@/components/ui/pending-button";
 
 interface ChapterInitial {
   id?: string;
@@ -142,22 +143,24 @@ export function ChapterForm({
       )}
       <div className="flex items-center justify-between">
         {mode === "edit" ? (
-          <button
+          <PendingButton
             type="button"
             onClick={onDelete}
-            disabled={pending}
-            className="rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-60"
+            pending={pending}
+            pendingLabel="Suppression…"
+            className="rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10"
           >
             Supprimer
-          </button>
+          </PendingButton>
         ) : <span />}
-        <button
+        <PendingButton
           type="submit"
-          disabled={pending}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          pending={pending}
+          pendingLabel={mode === "create" ? "Création…" : "Enregistrement…"}
+          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
         >
           {mode === "create" ? "Ajouter le chapitre" : "Enregistrer"}
-        </button>
+        </PendingButton>
       </div>
     </form>
   );

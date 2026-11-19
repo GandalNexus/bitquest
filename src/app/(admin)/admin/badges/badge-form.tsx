@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
+import { PendingButton } from "@/components/ui/pending-button";
 
 const RARITIES = ["COMMON", "RARE", "EPIC"] as const;
 type Rarity = (typeof RARITIES)[number];
@@ -288,27 +289,30 @@ export function BadgeForm({
       <div className="flex items-center justify-between pt-2">
         <div>
           {mode === "edit" && (
-            <button
+            <PendingButton
               type="button"
               onClick={() => onDelete(false)}
-              disabled={pending}
-              className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-60"
+              pending={pending}
+              pendingLabel="Suppression…"
+              className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
             >
               Supprimer{earnedCount > 0 ? ` (${earnedCount} utilisateur${earnedCount > 1 ? "s" : ""})` : ""}
-            </button>
+            </PendingButton>
           )}
         </div>
         <div className="flex items-center gap-2">
           <a href="/admin/badges" className="rounded-md border px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
             Annuler
           </a>
-          <button
+          <PendingButton
             type="submit"
-            disabled={pending || conditionError !== null}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+            pending={pending}
+            pendingLabel={mode === "create" ? "Création…" : "Enregistrement…"}
+            disabled={conditionError !== null}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             {mode === "create" ? "Créer le badge" : "Enregistrer"}
-          </button>
+          </PendingButton>
         </div>
       </div>
     </form>

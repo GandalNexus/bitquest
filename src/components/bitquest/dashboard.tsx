@@ -40,6 +40,7 @@ import {
 } from "@/lib/bitquest/hooks";
 import { formatSats } from "@/lib/bitquest/client";
 import type { View } from "@/lib/bitquest/store";
+import { useAppendTheme } from "@/lib/theme-sync";
 import {
   BadgeIcon,
   EmptyState,
@@ -244,6 +245,7 @@ function BitlabActivityTile() {
   const titleId = "dashboard-bitlab-title";
   const { data, isLoading, isError } = useMyBitlabStats();
   const bitlabUrl = process.env.NEXT_PUBLIC_BITLAB_URL ?? null;
+  const withTheme = useAppendTheme();
 
   // En cas d'erreur, on masque la tuile — comportement non bloquant
   // (c'est un ajout d'intégration, pas un module critique).
@@ -316,7 +318,7 @@ function BitlabActivityTile() {
           </div>
           {bitlabUrl && (
             <Button asChild variant="outline" className="w-full shrink-0 sm:w-auto">
-              <a href={bitlabUrl} target="_blank" rel="noopener noreferrer">
+              <a href={withTheme(bitlabUrl)} target="_blank" rel="noopener noreferrer">
                 Ouvrir BitLab
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </a>
@@ -370,6 +372,7 @@ function ActiveMissionsTile() {
   const { data: active, isLoading } = useMyBitlabAttempts("active", 5);
   const { data: all } = useMyBitlabAttempts("all", 10);
   const bitlabUrl = process.env.NEXT_PUBLIC_BITLAB_URL ?? null;
+  const withTheme = useAppendTheme();
 
   const activeAttempts = active?.attempts ?? [];
   const recentCompleted = (all?.attempts ?? [])
@@ -437,7 +440,7 @@ function ActiveMissionsTile() {
                           className="shrink-0"
                         >
                           <a
-                            href={a.returnTo ? `/quests/${a.questCode}` : bitlabUrl}
+                            href={a.returnTo ? `/quests/${a.questCode}` : withTheme(bitlabUrl)}
                             rel="noopener noreferrer"
                           >
                             Reprendre

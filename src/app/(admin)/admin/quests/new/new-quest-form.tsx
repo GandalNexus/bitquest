@@ -4,6 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
 import { useContentBasePath } from "@/lib/admin/base-path";
+import { PendingButton } from "@/components/ui/pending-button";
 
 const TRACKS = ["INITIATION", "INTERMEDIATE", "ADVANCED", "SPECIAL"] as const;
 const MISSION_TYPES = [
@@ -256,13 +257,14 @@ export function NewQuestForm() {
         >
           Annuler
         </a>
-        <button
+        <PendingButton
           type="submit"
-          disabled={pending}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          pending={pending}
+          pendingLabel="Création…"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
         >
           Créer la quête
-        </button>
+        </PendingButton>
       </div>
     </form>
   );

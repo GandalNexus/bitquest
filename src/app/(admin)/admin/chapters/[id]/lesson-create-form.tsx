@@ -4,6 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
 import { useContentBasePath } from "@/lib/admin/base-path";
+import { PendingButton } from "@/components/ui/pending-button";
 
 /**
  * Formulaire de création rapide d'une leçon. Le contenu est pré-rempli
@@ -121,13 +122,14 @@ export function LessonCreateForm({
         </div>
       )}
       <div className="flex justify-end">
-        <button
+        <PendingButton
           type="submit"
-          disabled={pending}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          pending={pending}
+          pendingLabel="Création…"
+          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
         >
           Créer la leçon
-        </button>
+        </PendingButton>
       </div>
     </form>
   );

@@ -1,8 +1,26 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "next-themes";
-import { useState, type ReactNode } from "react";
+import { ThemeProvider, useTheme } from "next-themes";
+import { useEffect, useState, type ReactNode } from "react";
+import { readThemeFromQuery, stripThemeFromUrl } from "@/lib/theme-sync";
+
+/**
+ * Au mount, applique `?theme=dark|light` reçu depuis BitLab (ou une autre
+ * app du nexus) puis retire le param. Monté *dans* `ThemeProvider` pour
+ * accéder au `setTheme` de next-themes.
+ */
+function ThemeQuerySync() {
+  const { setTheme } = useTheme();
+  useEffect(() => {
+    const hint = readThemeFromQuery(window.location.search);
+    if (hint) {
+      setTheme(hint);
+      stripThemeFromUrl();
+    }
+  }, [setTheme]);
+  return null;
+}
 
 /**
  * Providers globaux montés depuis `app/layout.tsx` (server component).
@@ -30,6 +48,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <ThemeQuerySync />
         {children}
       </ThemeProvider>
     </QueryClientProvider>

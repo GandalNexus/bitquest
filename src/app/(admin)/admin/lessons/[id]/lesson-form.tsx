@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import { readCookie } from "@/lib/bitquest/client";
+import { PendingButton } from "@/components/ui/pending-button";
 
 // MDXEditor dépend de Lexical (DOM only) → import dynamique sans SSR.
 // Skeleton = textarea en lecture seule pour éviter un layout shift.
@@ -187,21 +188,22 @@ export function LessonForm({ initial }: { initial: LessonInitial }) {
       )}
 
       <div className="flex items-center justify-between">
-        <button
+        <PendingButton
           type="button"
           onClick={onDelete}
-          disabled={pending}
-          className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-60"
+          pending={pending}
+          pendingLabel="Suppression…"
+          className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
         >
           Supprimer la leçon
-        </button>
-        <button
+        </PendingButton>
+        <PendingButton
           type="submit"
-          disabled={pending}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          pending={pending}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
         >
           Enregistrer
-        </button>
+        </PendingButton>
       </div>
     </form>
   );

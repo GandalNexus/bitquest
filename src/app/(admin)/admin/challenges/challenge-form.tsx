@@ -3,6 +3,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
+import { PendingButton } from "@/components/ui/pending-button";
 
 interface ChallengeInitial {
   id?: string;
@@ -163,27 +164,29 @@ export function ChallengeForm({
       <div className="flex items-center justify-between pt-2">
         <div>
           {mode === "edit" && (
-            <button
+            <PendingButton
               type="button"
               onClick={() => onDelete(false)}
-              disabled={pending}
-              className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-60"
+              pending={pending}
+              pendingLabel="Suppression…"
+              className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
             >
               Supprimer{completionsCount > 0 ? ` (${completionsCount} validation${completionsCount > 1 ? "s" : ""})` : ""}
-            </button>
+            </PendingButton>
           )}
         </div>
         <div className="flex items-center gap-2">
           <a href="/admin/challenges" className="rounded-md border px-3 py-2 text-sm text-muted-foreground hover:bg-muted">
             Annuler
           </a>
-          <button
+          <PendingButton
             type="submit"
-            disabled={pending}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+            pending={pending}
+            pendingLabel={mode === "create" ? "Création…" : "Enregistrement…"}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             {mode === "create" ? "Créer le défi" : "Enregistrer"}
-          </button>
+          </PendingButton>
         </div>
       </div>
     </form>

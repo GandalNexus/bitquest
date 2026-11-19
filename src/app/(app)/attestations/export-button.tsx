@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Link as LinkIcon } from "lucide-react";
+import { Download, Link as LinkIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
@@ -100,8 +100,12 @@ export function ExportCertificateButton({
         disabled={pending}
         className="gap-1.5"
       >
-        <Download className="h-3.5 w-3.5" />
-        {pending ? "…" : "Exporter"}
+        {pending ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Download className="h-3.5 w-3.5" />
+        )}
+        {pending ? "Export…" : "Exporter"}
       </Button>
       <Button
         size="sm"

@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
+import { PendingButton } from "@/components/ui/pending-button";
 import {
   LnInvoiceForm,
   MineNonceForm,
@@ -245,14 +246,15 @@ export function MissionEditor({
       )}
 
       <div className="flex justify-end">
-        <button
+        <PendingButton
           type="button"
           onClick={onSave}
-          disabled={pending || configError !== null}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          pending={pending}
+          disabled={configError !== null}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
         >
           Enregistrer la mission
-        </button>
+        </PendingButton>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
 import { useContentBasePath } from "@/lib/admin/base-path";
+import { PendingButton } from "@/components/ui/pending-button";
 
 interface TeamMemberInitial {
   id?: string;
@@ -197,14 +198,15 @@ export function TeamMemberForm({
       <div className="flex items-center justify-between pt-2">
         <div>
           {mode === "edit" && (
-            <button
+            <PendingButton
               type="button"
               onClick={onDelete}
-              disabled={pending}
-              className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-60"
+              pending={pending}
+              pendingLabel="Suppression…"
+              className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
             >
               Supprimer
-            </button>
+            </PendingButton>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -214,13 +216,14 @@ export function TeamMemberForm({
           >
             Annuler
           </a>
-          <button
+          <PendingButton
             type="submit"
-            disabled={pending}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+            pending={pending}
+            pendingLabel={mode === "create" ? "Création…" : "Enregistrement…"}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             {mode === "create" ? "Créer le membre" : "Enregistrer"}
-          </button>
+          </PendingButton>
         </div>
       </div>
     </form>

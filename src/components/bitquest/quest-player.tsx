@@ -59,6 +59,7 @@ import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toBitlabKind, type BitlabKind } from "@/lib/bitlab/mission-kinds";
 import { parseBitlabReturn } from "@/lib/bitlab/deep-link";
+import { useAppendTheme } from "@/lib/theme-sync";
 import { useT } from "@/i18n/locale-provider";
 
 /* ============ Types locaux ============ */
@@ -575,6 +576,7 @@ function BitLabProofStep({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const withTheme = useAppendTheme();
   const kind = toBitlabKind(quest.missionType);
 
   const bitlabReturn = useMemo(() => {
@@ -697,7 +699,7 @@ function BitLabProofStep({
       return api.bitlabDeepLink({ questCode: quest.code, kind, network, returnTo });
     },
     onSuccess: (res) => {
-      window.location.href = res.url;
+      window.location.href = withTheme(res.url);
     },
     onError: (err) => {
       setLocalError(errorMessage(err, t));
