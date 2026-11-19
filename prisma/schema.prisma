@@ -477,3 +477,49 @@ model LightningReward {
   @@index([userId, status, createdAt]) // dashboard rewards 30j LOT 21 + caps LOT 14
   @@index([failureReason, createdAt]) // top failure reasons admin LOT 16
 }
+
+/**
+ * Brouillons générés par IA (Claude) avant approbation humaine.
+ *
+ * Pipeline : AI génère → PENDING → admin review → APPROVED (crée Quest réel) | REJECTED.
+ * Volontairement découplé des tables Quest/Lesson/etc. : pas de pollution des contenus
+ * publiés, structure libre dans `payload` JSON pour tolérer les évolutions de schéma
+ * du générateur sans migration, suppression facile des rejets.
+ */
+model AIDraft {
+  id           String    @id @default(cuid())
+  type         String    // QUEST | LESSON | CHAPTER | CHALLENGE
+  payload      String    // JSON du contenu généré (shape dépend de `type`)
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  aiModel      String    // ex. "claude-opus-4-7"
+  promptHash   String?   // sha256 hex du prompt — pour détecter doublons éventuels
+  rejectReason String?
+  publishedId  String?   // ID du Quest/Lesson/etc. créé après approbation (traçabilité)
+  createdAt    DateTime  @default(now())
+  reviewedAt   DateTime?
+  reviewedBy   String?   // userId admin qui a tranché
+  tokensInput  Int?      // observability + budget
+  tokensOutput Int?
+
+  @@index([status, type, createdAt])
+  @@index([createdAt])
+}
+
+/**
+ * Config du scheduler IA — 1 ligne par type de contenu (QUEST, LESSON, …).
+ *
+ * `cadenceHours` = nombre d'heures entre 2 runs. `maxPerRun` = nombre de
+ * brouillons générés à chaque tick. Un tick ne s'exécute que si
+ * `now - lastRunAt >= cadenceHours` ET `enabled = true`. Le kill-switch env
+ * `AI_GENERATION_ENABLED` reste maître — s'il est off, la table est ignorée.
+ */
+model AIGenerationConfig {
+  type         String   @id // QUEST | LESSON | CHAPTER | CHALLENGE
+  enabled      Boolean  @default(false)
+  cadenceHours Int      @default(24)
+  maxPerRun    Int      @default(1)
+  hint         String?  // hint par défaut passé au générateur
+  lastRunAt    DateTime?
+  lastError    String?
+  updatedAt    DateTime @updatedAt
+}

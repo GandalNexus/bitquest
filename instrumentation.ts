@@ -27,6 +27,15 @@ export async function register() {
       "./src/lib/handlers/attestations"
     );
     registerAttestationHandlers();
+    // Scheduler IA : tick toutes les 15 min en interne. Les cadences
+    // réelles par type sont dans la table AIGenerationConfig ; ce
+    // tick lit la table et génère uniquement ce qui est dû.
+    // Désactivable via AI_SCHEDULER_INTERNAL=0 pour les setups où un
+    // cron externe (Vercel Cron, k8s CronJob) appelle /api/admin/ai/cron-tick.
+    if (process.env.AI_SCHEDULER_INTERNAL !== "0") {
+      const { startInternalScheduler } = await import("./src/lib/ai/internal-scheduler");
+      startInternalScheduler();
+    }
   }
   if (process.env.NEXT_RUNTIME === "edge") {
     await import("./sentry.edge.config");

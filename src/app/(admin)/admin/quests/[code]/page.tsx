@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuestForm } from "../quest-form";
+import { EnrichWithAIButton } from "./enrich-with-ai-button";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,20 @@ export default async function EditQuestPage({
             }}
           />
         </CardContent>
+      </Card>
+
+      {/* Enrichissement IA : regénère theory + quiz d'un coup */}
+      <Card className="border-primary/40 bg-primary/5">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="text-sm">Enrichir avec IA</CardTitle>
+            <CardDescription>
+              Claude Opus 4.7 regénère les sections théoriques et le quiz en se basant sur
+              l&apos;intro et le type de mission. Remplace l&apos;existant.
+            </CardDescription>
+          </div>
+          <EnrichWithAIButton code={quest.code} />
+        </CardHeader>
       </Card>
 
       {/* Sections théoriques — éditables */}

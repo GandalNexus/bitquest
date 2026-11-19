@@ -43,7 +43,11 @@ export type AuditAction =
   | "CHAPTER_QUEST_ATTACH"
   | "CHAPTER_QUEST_DETACH"
   | "FEATURE_FLAG_UPDATE"
-  | "USER_PURGE";
+  | "USER_PURGE"
+  | "AI_DRAFT_GENERATE"
+  | "AI_DRAFT_APPROVE"
+  | "AI_DRAFT_REJECT"
+  | "AI_CONFIG_UPDATE";
 
 export async function logAdminAction(
   actorId: string,
