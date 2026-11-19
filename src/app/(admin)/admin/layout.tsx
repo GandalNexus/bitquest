@@ -8,11 +8,15 @@ import {
   Flag,
   Flame,
   FlaskConical,
+  Gauge,
+  GraduationCap,
   LayoutDashboard,
   Lock,
   LogIn,
   Map,
+  PenSquare,
   ShieldAlert,
+  Sparkles,
   Trophy,
   Users,
   UsersRound,
@@ -21,6 +25,7 @@ import {
 } from "lucide-react";
 import { requireRoleSsr } from "@/lib/auth/server";
 import { Button } from "@/components/ui/button";
+import { AdminMobileNav } from "./_mobile-nav";
 
 export const metadata = {
   title: "Admin — BitQuest",
@@ -33,25 +38,42 @@ type NavItem = {
   icon: LucideIcon;
   /** `"ADMIN"` → visible ADMIN uniquement. Sinon visible à partir d'EDITOR. */
   minRole?: "EDITOR" | "ADMIN";
+  /** Entête de section optionnel, affiché au-dessus. */
+  section?: string;
 };
 
 /**
  * Nav admin complète. `minRole: "ADMIN"` filtre les entrées sensibles
  * (gestion users, audit, modération gamification) hors de la vue EDITOR.
+ * `section` sert à grouper visuellement les entrées.
  */
 const NAV: NavItem[] = [
-  { href: "/admin", label: "Vue d'ensemble", icon: LayoutDashboard },
-  { href: "/admin/users", label: "Utilisateurs", icon: Users, minRole: "ADMIN" },
-  { href: "/admin/courses", label: "Cours", icon: BookOpen },
+  { href: "/admin", label: "Vue d'ensemble", icon: LayoutDashboard, section: "Général" },
+
+  // Contenu pédagogique — EDITOR+
+  { href: "/admin/courses", label: "Cours", icon: GraduationCap, section: "Contenu" },
+  { href: "/admin/chapters", label: "Chapitres", icon: BookOpen },
+  { href: "/admin/lessons", label: "Leçons", icon: PenSquare },
   { href: "/admin/quests", label: "Quêtes", icon: Map },
+  { href: "/admin/challenges", label: "Défis quotidiens", icon: Flame, minRole: "ADMIN" },
+
+  // IA — EDITOR+
+  { href: "/admin/ai-review", label: "Review IA", icon: Sparkles, section: "IA" },
+  { href: "/admin/ai-usage", label: "Usage IA", icon: Gauge },
+
+  // Communauté & gamification — ADMIN
+  { href: "/admin/users", label: "Utilisateurs", icon: Users, minRole: "ADMIN", section: "Communauté" },
   { href: "/admin/badges", label: "Badges", icon: Trophy, minRole: "ADMIN" },
-  { href: "/admin/challenges", label: "Défis", icon: Flame, minRole: "ADMIN" },
   { href: "/admin/team-members", label: "Équipe", icon: UsersRound, minRole: "ADMIN" },
-  { href: "/admin/bitlab/attempts", label: "BitLab preuves", icon: FlaskConical, minRole: "ADMIN" },
+
+  // Preuves & récompenses — ADMIN
+  { href: "/admin/bitlab/attempts", label: "BitLab preuves", icon: FlaskConical, minRole: "ADMIN", section: "Preuves" },
   { href: "/admin/lightning-rewards", label: "Lightning rewards", icon: Zap, minRole: "ADMIN" },
-  { href: "/admin/feature-flags", label: "Feature flags", icon: Flag, minRole: "ADMIN" },
   { href: "/admin/attestations", label: "Attestations", icon: Award, minRole: "ADMIN" },
   { href: "/admin/certificates", label: "Certificates", icon: FileSignature, minRole: "ADMIN" },
+
+  // Système — ADMIN
+  { href: "/admin/feature-flags", label: "Feature flags", icon: Flag, minRole: "ADMIN", section: "Système" },
   { href: "/admin/audit", label: "Audit log", icon: ClipboardList, minRole: "ADMIN" },
   { href: "/admin/health", label: "État service", icon: Activity, minRole: "ADMIN" },
 ];
@@ -94,19 +116,30 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       </header>
 
+      {/* Nav mobile : dropdown visible < md */}
+      <AdminMobileNav
+        items={visibleNav.map((item) => ({ href: item.href, label: item.label, section: item.section }))}
+      />
+
       {/* Shell admin : sidebar + contenu */}
       <div className="mx-auto flex w-full max-w-6xl gap-6 px-4 py-6">
         <aside className="hidden w-56 shrink-0 md:block">
           <nav aria-label="Navigation admin" className="space-y-1">
             {visibleNav.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <item.icon className="h-4 w-4" aria-hidden />
-                {item.label}
-              </Link>
+              <div key={item.href}>
+                {item.section && (
+                  <div className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 first:mt-0">
+                    {item.section}
+                  </div>
+                )}
+                <Link
+                  href={item.href}
+                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <item.icon className="h-4 w-4" aria-hidden />
+                  {item.label}
+                </Link>
+              </div>
             ))}
           </nav>
         </aside>

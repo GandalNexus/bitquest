@@ -1,11 +1,19 @@
+import { ContentLink as Link } from "@/components/admin/content-link";
 import {
   Activity,
+  ArrowRight,
   BookOpen,
+  Flag,
   FlaskConical,
+  Flame,
+  Gauge,
   GraduationCap,
   Map,
+  PenSquare,
+  Sparkles,
   TrendingUp,
   Trophy,
+  UsersRound,
   Users,
   Zap,
 } from "lucide-react";
@@ -210,6 +218,42 @@ export default async function AdminDashboardPage() {
         ))}
       </section>
 
+      {/* Accès rapide — cartes vers chaque module admin, pour les users qui
+          n'ont pas vu la sidebar (mobile, écran étroit). */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Accès rapide
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <QuickNavTile href="/admin/courses" label="Cours" icon={GraduationCap} />
+          <QuickNavTile href="/admin/chapters" label="Chapitres" icon={BookOpen} />
+          <QuickNavTile href="/admin/lessons" label="Leçons" icon={PenSquare} />
+          <QuickNavTile href="/admin/quests" label="Quêtes" icon={Map} />
+          <QuickNavTile href="/admin/challenges" label="Défis quotidiens" icon={Flame} />
+          <QuickNavTile
+            href="/admin/ai-review"
+            label="Review IA"
+            icon={Sparkles}
+            accent
+          />
+          <QuickNavTile
+            href="/admin/ai-usage"
+            label="Usage IA"
+            icon={Gauge}
+            accent
+          />
+          <QuickNavTile href="/admin/team-members" label="Équipe" icon={UsersRound} />
+          <QuickNavTile href="/admin/users" label="Utilisateurs" icon={Users} />
+          <QuickNavTile href="/admin/badges" label="Badges" icon={Trophy} />
+          <QuickNavTile
+            href="/admin/bitlab/attempts"
+            label="BitLab preuves"
+            icon={FlaskConical}
+          />
+          <QuickNavTile href="/admin/feature-flags" label="Feature flags" icon={Flag} />
+        </div>
+      </section>
+
       <section className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -401,6 +445,39 @@ export default async function AdminDashboardPage() {
         </Card>
       </section>
     </div>
+  );
+}
+
+function QuickNavTile({
+  href,
+  label,
+  icon: Icon,
+  accent,
+}: {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  accent?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`group flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+        accent
+          ? "border-primary/40 bg-primary/5 hover:bg-primary/10"
+          : "hover:bg-muted"
+      }`}
+    >
+      <Icon
+        className={`h-4 w-4 shrink-0 ${accent ? "text-primary" : "text-muted-foreground"}`}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+      <ArrowRight
+        className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+        aria-hidden
+      />
+    </Link>
   );
 }
 
