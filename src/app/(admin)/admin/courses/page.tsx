@@ -1,5 +1,5 @@
 import { ContentLink as Link } from "@/components/admin/content-link";
-import { BookOpen, Plus } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,14 +7,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CrudSearchBar } from "@/components/admin/crud-search-bar";
 
 export const dynamic = "force-dynamic";
+const PAGE_SIZE = 20;
 
 export default async function AdminCoursesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string }>;
+  searchParams?: Promise<{ q?: string; page?: string }>;
 }) {
   const sp = (await searchParams) ?? {};
   const query = (sp.q ?? "").trim().slice(0, 60);
+  const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
 
   const where = query.length > 0
     ? {
@@ -26,14 +28,21 @@ export default async function AdminCoursesPage({
       }
     : undefined;
 
-  const courses = await db.course.findMany({
-    where,
-    orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-    include: {
-      _count: { select: { chapters: true } },
-      chapters: { include: { _count: { select: { lessons: true } } } },
-    },
-  });
+  const skip = (page - 1) * PAGE_SIZE;
+  const [courses, total] = await Promise.all([
+    db.course.findMany({
+      where,
+      orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+      include: {
+        _count: { select: { chapters: true } },
+        chapters: { select: { _count: { select: { lessons: true } } } },
+      },
+      skip,
+      take: PAGE_SIZE,
+    }),
+    db.course.count({ where }),
+  ]);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="space-y-6">
@@ -41,7 +50,8 @@ export default async function AdminCoursesPage({
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Cours</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {courses.length} cours{query ? ` · recherche « ${query} »` : ""}
+            {total} cours{query ? ` · recherche « ${query} »` : ""}
+            {pageCount > 1 ? ` · page ${page}/${pageCount}` : ""}
             {" · Créer, modifier et publier les parcours Académie."}
           </p>
         </div>
@@ -127,6 +137,63 @@ export default async function AdminCoursesPage({
           })}
         </ul>
       )}
+
+      {pageCount > 1 && (
+        <Pagination page={page} pageCount={pageCount} query={query} />
+      )}
+    </div>
+  );
+}
+
+function Pagination({
+  page,
+  pageCount,
+  query,
+}: {
+  page: number;
+  pageCount: number;
+  query: string;
+}) {
+  const buildHref = (p: number) => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (p > 1) params.set("page", String(p));
+    const qs = params.toString();
+    return qs ? `/admin/courses?${qs}` : "/admin/courses";
+  };
+  return (
+    <div className="flex items-center justify-between rounded-md border px-4 py-2 text-xs text-muted-foreground">
+      <span>Page {page} sur {pageCount}</span>
+      <div className="flex items-center gap-1">
+        {page > 1 ? (
+          <Link
+            href={buildHref(page - 1)}
+            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:border-primary/40 hover:text-foreground"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Précédente
+          </Link>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 opacity-50">
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Précédente
+          </span>
+        )}
+        {page < pageCount ? (
+          <Link
+            href={buildHref(page + 1)}
+            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:border-primary/40 hover:text-foreground"
+          >
+            Suivante
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 opacity-50">
+            Suivante
+            <ChevronRight className="h-3.5 w-3.5" />
+          </span>
+        )}
+      </div>
     </div>
   );
 }

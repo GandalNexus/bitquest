@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { SearchableSelect } from "@/components/admin/searchable-select";
 
 interface QuestOption {
   code: string;
@@ -139,48 +140,52 @@ export function LinkedQuestsPanel({
         </ul>
       )}
 
-      {candidates.length > 0 && (
-        <div className="space-y-2 rounded-md border bg-muted/20 p-3">
-          <Label className="text-xs">Lier une quête</Label>
-          <div className="grid gap-2 sm:grid-cols-[1fr_80px]">
-            <select
-              value={picked}
-              onChange={(e) => setPicked(e.target.value)}
-              className="rounded-md border bg-background px-3 py-2 text-sm"
-              aria-label="Choisir une quête"
-            >
-              <option value="">Choisis une quête…</option>
-              {candidates.map((q) => (
-                <option key={q.code} value={q.code}>
-                  [{q.track}] {q.title} ({q.code})
-                </option>
-              ))}
-            </select>
-            <Input
-              type="number"
-              value={order}
-              onChange={(e) => setOrder(e.target.value)}
-              placeholder="Ordre"
-              min={0}
-              max={999}
-            />
-          </div>
-          <Input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Note pédagogique (optionnel, ≤ 500 chars)"
+      <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+        <Label className="text-xs">Lier une quête</Label>
+        <div className="grid gap-2 sm:grid-cols-[1fr_80px]">
+          <SearchableSelect
+            type="quest"
+            value={picked || null}
+            valueField="code"
+            placeholder="Rechercher par titre ou code…"
+            onChange={(item) => {
+              const code = item?.code ?? "";
+              if (code && linkedCodes.has(code)) {
+                toast({
+                  variant: "destructive",
+                  title: "Déjà liée",
+                  description: "Cette quête est déjà liée à ce chapitre.",
+                });
+                return;
+              }
+              setPicked(code);
+            }}
           />
-          <Button size="sm" onClick={attach} disabled={!picked || pending} className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" />
-            {pending ? "…" : "Lier"}
-          </Button>
+          <Input
+            type="number"
+            value={order}
+            onChange={(e) => setOrder(e.target.value)}
+            placeholder="Ordre"
+            min={0}
+            max={999}
+          />
         </div>
-      )}
-      {candidates.length === 0 && initial.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Toutes les quêtes sont déjà liées à ce chapitre.
-        </p>
-      )}
+        <Input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Note pédagogique (optionnel, ≤ 500 chars)"
+        />
+        <Button size="sm" onClick={attach} disabled={!picked || pending} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" />
+          {pending ? "…" : "Lier"}
+        </Button>
+        {candidates.length === 0 && initial.length > 0 && (
+          <p className="text-[11px] text-muted-foreground">
+            Toutes les quêtes connues au premier chargement sont déjà liées, mais la
+            recherche peut en révéler d&apos;autres créées depuis.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

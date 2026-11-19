@@ -1,25 +1,21 @@
 import { ContentLink as Link } from "@/components/admin/content-link";
-import { BookOpen, ChevronRight, Plus } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CrudSearchBar } from "@/components/admin/crud-search-bar";
 
 export const dynamic = "force-dynamic";
+const PAGE_SIZE = 25;
 
-/**
- * Liste à plat de tous les chapitres (admin + studio).
- * Partagée via re-export côté `/studio/chapters` — `ContentLink`
- * réécrit les hrefs `/admin/*` vers `/studio/*` quand l'URL courante
- * est sous `/studio`.
- */
 export default async function AdminChaptersPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string }>;
+  searchParams?: Promise<{ q?: string; page?: string }>;
 }) {
   const sp = (await searchParams) ?? {};
   const query = (sp.q ?? "").trim().slice(0, 60);
+  const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
 
   const where = query.length > 0
     ? {
@@ -30,14 +26,21 @@ export default async function AdminChaptersPage({
       }
     : undefined;
 
-  const chapters = await db.chapter.findMany({
-    where,
-    orderBy: [{ course: { order: "asc" } }, { order: "asc" }],
-    include: {
-      course: { select: { id: true, slug: true, title: true } },
-      _count: { select: { lessons: true } },
-    },
-  });
+  const skip = (page - 1) * PAGE_SIZE;
+  const [chapters, total] = await Promise.all([
+    db.chapter.findMany({
+      where,
+      orderBy: [{ course: { order: "asc" } }, { order: "asc" }],
+      include: {
+        course: { select: { id: true, slug: true, title: true } },
+        _count: { select: { lessons: true } },
+      },
+      skip,
+      take: PAGE_SIZE,
+    }),
+    db.chapter.count({ where }),
+  ]);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="space-y-6">
@@ -45,9 +48,9 @@ export default async function AdminChaptersPage({
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Chapitres</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {chapters.length} chapitre{chapters.length > 1 ? "s" : ""}
+            {total} chapitre{total > 1 ? "s" : ""}
             {query ? ` · recherche « ${query} »` : ""}
-            {" · Clique pour éditer le contenu et ses leçons."}
+            {pageCount > 1 ? ` · page ${page}/${pageCount}` : ""}
           </p>
         </div>
         <Button asChild>
@@ -104,6 +107,55 @@ export default async function AdminChaptersPage({
           ))}
         </ul>
       )}
+
+      {pageCount > 1 && (
+        <PaginationBar page={page} pageCount={pageCount} query={query} basePath="/admin/chapters" />
+      )}
+    </div>
+  );
+}
+
+function PaginationBar({
+  page,
+  pageCount,
+  query,
+  basePath,
+}: {
+  page: number;
+  pageCount: number;
+  query: string;
+  basePath: string;
+}) {
+  const buildHref = (p: number) => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (p > 1) params.set("page", String(p));
+    const qs = params.toString();
+    return qs ? `${basePath}?${qs}` : basePath;
+  };
+  return (
+    <div className="flex items-center justify-between rounded-md border px-4 py-2 text-xs text-muted-foreground">
+      <span>Page {page} sur {pageCount}</span>
+      <div className="flex items-center gap-1">
+        {page > 1 ? (
+          <Link href={buildHref(page - 1)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:border-primary/40 hover:text-foreground">
+            <ChevronLeft className="h-3.5 w-3.5" /> Précédente
+          </Link>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 opacity-50">
+            <ChevronLeft className="h-3.5 w-3.5" /> Précédente
+          </span>
+        )}
+        {page < pageCount ? (
+          <Link href={buildHref(page + 1)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:border-primary/40 hover:text-foreground">
+            Suivante <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        ) : (
+          <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 opacity-50">
+            Suivante <ChevronRight className="h-3.5 w-3.5" />
+          </span>
+        )}
+      </div>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { PendingButton } from "@/components/ui/pending-button";
 import { useToast } from "@/hooks/use-toast";
 import { DraftEditor } from "./draft-editor";
+import { SearchableSelect } from "@/components/admin/searchable-select";
 
 type DraftType = "QUEST" | "LESSON" | "CHAPTER" | "CHALLENGE";
 type GenerationMode = "NEW" | "COURSE_FILL" | "ENRICH" | "DAILY";
@@ -117,11 +118,6 @@ function GenerationForm({ courses }: { courses: CourseOption[] }) {
   const [courseSlug, setCourseSlug] = useState<string>("");
   const [chapterSlug, setChapterSlug] = useState<string>("");
   const [challengeFormat, setChallengeFormat] = useState<ChallengeFormat>("QUESTION");
-
-  const selectedCourse = useMemo(
-    () => courses.find((c) => c.slug === courseSlug) ?? null,
-    [courseSlug, courses],
-  );
 
   // Modes verrouillent partiellement les types pour éviter les combinaisons absurdes.
   const availableTypes: DraftType[] = useMemo(() => {
@@ -279,46 +275,45 @@ function GenerationForm({ courses }: { courses: CourseOption[] }) {
           </div>
         </div>
 
-        {/* Course picker (COURSE_FILL / ENRICH) */}
+        {/* Course picker (COURSE_FILL / ENRICH) — SearchableSelect lazy + paginé */}
         {needsCourse && (
-          <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
-            <Label htmlFor="course" className="text-xs">Cours ciblé</Label>
-            <select
-              id="course"
-              value={courseSlug}
-              onChange={(e) => {
-                setCourseSlug(e.target.value);
-                setChapterSlug("");
-              }}
-              disabled={generating || pending}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-              required
-            >
-              <option value="">— sélectionne un cours —</option>
-              {courses.map((c) => (
-                <option key={c.slug} value={c.slug}>
-                  {c.title} {c.published ? "" : "(brouillon)"}
-                </option>
-              ))}
-            </select>
-            {selectedCourse && selectedCourse.chapters.length > 0 && (
-              <>
-                <Label htmlFor="chapter" className="mt-2 block text-xs">
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="course" className="text-xs">Cours ciblé</Label>
+              <SearchableSelect
+                id="course"
+                type="course"
+                value={courseSlug || null}
+                valueField="slug"
+                placeholder="Rechercher un cours par titre…"
+                disabled={generating || pending}
+                required
+                selectedLabel={
+                  courses.find((c) => c.slug === courseSlug)?.title ?? undefined
+                }
+                onChange={(item) => {
+                  setCourseSlug(item?.slug ?? "");
+                  setChapterSlug("");
+                }}
+              />
+            </div>
+            {courseSlug && (
+              <div className="space-y-1.5">
+                <Label htmlFor="chapter" className="text-xs">
                   {needsChapter ? "Chapitre cible (requis)" : "Chapitre cible (optionnel)"}
                 </Label>
-                <select
+                <SearchableSelect
                   id="chapter"
-                  value={chapterSlug}
-                  onChange={(e) => setChapterSlug(e.target.value)}
+                  type="chapter"
+                  value={chapterSlug || null}
+                  valueField="slug"
+                  placeholder="Rechercher un chapitre dans ce cours…"
                   disabled={generating || pending}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">— aucun / tous —</option>
-                  {selectedCourse.chapters.map((ch) => (
-                    <option key={ch.slug} value={ch.slug}>{ch.title}</option>
-                  ))}
-                </select>
-              </>
+                  required={needsChapter}
+                  extraParams={{ courseSlug }}
+                  onChange={(item) => setChapterSlug(item?.slug ?? "")}
+                />
+              </div>
             )}
           </div>
         )}

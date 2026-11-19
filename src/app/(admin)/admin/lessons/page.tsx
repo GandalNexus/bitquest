@@ -1,5 +1,5 @@
 import { ContentLink as Link } from "@/components/admin/content-link";
-import { CheckCircle2, Clock, PenSquare, Plus } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, PenSquare, Plus } from "lucide-react";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,41 +7,50 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CrudSearchBar } from "@/components/admin/crud-search-bar";
 
 export const dynamic = "force-dynamic";
+const PAGE_SIZE = 25;
 
-/**
- * Liste à plat de toutes les leçons (admin + studio).
- */
 export default async function AdminLessonsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string }>;
+  searchParams?: Promise<{ q?: string; page?: string }>;
 }) {
   const sp = (await searchParams) ?? {};
   const query = (sp.q ?? "").trim().slice(0, 60);
+  const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
 
   const where = query.length > 0
     ? {
-        title: { contains: query, mode: "insensitive" as const },
+        OR: [
+          { title: { contains: query, mode: "insensitive" as const } },
+          { summary: { contains: query, mode: "insensitive" as const } },
+        ],
       }
     : undefined;
 
-  const lessons = await db.lesson.findMany({
-    where,
-    orderBy: [
-      { chapter: { course: { order: "asc" } } },
-      { chapter: { order: "asc" } },
-      { order: "asc" },
-    ],
-    include: {
-      chapter: {
-        select: {
-          id: true,
-          title: true,
-          course: { select: { id: true, slug: true, title: true } },
+  const skip = (page - 1) * PAGE_SIZE;
+  const [lessons, total] = await Promise.all([
+    db.lesson.findMany({
+      where,
+      orderBy: [
+        { chapter: { course: { order: "asc" } } },
+        { chapter: { order: "asc" } },
+        { order: "asc" },
+      ],
+      include: {
+        chapter: {
+          select: {
+            id: true,
+            title: true,
+            course: { select: { id: true, slug: true, title: true } },
+          },
         },
       },
-    },
-  });
+      skip,
+      take: PAGE_SIZE,
+    }),
+    db.lesson.count({ where }),
+  ]);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="space-y-6">
@@ -49,9 +58,9 @@ export default async function AdminLessonsPage({
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Leçons</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {lessons.length} leçon{lessons.length > 1 ? "s" : ""}
+            {total} leçon{total > 1 ? "s" : ""}
             {query ? ` · recherche « ${query} »` : ""}
-            {" · Clique pour éditer le Markdown."}
+            {pageCount > 1 ? ` · page ${page}/${pageCount}` : ""}
           </p>
         </div>
         <Button asChild>
@@ -123,6 +132,38 @@ export default async function AdminLessonsPage({
             );
           })}
         </ul>
+      )}
+
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between rounded-md border px-4 py-2 text-xs text-muted-foreground">
+          <span>Page {page} sur {pageCount}</span>
+          <div className="flex items-center gap-1">
+            {page > 1 ? (
+              <Link
+                href={`/admin/lessons?${new URLSearchParams({ ...(query ? { q: query } : {}), page: String(page - 1) }).toString()}`}
+                className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:border-primary/40 hover:text-foreground"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" /> Précédente
+              </Link>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 opacity-50">
+                <ChevronLeft className="h-3.5 w-3.5" /> Précédente
+              </span>
+            )}
+            {page < pageCount ? (
+              <Link
+                href={`/admin/lessons?${new URLSearchParams({ ...(query ? { q: query } : {}), page: String(page + 1) }).toString()}`}
+                className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:border-primary/40 hover:text-foreground"
+              >
+                Suivante <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 opacity-50">
+                Suivante <ChevronRight className="h-3.5 w-3.5" />
+              </span>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

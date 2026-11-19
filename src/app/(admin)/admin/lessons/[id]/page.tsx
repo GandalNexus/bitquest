@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LessonForm } from "./lesson-form";
 import { LessonEnrichPanel } from "./enrich-panel";
+import { ContentBreadcrumbs } from "@/components/admin/content-breadcrumbs";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,21 @@ export default async function EditLessonPage({
 
   return (
     <div className="space-y-6">
+      <ContentBreadcrumbs
+        items={[
+          { label: "Cours", href: "/admin/courses" },
+          {
+            label: lesson.chapter.course.title,
+            href: `/admin/courses/${lesson.chapter.course.id}`,
+          },
+          {
+            label: lesson.chapter.title,
+            href: `/admin/chapters/${lesson.chapter.id}`,
+          },
+          { label: "Leçons", href: "/admin/lessons" },
+          { label: lesson.title },
+        ]}
+      />
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link href={`/admin/chapters/${lesson.chapter.id}`}>
           <ArrowLeft className="h-4 w-4" aria-hidden />

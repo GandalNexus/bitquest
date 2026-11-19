@@ -10,6 +10,7 @@ import { LessonCreateForm } from "./lesson-create-form";
 import { LinkedQuestsPanel } from "./linked-quests";
 import { ChapterCascadePanel } from "./ai-cascade-panel";
 import { loadChapterPlan, loadPlanStatuses } from "@/lib/ai/cascade";
+import { ContentBreadcrumbs } from "@/components/admin/content-breadcrumbs";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,17 @@ export default async function EditChapterPage({
 
   return (
     <div className="space-y-6">
+      <ContentBreadcrumbs
+        items={[
+          { label: "Cours", href: "/admin/courses" },
+          {
+            label: chapter.course.title,
+            href: `/admin/courses/${chapter.course.id}`,
+          },
+          { label: "Chapitres", href: "/admin/chapters" },
+          { label: chapter.title },
+        ]}
+      />
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link href={`/admin/courses/${chapter.course.id}`}>
           <ArrowLeft className="h-4 w-4" aria-hidden />
