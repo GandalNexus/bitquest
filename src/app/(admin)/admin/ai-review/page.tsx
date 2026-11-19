@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AIReviewPanel } from "./ai-review-panel";
+import { CascadeProgressSection } from "./cascade-progress";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +103,8 @@ export default async function AIReviewPage() {
           </CardContent>
         </Card>
       )}
+
+      <CascadeProgressSection />
 
       <AIReviewPanel drafts={serializableDrafts} courses={serializableCourses} />
     </div>

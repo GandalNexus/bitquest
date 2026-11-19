@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, ChevronUp, Sparkles, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Pencil, Sparkles, X } from "lucide-react";
 import { readCookie } from "@/lib/bitquest/client";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PendingButton } from "@/components/ui/pending-button";
 import { useToast } from "@/hooks/use-toast";
+import { DraftEditor } from "./draft-editor";
 
 type DraftType = "QUEST" | "LESSON" | "CHAPTER" | "CHALLENGE";
 type GenerationMode = "NEW" | "COURSE_FILL" | "ENRICH" | "DAILY";
@@ -451,6 +452,7 @@ function DraftCard({ draft }: { draft: DraftRow }) {
   const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
   const payload = useMemo(() => JSON.parse(draft.payload) as Record<string, unknown>, [draft.payload]);
   const title = String(payload.title ?? "(sans titre)");
   const subtitle = String(payload.subtitle ?? payload.summary ?? "");
@@ -530,42 +532,67 @@ function DraftCard({ draft }: { draft: DraftRow }) {
         )}
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        <DraftPreview type={draft.type} payload={payload} />
-        <details className="rounded-md border bg-muted/30 p-3">
-          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-            Payload JSON complet
-          </summary>
-          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap font-mono text-[11px]">
-            {JSON.stringify(payload, null, 2)}
-          </pre>
-        </details>
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-          <span>{draft.aiModel}</span>
-          {typeof draft.tokensOutput === "number" && (
-            <span>· {draft.tokensOutput} tokens sortie</span>
-          )}
-          <span>· {new Date(draft.createdAt).toLocaleString("fr-FR")}</span>
-        </div>
-        <div className="flex items-center justify-between pt-2">
-          <PendingButton
-            type="button"
-            pending={busy || pending}
-            pendingLabel="Rejet…"
-            onClick={onReject}
-            className="inline-flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10"
-          >
-            <X className="h-3.5 w-3.5" /> Rejeter
-          </PendingButton>
-          <PendingButton
-            type="button"
-            pending={busy || pending}
-            pendingLabel="Publication…"
-            onClick={onApprove}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
-          >
-            <Check className="h-3.5 w-3.5" /> Approuver et publier
-          </PendingButton>
-        </div>
+        {editing ? (
+          <DraftEditor
+            draftId={draft.id}
+            type={draft.type as "QUEST" | "LESSON" | "CHAPTER" | "CHALLENGE"}
+            payload={payload}
+            onCancel={() => setEditing(false)}
+            onDone={() => {
+              setEditing(false);
+              startTransition(() => router.refresh());
+            }}
+          />
+        ) : (
+          <>
+            <DraftPreview type={draft.type} payload={payload} />
+            <details className="rounded-md border bg-muted/30 p-3">
+              <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                Payload JSON complet
+              </summary>
+              <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap font-mono text-[11px]">
+                {JSON.stringify(payload, null, 2)}
+              </pre>
+            </details>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              <span>{draft.aiModel}</span>
+              {typeof draft.tokensOutput === "number" && (
+                <span>· {draft.tokensOutput} tokens sortie</span>
+              )}
+              <span>· {new Date(draft.createdAt).toLocaleString("fr-FR")}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 pt-2">
+              <PendingButton
+                type="button"
+                pending={busy || pending}
+                pendingLabel="Rejet…"
+                onClick={onReject}
+                className="inline-flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+              >
+                <X className="h-3.5 w-3.5" /> Rejeter
+              </PendingButton>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  disabled={busy || pending}
+                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted disabled:opacity-60"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Modifier
+                </button>
+                <PendingButton
+                  type="button"
+                  pending={busy || pending}
+                  pendingLabel="Publication…"
+                  onClick={onApprove}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+                >
+                  <Check className="h-3.5 w-3.5" /> Approuver
+                </PendingButton>
+              </div>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

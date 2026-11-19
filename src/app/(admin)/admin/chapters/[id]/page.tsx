@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChapterForm } from "../chapter-form";
 import { LessonCreateForm } from "./lesson-create-form";
 import { LinkedQuestsPanel } from "./linked-quests";
+import { ChapterCascadePanel } from "./ai-cascade-panel";
+import { loadChapterPlan, loadPlanStatuses } from "@/lib/ai/cascade";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +49,12 @@ export default async function EditChapterPage({
   ]);
   if (!chapter) notFound();
 
+  // Charge le plan IA d'origine (si chapter a été créé via AI) + statut
+  // de chaque leçon planifiée (none / draft / published).
+  const chapterPlan = await loadChapterPlan(chapter.id);
+  const planStatuses =
+    chapterPlan.length > 0 ? await loadPlanStatuses(chapter.id, chapterPlan) : [];
+
   const linkedInitial = chapter.linkedQuests.map((l) => ({
     questId: l.questId,
     questCode: l.quest.code,
@@ -85,6 +93,14 @@ export default async function EditChapterPage({
           />
         </CardContent>
       </Card>
+
+      <ChapterCascadePanel
+        chapterId={chapter.id}
+        chapterTitle={chapter.title}
+        courseTitle={chapter.course.title}
+        initialPlan={chapterPlan}
+        initialStatuses={planStatuses}
+      />
 
       <Card>
         <CardHeader>
