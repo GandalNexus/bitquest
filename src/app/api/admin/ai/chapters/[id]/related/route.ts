@@ -12,10 +12,10 @@ import { isAIGenerationLive } from "@/lib/ai/anthropic-client";
 import { generateDraft } from "@/lib/ai/generate";
 import { loadTaxonomy } from "@/lib/ai/context";
 import { checkConformity } from "@/lib/ai/validate";
-import { GenerationBriefSchema } from "@/lib/ai/schemas";
+import { AIRelatedPostSchema, GenerationBriefSchema } from "@/lib/ai/schemas";
+import { parseJsonBody } from "@/lib/validation/schemas";
 
-const ALLOWED_KINDS = ["QUEST", "CHALLENGE"] as const;
-type Kind = (typeof ALLOWED_KINDS)[number];
+type Kind = "QUEST" | "CHALLENGE";
 
 export async function POST(
   req: Request,
@@ -38,26 +38,19 @@ export async function POST(
   });
   if (!chapter) return Response.json({ error: "Chapitre introuvable." }, { status: 404 });
 
-  const body = (await req.json().catch(() => ({}))) as {
-    kind?: unknown;
-    subject?: unknown;
-    audience?: unknown;
-    challengeFormat?: unknown;
-  };
-
-  if (typeof body.kind !== "string" || !(ALLOWED_KINDS as readonly string[]).includes(body.kind)) {
-    return Response.json({ error: "kind doit être QUEST ou CHALLENGE." }, { status: 400 });
-  }
-  const kind = body.kind as Kind;
+  const parsed = await parseJsonBody(req, AIRelatedPostSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
+  const kind: Kind = body.kind;
 
   const subject =
-    typeof body.subject === "string" && body.subject.trim().length >= 5
-      ? body.subject.trim()
+    body.subject && body.subject.length >= 5
+      ? body.subject
       : `${kind === "QUEST" ? "Quête" : "Défi quotidien"} lié au chapitre « ${chapter.title} » (${chapter.summary.slice(0, 120)})`;
 
   const audience =
     body.audience === "INTERMEDIATE" || body.audience === "ADVANCED"
-      ? (body.audience as "INTERMEDIATE" | "ADVANCED")
+      ? body.audience
       : "BEGINNER";
 
   const briefInput = {
@@ -69,12 +62,7 @@ export async function POST(
     concepts: [],
     courseSlug: chapter.course.slug,
     chapterSlug: chapter.slug,
-    challengeFormat:
-      kind === "CHALLENGE" &&
-      typeof body.challengeFormat === "string" &&
-      ["QUESTION", "QUIZ", "MINI_TASK", "OBSERVATION"].includes(body.challengeFormat)
-        ? (body.challengeFormat as "QUESTION" | "QUIZ" | "MINI_TASK" | "OBSERVATION")
-        : undefined,
+    challengeFormat: kind === "CHALLENGE" ? body.challengeFormat : undefined,
   };
 
   const briefParse = GenerationBriefSchema.safeParse(briefInput);
@@ -88,7 +76,6 @@ export async function POST(
   const taxonomy = await loadTaxonomy(kind);
   let result;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     result = await generateDraft({ type: kind, brief: briefParse.data, taxonomy: taxonomy as any });
   } catch (err) {
     return Response.json(

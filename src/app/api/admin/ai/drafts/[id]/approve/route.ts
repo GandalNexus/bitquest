@@ -14,12 +14,14 @@ import { db } from "@/lib/db";
 import { requireRoleAndCsrf } from "@/lib/auth/guard";
 import { logAdminAction } from "@/lib/auth/audit";
 import {
+  AIDraftApproveSchema,
   ChallengeDraftSchema,
   ChapterDraftSchema,
   LessonDraftSchema,
   QuestDraftSchema,
   type DraftType,
 } from "@/lib/ai/schemas";
+import { parseJsonBody } from "@/lib/validation/schemas";
 
 export async function POST(
   req: Request,
@@ -29,7 +31,9 @@ export async function POST(
   if (!guard.ok) return guard.response;
 
   const { id } = await context.params;
-  const body = (await req.json().catch(() => ({}))) as { overrides?: unknown };
+  const parsed = await parseJsonBody(req, AIDraftApproveSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   const draft = await db.aIDraft.findUnique({ where: { id } });
   if (!draft) return Response.json({ error: "Draft introuvable." }, { status: 404 });
@@ -41,10 +45,7 @@ export async function POST(
   }
 
   const raw = JSON.parse(draft.payload) as Record<string, unknown>;
-  const merged =
-    typeof body.overrides === "object" && body.overrides !== null
-      ? { ...raw, ...(body.overrides as Record<string, unknown>) }
-      : raw;
+  const merged = body.overrides ? { ...raw, ...body.overrides } : raw;
 
   // Extrait la meta BitQuest (injectée par certains endpoints — ex: related
   // depuis une page chapitre pour auto-link). Pop AVANT Zod car Zod en strict

@@ -9,6 +9,8 @@ import { requireRoleAndCsrf } from "@/lib/auth/guard";
 import { logAdminAction } from "@/lib/auth/audit";
 import { isAIGenerationLive } from "@/lib/ai/anthropic-client";
 import { runLessonCascade } from "@/lib/ai/cascade";
+import { AICascadePostSchema } from "@/lib/ai/schemas";
+import { parseJsonBody } from "@/lib/validation/schemas";
 
 export async function POST(
   req: Request,
@@ -25,21 +27,16 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  const body = (await req.json().catch(() => ({}))) as {
-    titles?: unknown;
-    audience?: unknown;
-    objective?: unknown;
-    skipExisting?: unknown;
-  };
+  const parsed = await parseJsonBody(req, AICascadePostSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
-  if (!Array.isArray(body.titles)) {
-    return Response.json({ error: "Champ `titles` requis (array)." }, { status: 400 });
-  }
+  // Filtrage post-Zod : trim + bornes 4-160 car. Cohérent avec le schéma mais
+  // le schéma accepte des strings libres pour laisser passer des espaces en
+  // tête/queue avant normalisation ici.
   const titles = body.titles
-    .filter((t): t is string => typeof t === "string")
     .map((t) => t.trim())
     .filter((t) => t.length >= 4 && t.length <= 160);
-
   if (titles.length === 0) {
     return Response.json({ error: "Aucun titre valide (4-160 car.)." }, { status: 400 });
   }
@@ -52,12 +49,9 @@ export async function POST(
 
   const audience =
     body.audience === "INTERMEDIATE" || body.audience === "ADVANCED"
-      ? (body.audience as "INTERMEDIATE" | "ADVANCED")
+      ? body.audience
       : "BEGINNER";
-  const objective =
-    typeof body.objective === "string" && body.objective.trim().length > 0
-      ? body.objective.trim()
-      : undefined;
+  const objective = body.objective && body.objective.length > 0 ? body.objective : undefined;
   const skipExisting = body.skipExisting !== false;
 
   try {

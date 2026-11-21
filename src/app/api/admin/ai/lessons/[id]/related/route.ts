@@ -17,10 +17,10 @@ import { isAIGenerationLive } from "@/lib/ai/anthropic-client";
 import { generateDraft } from "@/lib/ai/generate";
 import { loadTaxonomy } from "@/lib/ai/context";
 import { checkConformity } from "@/lib/ai/validate";
-import { GenerationBriefSchema } from "@/lib/ai/schemas";
+import { AIRelatedPostSchema, GenerationBriefSchema } from "@/lib/ai/schemas";
+import { parseJsonBody } from "@/lib/validation/schemas";
 
-const ALLOWED_KINDS = ["QUEST", "CHALLENGE"] as const;
-type Kind = (typeof ALLOWED_KINDS)[number];
+type Kind = "QUEST" | "CHALLENGE";
 
 export async function POST(
   req: Request,
@@ -47,17 +47,10 @@ export async function POST(
   });
   if (!lesson) return Response.json({ error: "Leçon introuvable." }, { status: 404 });
 
-  const body = (await req.json().catch(() => ({}))) as {
-    kind?: unknown;
-    subject?: unknown;
-    audience?: unknown;
-    challengeFormat?: unknown;
-  };
-
-  if (typeof body.kind !== "string" || !(ALLOWED_KINDS as readonly string[]).includes(body.kind)) {
-    return Response.json({ error: "kind doit être QUEST ou CHALLENGE." }, { status: 400 });
-  }
-  const kind = body.kind as Kind;
+  const parsed = await parseJsonBody(req, AIRelatedPostSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
+  const kind: Kind = body.kind;
 
   // Troncation du contenu pour tenir dans le brief.
   const lessonExcerpt =
@@ -68,14 +61,11 @@ export async function POST(
       ? `Mettre en pratique le concept enseigné dans « ${lesson.title} » via une mission BitLab concrète`
       : `Défi quotidien court basé sur le concept clé de « ${lesson.title} »`;
 
-  const subject =
-    typeof body.subject === "string" && body.subject.trim().length >= 5
-      ? body.subject.trim()
-      : defaultSubject;
+  const subject = body.subject && body.subject.length >= 5 ? body.subject : defaultSubject;
 
   const audience =
     body.audience === "INTERMEDIATE" || body.audience === "ADVANCED"
-      ? (body.audience as "INTERMEDIATE" | "ADVANCED")
+      ? body.audience
       : "BEGINNER";
 
   const objective = `Renforcer l'acquis de la leçon « ${lesson.title} » (chapitre : ${lesson.chapter.title}, cours : ${lesson.chapter.course.title}).
@@ -95,12 +85,7 @@ ${lessonExcerpt}`;
     concepts: [],
     courseSlug: lesson.chapter.course.slug,
     chapterSlug: lesson.chapter.slug,
-    challengeFormat:
-      kind === "CHALLENGE" &&
-      typeof body.challengeFormat === "string" &&
-      ["QUESTION", "QUIZ", "MINI_TASK", "OBSERVATION"].includes(body.challengeFormat)
-        ? (body.challengeFormat as "QUESTION" | "QUIZ" | "MINI_TASK" | "OBSERVATION")
-        : undefined,
+    challengeFormat: kind === "CHALLENGE" ? body.challengeFormat : undefined,
   });
   if (!briefParse.success) {
     return Response.json(
@@ -112,7 +97,6 @@ ${lessonExcerpt}`;
   const taxonomy = await loadTaxonomy(kind);
   let result;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     result = await generateDraft({ type: kind, brief: briefParse.data, taxonomy: taxonomy as any });
   } catch (err) {
     return Response.json(

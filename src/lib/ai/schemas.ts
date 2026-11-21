@@ -184,3 +184,55 @@ export const DRAFT_SCHEMA_BY_TYPE = {
 export function isDraftType(v: unknown): v is DraftType {
   return typeof v === "string" && (DRAFT_TYPES as readonly string[]).includes(v);
 }
+
+/* ============================================================
+ * INPUT — ADMIN REQUEST SCHEMAS
+ * Schémas Zod pour les routes POST /api/admin/ai/**
+ * ============================================================ */
+
+/** POST /api/admin/ai/config — upsert la cadence d'un type de génération. */
+export const AIConfigPostSchema = z.object({
+  type: z.enum(DRAFT_TYPES),
+  enabled: z.boolean().optional(),
+  cadenceHours: z.number().int().min(1).max(24 * 30).optional(),
+  maxPerRun: z.number().int().min(1).max(5).optional(),
+  hint: z.string().trim().max(500).nullable().optional(),
+});
+export type AIConfigPostInput = z.infer<typeof AIConfigPostSchema>;
+
+/** POST /api/admin/ai/{chapters,lessons}/[id]/related */
+export const AIRelatedPostSchema = z.object({
+  kind: z.enum(["QUEST", "CHALLENGE"]),
+  subject: z.string().trim().min(5).max(500).optional(),
+  audience: z.enum(AUDIENCES).optional(),
+  challengeFormat: z.enum(CHALLENGE_FORMATS).optional(),
+});
+export type AIRelatedPostInput = z.infer<typeof AIRelatedPostSchema>;
+
+/** POST /api/admin/ai/chapters/[id]/cascade */
+export const AICascadePostSchema = z.object({
+  titles: z.array(z.string()).min(1, "Au moins un titre requis."),
+  audience: z.enum(AUDIENCES).optional(),
+  objective: z.string().trim().max(500).optional(),
+  skipExisting: z.boolean().optional(),
+});
+export type AICascadePostInput = z.infer<typeof AICascadePostSchema>;
+
+/** POST /api/admin/ai/drafts/[id]/reject */
+export const AIDraftRejectSchema = z.object({
+  reason: z.string().trim().max(500).nullable().optional(),
+});
+export type AIDraftRejectInput = z.infer<typeof AIDraftRejectSchema>;
+
+/** POST /api/admin/ai/drafts/[id]/approve */
+export const AIDraftApproveSchema = z.object({
+  overrides: z.record(z.string(), z.unknown()).optional(),
+});
+export type AIDraftApproveInput = z.infer<typeof AIDraftApproveSchema>;
+
+/**
+ * POST /api/admin/ai/generate/[type] — le `type` vient de l'URL donc on
+ * accepte un body sans `type` et on le fusionne avant la revalidation stricte
+ * via `GenerationBriefSchema`. Schéma minimal ici : on accepte tout objet.
+ */
+export const AIGenerateBodySchema = z.record(z.string(), z.unknown());

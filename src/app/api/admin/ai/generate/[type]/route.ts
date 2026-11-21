@@ -12,7 +12,13 @@ import { isAIGenerationLive } from "@/lib/ai/anthropic-client";
 import { generateDraft } from "@/lib/ai/generate";
 import { loadTaxonomy } from "@/lib/ai/context";
 import { checkConformity } from "@/lib/ai/validate";
-import { GenerationBriefSchema, isDraftType, type DraftType } from "@/lib/ai/schemas";
+import {
+  AIGenerateBodySchema,
+  GenerationBriefSchema,
+  isDraftType,
+  type DraftType,
+} from "@/lib/ai/schemas";
+import { parseJsonBody } from "@/lib/validation/schemas";
 
 export async function POST(
   req: Request,
@@ -35,21 +41,22 @@ export async function POST(
   }
   const type = normalized as DraftType;
 
-  const rawBody = await req.json().catch(() => ({}));
-  const parsed = GenerationBriefSchema.safeParse({ ...rawBody, type });
-  if (!parsed.success) {
+  const bodyParsed = await parseJsonBody(req, AIGenerateBodySchema);
+  if (!bodyParsed.ok) return bodyParsed.response;
+
+  const briefParsed = GenerationBriefSchema.safeParse({ ...bodyParsed.data, type });
+  if (!briefParsed.success) {
     return Response.json(
-      { error: "Brief invalide.", issues: parsed.error.issues },
+      { error: "Brief invalide.", issues: briefParsed.error.issues },
       { status: 400 },
     );
   }
-  const brief = parsed.data;
+  const brief = briefParsed.data;
 
   const taxonomy = await loadTaxonomy(type);
 
   let result;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     result = await generateDraft({ type, brief, taxonomy: taxonomy as any });
   } catch (err) {
     return Response.json(
