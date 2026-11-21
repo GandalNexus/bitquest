@@ -1,6 +1,7 @@
 import { clientIp, rateLimit } from "@/lib/bitquest/session";
 import { verifySessionFromRequest } from "@/lib/auth/launch-token";
 import { ACTIVE_STATES } from "@/lib/bitlab/attempt";
+import { corsHeaders, preflight } from "@/lib/auth/cors";
 import { db } from "@/lib/db";
 
 /**
@@ -16,32 +17,14 @@ import { db } from "@/lib/db";
  * réutilisation côté client BitLab.
  */
 
-function allowedOrigins(): string[] {
-  const raw = process.env.BITLAB_ALLOWED_ORIGINS?.trim();
-  if (!raw) return ["*"];
-  return raw.split(",").map((s) => s.trim()).filter(Boolean);
-}
-
-function corsHeaders(reqOrigin: string | null): Record<string, string> {
-  const origins = allowedOrigins();
-  const permissive = origins.includes("*");
-  const allow = permissive ? reqOrigin ?? "*" : origins.find((o) => o === reqOrigin) ?? "";
-  const headers: Record<string, string> = {
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, content-type",
-    "Access-Control-Max-Age": "600",
-    Vary: "Origin",
-  };
-  if (allow) headers["Access-Control-Allow-Origin"] = allow;
-  return headers;
-}
+const METHODS = ["GET", "OPTIONS"];
 
 export async function OPTIONS(req: Request) {
-  return new Response(null, { status: 204, headers: corsHeaders(req.headers.get("origin")) });
+  return preflight(req, METHODS);
 }
 
 export async function GET(req: Request) {
-  const extraHeaders = corsHeaders(req.headers.get("origin"));
+  const extraHeaders = corsHeaders(req.headers.get("origin"), METHODS);
 
   if (!(await rateLimit(`bitlab-me-attempts-ip:${clientIp(req)}`, 120, 60_000))) {
     return Response.json(

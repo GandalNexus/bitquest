@@ -1187,7 +1187,6 @@ export function QuestPlayer({
   // Les setState() dans cet effet sont des hydratations initiales (one-shot
   // gated by `localHydrated`) — pattern légitime pour synchroniser un state
   // React avec un storage externe au premier render.
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (localHydrated || hydratedCode !== code || !detail) return;
     try {
@@ -1243,7 +1242,6 @@ export function QuestPlayer({
     }
     setLocalHydratedCode(code);
   }, [localHydrated, hydratedCode, code, detail, quiz.length]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Persistance : écrit l'état courant dans sessionStorage à chaque changement
   // significatif. Débouncé implicitement par React batching ; la sérialisation

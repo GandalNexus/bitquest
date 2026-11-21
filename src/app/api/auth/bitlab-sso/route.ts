@@ -1,5 +1,6 @@
 import { authenticate, clientIp, rateLimit } from "@/lib/bitquest/session";
 import { issueLaunchToken } from "@/lib/auth/launch-token";
+import { isOriginAllowed } from "@/lib/auth/cors";
 import { logger } from "@/lib/log";
 
 const log = logger("bitlab-sso");
@@ -30,15 +31,6 @@ const log = logger("bitlab-sso");
  * pour accéder — le succès dépend juste du cookie).
  */
 
-function allowedOrigins(): string[] {
-  const raw = process.env.BITLAB_ALLOWED_ORIGINS?.trim();
-  if (!raw) return ["*"];
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 /**
  * `returnTo` doit être une URL absolue http(s) dont l'origine est dans
  * l'allowlist. On rejette toute autre forme (schémas javascript:, data:,
@@ -53,11 +45,8 @@ function validateReturnTo(raw: string | null): URL | null {
     return null;
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-
-  const origins = allowedOrigins();
-  if (origins.includes("*")) return url;
   const originStr = `${url.protocol}//${url.host}`;
-  if (!origins.includes(originStr)) return null;
+  if (!isOriginAllowed(originStr)) return null;
   return url;
 }
 

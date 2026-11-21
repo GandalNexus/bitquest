@@ -20,28 +20,10 @@ import { jsonWithProtocolVersion } from "@/lib/bitlab/response";
  * (liste séparée par virgules, défaut "*" permissif en dev).
  */
 
-function allowedOrigins(): string[] {
-  const raw = process.env.BITLAB_ALLOWED_ORIGINS?.trim();
-  if (!raw) return ["*"];
-  return raw.split(",").map((s) => s.trim()).filter(Boolean);
-}
-
-function corsHeaders(reqOrigin: string | null): Record<string, string> {
-  const origins = allowedOrigins();
-  const permissive = origins.includes("*");
-  const allow = permissive ? reqOrigin ?? "*" : origins.find((o) => o === reqOrigin) ?? "";
-  const headers: Record<string, string> = {
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "content-type, authorization",
-    "Access-Control-Max-Age": "600",
-    Vary: "Origin",
-  };
-  if (allow) headers["Access-Control-Allow-Origin"] = allow;
-  return headers;
-}
+import { corsHeaders, preflight } from "@/lib/auth/cors";
 
 export async function OPTIONS(req: Request) {
-  return new Response(null, { status: 204, headers: corsHeaders(req.headers.get("origin")) });
+  return preflight(req);
 }
 
 export async function POST(req: Request) {

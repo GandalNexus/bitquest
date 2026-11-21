@@ -19,6 +19,12 @@ import type { Instrumentation } from "next";
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Validation env — fail-closed en prod/preprod si secrets manquants
+    // ou configuration permissive (wildcard CORS, Redis facultatif).
+    const { validateOrThrow } = await import("./src/lib/config/env-validator");
+    const { logger } = await import("./src/lib/log");
+    validateOrThrow(logger("env-validator"));
+
     await import("./sentry.server.config");
     // Handlers event-bus : brancher au boot node pour que les
     // évènements (quest.completed, etc.) soient consommés dès le

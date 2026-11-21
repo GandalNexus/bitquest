@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const getRedisMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
-vi.mock("@/lib/cache/redis", () => ({ getRedis: () => getRedisMock() }));
+vi.mock("@/lib/cache/redis", () => ({ getRedis: () => getRedisMock(), isRedisStrict: () => false }));
 
 import { GET } from "./route";
 import { signCertificate, type CertificatePayload } from "@/lib/certificates/sign";

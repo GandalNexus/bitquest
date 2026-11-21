@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import { getRedis } from "@/lib/cache/redis";
+import { getRedis, isRedisStrict } from "@/lib/cache/redis";
 import { logger } from "@/lib/log";
 import { PROTOCOL_VERSION } from "./protocol";
 
@@ -148,6 +148,10 @@ export async function verifyChallenge(token: string): Promise<ChallengeClaims> {
     if (result === null) {
       throw new Error("Nonce BitLab déjà consommé (replay bloqué).");
     }
+  } else if (isRedisStrict()) {
+    // Fail-closed : en prod, impossible de garantir l'anti-replay sans Redis.
+    log.error({ nonce: claims.nonce }, "redis indisponible en mode strict : refus challenge");
+    throw new Error("Service anti-replay indisponible — réessaie dans quelques secondes.");
   } else {
     log.warn({ nonce: claims.nonce }, "redis indisponible : anti-replay désactivé en dev");
   }

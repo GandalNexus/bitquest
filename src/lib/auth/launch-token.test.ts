@@ -15,7 +15,11 @@ const redisMock = vi.hoisted(() => ({
   set: vi.fn(),
 }));
 const getRedisMock = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/cache/redis", () => ({ getRedis: () => getRedisMock() }));
+const isRedisStrictMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/cache/redis", () => ({
+  getRedis: () => getRedisMock(),
+  isRedisStrict: () => isRedisStrictMock(),
+}));
 
 import {
   issueLaunchToken,
@@ -37,6 +41,8 @@ beforeEach(() => {
   redisMock.set.mockResolvedValue("OK");
   getRedisMock.mockReset();
   getRedisMock.mockResolvedValue(redisMock);
+  isRedisStrictMock.mockReset();
+  isRedisStrictMock.mockReturnValue(false);
 });
 
 describe("issueLaunchToken", () => {
@@ -105,8 +111,9 @@ describe("verifyLaunchToken — anti-replay", () => {
     await expect(verifyLaunchToken(token)).rejects.toThrow(/replay/i);
   });
 
-  it("sans Redis : anti-replay désactivé (dev) mais signature toujours vérifiée", async () => {
+  it("sans Redis + mode permissif : anti-replay désactivé (dev) mais signature toujours vérifiée", async () => {
     getRedisMock.mockResolvedValue(null);
+    isRedisStrictMock.mockReturnValue(false);
     const { token } = await issueLaunchToken({
       userId: "u1",
       pseudo: "alice",
@@ -116,6 +123,19 @@ describe("verifyLaunchToken — anti-replay", () => {
     });
     const claims = await verifyLaunchToken(token);
     expect(claims.userId).toBe("u1");
+  });
+
+  it("sans Redis + mode strict : refuse (fail-closed prod)", async () => {
+    getRedisMock.mockResolvedValue(null);
+    isRedisStrictMock.mockReturnValue(true);
+    const { token } = await issueLaunchToken({
+      userId: "u1",
+      pseudo: "alice",
+      role: "APPRENTICE",
+      email: null,
+      emailVerifiedAt: null,
+    });
+    await expect(verifyLaunchToken(token)).rejects.toThrow(/anti-replay indisponible/i);
   });
 });
 

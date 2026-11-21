@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import { getRedis } from "@/lib/cache/redis";
+import { getRedis, isRedisStrict } from "@/lib/cache/redis";
 import { logger } from "@/lib/log";
 import { PROTOCOL_VERSION } from "@/lib/bitlab/protocol";
 
@@ -148,8 +148,13 @@ export async function verifyLaunchToken(token: string): Promise<LaunchTokenClaim
     if (result === null) {
       throw new Error("Launch token déjà consommé (replay bloqué).");
     }
+  } else if (isRedisStrict()) {
+    // Fail-closed : en prod, l'absence de Redis = refus. Un launch token
+    // sans vérification anti-replay = fenêtre de replay ouverte.
+    log.error({ nonce }, "redis indisponible en mode strict : refus anti-replay");
+    throw new Error("Service anti-replay indisponible — réessaie dans quelques secondes.");
   } else {
-    log.warn({ nonce }, "redis indisponible : anti-replay launch token désactivé");
+    log.warn({ nonce }, "redis indisponible : anti-replay launch token désactivé (dev)");
   }
 
   const email = typeof claims.email === "string" ? claims.email : null;

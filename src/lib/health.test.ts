@@ -10,6 +10,7 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/cache/redis", () => ({
   getRedis: () => getRedisMock(),
+  isRedisStrict: () => false,
 }));
 
 import { getHealthStatus, HEALTH_DEGRADED_MS } from "./health";

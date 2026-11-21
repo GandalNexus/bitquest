@@ -7,6 +7,7 @@ import {
   rateLimit,
 } from "@/lib/bitquest/session";
 import { buildClearCsrfCookie } from "@/lib/auth/csrf";
+import { isOriginAllowed } from "@/lib/auth/cors";
 import { logger } from "@/lib/log";
 
 const log = logger("bitlab-logout");
@@ -32,15 +33,6 @@ const log = logger("bitlab-logout");
  * - Rate-limit IP 30/60s (même budget que bitlab-sso).
  */
 
-function allowedOrigins(): string[] {
-  const raw = process.env.BITLAB_ALLOWED_ORIGINS?.trim();
-  if (!raw) return ["*"];
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 function validateReturnTo(raw: string | null): URL | null {
   if (!raw) return null;
   let url: URL;
@@ -50,11 +42,8 @@ function validateReturnTo(raw: string | null): URL | null {
     return null;
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-
-  const origins = allowedOrigins();
-  if (origins.includes("*")) return url;
   const originStr = `${url.protocol}//${url.host}`;
-  if (!origins.includes(originStr)) return null;
+  if (!isOriginAllowed(originStr)) return null;
   return url;
 }
 

@@ -21,7 +21,7 @@ vi.mock("@/lib/bitquest/session", async () => {
 });
 
 const getRedisMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
-vi.mock("@/lib/cache/redis", () => ({ getRedis: () => getRedisMock() }));
+vi.mock("@/lib/cache/redis", () => ({ getRedis: () => getRedisMock(), isRedisStrict: () => false }));
 
 const dbMock = vi.hoisted(() => ({ user: { findUnique: vi.fn() } }));
 vi.mock("@/lib/db", () => ({ db: dbMock }));

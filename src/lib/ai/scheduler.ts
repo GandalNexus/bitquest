@@ -79,7 +79,7 @@ export async function runSchedulerTick(): Promise<TickResult> {
       const taxonomy = await loadTaxonomy(type);
       for (let i = 0; i < Math.max(1, Math.min(cfg.maxPerRun, 5)); i++) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
           const result = await generateDraft({ type, brief, taxonomy: taxonomy as any });
           const issues = checkConformity(type, result.draft);
           const errors = issues.filter((i) => i.severity === "error");

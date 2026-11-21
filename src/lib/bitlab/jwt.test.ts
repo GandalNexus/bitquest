@@ -13,6 +13,7 @@ const getRedisMock: ReturnType<typeof vi.fn> = vi.fn();
 
 vi.mock("@/lib/cache/redis", () => ({
   getRedis: () => getRedisMock(),
+  isRedisStrict: () => false,
 }));
 
 import {

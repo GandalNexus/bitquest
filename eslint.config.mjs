@@ -39,6 +39,8 @@ const eslintConfig = [
 
       // ── React (base gérée par oxlint) ────────────────────────────────
       "react-hooks/exhaustive-deps": "warn", // gardé : utile pour éviter les bugs silencieux
+      "react-hooks/immutability": "off", // React Compiler strictness — pas adopté dans le projet
+      "react-hooks/set-state-in-effect": "off", // Idem — pattern largement répandu dans le code existant
       "react/no-unescaped-entities": "off",
       "react/display-name": "off",
       "react/prop-types": "off",

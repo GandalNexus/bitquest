@@ -63,6 +63,26 @@ export async function getRedis(): Promise<Redis | null> {
   return clientPromise;
 }
 
+/**
+ * Fail-closed : en prod, Redis est obligatoire pour la sécurité
+ * (anti-replay nonces, idempotence launch-token / challenge JWT).
+ *
+ * Priorité :
+ *   1. `REDIS_REQUIRED=0`   → fail-open explicite (dev avec flag).
+ *   2. `REDIS_REQUIRED=1`   → fail-closed explicite (preprod, CI).
+ *   3. `NODE_ENV=production` → fail-closed par défaut.
+ *   4. Sinon                → fail-open par défaut (dev).
+ *
+ * Export utilisé par les call sites anti-replay pour choisir entre
+ * (accepter sans vérifier) et (refuser 503).
+ */
+export function isRedisStrict(): boolean {
+  const flag = process.env.REDIS_REQUIRED?.trim();
+  if (flag === "0" || flag === "false") return false;
+  if (flag === "1" || flag === "true") return true;
+  return process.env.NODE_ENV === "production";
+}
+
 /** Permet de réinitialiser le singleton (utile dans les tests). */
 export function __resetRedisClientForTests(): void {
   clientPromise = null;

@@ -30,7 +30,7 @@ export function checkConformity<T extends DraftType>(
 
   switch (type) {
     case "QUEST": {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const q = payload as any;
       const range = XP_RANGES[q.track];
       if (range) {
@@ -59,7 +59,7 @@ export function checkConformity<T extends DraftType>(
       break;
     }
     case "LESSON": {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const l = payload as any;
       const totalChars =
         (l.intro?.length ?? 0) +
@@ -76,7 +76,7 @@ export function checkConformity<T extends DraftType>(
       break;
     }
     case "CHAPTER": {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const c = payload as any;
       if (c.lessonsPlan.length < 2) {
         issues.push({
@@ -88,7 +88,7 @@ export function checkConformity<T extends DraftType>(
       break;
     }
     case "CHALLENGE": {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const ch = payload as any;
       const today = new Date().toISOString().slice(0, 10);
       if (ch.date < today) {

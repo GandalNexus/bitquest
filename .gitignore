@@ -71,3 +71,4 @@ server.log
 # Postgres backups (scripts/backup-postgres.sh, voir docs/POSTGRES_PROD.md)
 /backups/
 *.dump.gz
+.vitest/

@@ -42,7 +42,7 @@ const dbMock = vi.hoisted(() => ({
 vi.mock("@/lib/db", () => ({ db: dbMock }));
 
 const getRedisMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
-vi.mock("@/lib/cache/redis", () => ({ getRedis: () => getRedisMock() }));
+vi.mock("@/lib/cache/redis", () => ({ getRedis: () => getRedisMock(), isRedisStrict: () => false }));
 
 /* ---------- Imports — APRÈS les vi.mock ---------- */
 
