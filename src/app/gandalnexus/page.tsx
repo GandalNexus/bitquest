@@ -4,9 +4,11 @@ import {
   ArrowRight,
   BookOpen,
   Coins,
+  ExternalLink,
   FlaskConical,
   Github,
   Globe,
+  Handshake,
   Heart,
   Lightbulb,
   Shield,
@@ -144,6 +146,44 @@ async function getPublishedMembers() {
   }
 }
 
+type PartnerRow = {
+  id: string;
+  name: string;
+  tier: string;
+  description: string;
+  websiteUrl: string | null;
+  logoUrl: string | null;
+  initials: string;
+};
+
+/** Charge les partenaires publiés groupés par tier. Table absente → [] silencieux. */
+async function getPublishedPartners(): Promise<PartnerRow[]> {
+  try {
+    return await db.partner.findMany({
+      where: { publishedAt: { not: null } },
+      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        tier: true,
+        description: true,
+        websiteUrl: true,
+        logoUrl: true,
+        initials: true,
+      },
+    });
+  } catch {
+    return [];
+  }
+}
+
+const TIER_META: Record<string, { label: string; accent: string }> = {
+  SPONSOR: { label: "Sponsors", accent: "text-primary" },
+  PARTNER: { label: "Partenaires", accent: "text-sky-500" },
+  SUPPORTER: { label: "Soutiens", accent: "text-emerald-500" },
+};
+const TIER_ORDER = ["SPONSOR", "PARTNER", "SUPPORTER"] as const;
+
 const PRINCIPLES = [
   "Pas de monnaie fictive confondue avec du vrai Bitcoin — séparation stricte",
   "Pas de collecte de données utilisateur au-delà du strict nécessaire",
@@ -153,6 +193,13 @@ const PRINCIPLES = [
 
 export default async function GandalNexusLandingPage() {
   const members = await getPublishedMembers();
+  const partners = await getPublishedPartners();
+  const partnersByTier = TIER_ORDER.map((tier) => ({
+    tier,
+    label: TIER_META[tier].label,
+    accent: TIER_META[tier].accent,
+    rows: partners.filter((p) => p.tier === tier),
+  })).filter((g) => g.rows.length > 0);
   return (
     <div className="relative min-h-screen bg-background">
       <div aria-hidden className="starfield pointer-events-none" />
@@ -395,6 +442,102 @@ export default async function GandalNexusLandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Sponsors & partenaires */}
+      {partnersByTier.length > 0 && (
+        <section className="relative z-10 mx-auto w-full max-w-6xl px-4 py-16">
+          <div className="mb-8 text-center">
+            <Handshake className="mx-auto mb-3 h-8 w-8 text-primary" aria-hidden />
+            <h2 className="font-display text-2xl font-bold sm:text-3xl">
+              Sponsors &amp; partenaires
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Celles et ceux qui rendent l&apos;écosystème possible — soutien financier,
+              infrastructure, expertise et communauté.
+            </p>
+          </div>
+
+          {partnersByTier.map((group) => (
+            <div key={group.tier} className="mb-10 last:mb-0">
+              <h3
+                className={`mb-4 text-center text-xs font-semibold uppercase tracking-wider ${group.accent}`}
+              >
+                {group.label}
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {group.rows.map((p) => {
+                  const inner = (
+                    <Card className="h-full transition-colors group-hover:border-primary/40">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center gap-3">
+                          {p.logoUrl ? (
+                            <Image
+                              src={p.logoUrl}
+                              alt={`Logo ${p.name}`}
+                              width={48}
+                              height={48}
+                              className="h-12 w-12 shrink-0 rounded-md bg-background object-contain p-1"
+                              unoptimized
+                            />
+                          ) : (
+                            <div
+                              aria-hidden
+                              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-primary/30 to-primary/10 font-display text-base font-bold text-primary"
+                            >
+                              {p.initials}
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <CardTitle className="flex items-center gap-1.5 truncate text-base">
+                              {p.name}
+                              {p.websiteUrl && (
+                                <ExternalLink
+                                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                                  aria-hidden
+                                />
+                              )}
+                            </CardTitle>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">{p.description}</p>
+                      </CardContent>
+                    </Card>
+                  );
+                  return p.websiteUrl ? (
+                    <a
+                      key={p.id}
+                      href={p.websiteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
+                    >
+                      {inner}
+                    </a>
+                  ) : (
+                    <div key={p.id}>{inner}</div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          <div className="mt-8 rounded-md border border-primary/20 bg-primary/5 p-4 text-center text-sm">
+            <Handshake className="mx-auto mb-2 h-5 w-5 text-primary" aria-hidden />
+            Tu veux soutenir GandalNexus ou devenir partenaire ?{" "}
+            <a
+              href="https://github.com"
+              rel="noopener noreferrer"
+              target="_blank"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Contacte-nous via GitHub
+            </a>
+            .
+          </div>
+        </section>
+      )}
 
       {/* CTA final */}
       <section className="relative z-10 mx-auto w-full max-w-4xl px-4 py-16 text-center">

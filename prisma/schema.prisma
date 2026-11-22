@@ -458,6 +458,34 @@ model TeamMember {
   @@index([publishedAt])
 }
 
+/**
+ * Sponsors / partenaires affichés publiquement sur la landing /gandalnexus.
+ *
+ * - `tier` catégorise l'affichage : SPONSOR (partenaire financier, affichage
+ *   proéminent), PARTNER (partenariat institutionnel ou technique), SUPPORTER
+ *   (soutien communautaire).
+ * - `publishedAt` null = brouillon (non affiché publiquement).
+ * - `logoUrl` optionnel ; fallback = `initials` comme pour TeamMember.
+ * - `websiteUrl` optionnel ; si présent, le logo/nom devient un lien externe.
+ */
+model Partner {
+  id          String    @id @default(cuid())
+  name        String
+  tier        String // SPONSOR | PARTNER | SUPPORTER
+  description String // courte description max ~500 chars
+  websiteUrl  String? // URL externe optionnelle
+  logoUrl     String? // URL image optionnelle
+  initials    String // 2-4 caractères, fallback logo
+  order       Int       @default(0)
+  publishedAt DateTime? // null = brouillon
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([order])
+  @@index([publishedAt])
+  @@index([tier])
+}
+
 model LightningReward {
   id             String    @id @default(cuid())
   userId         String

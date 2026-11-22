@@ -377,6 +377,48 @@ export const adminTeamMemberUpdateSchema = teamMemberCoreSchema.partial();
 export type AdminTeamMemberCreateBody = z.infer<typeof adminTeamMemberCreateSchema>;
 export type AdminTeamMemberUpdateBody = z.infer<typeof adminTeamMemberUpdateSchema>;
 
+/* ============================================================
+ * Partenaires / sponsors (landing /gandalnexus)
+ * ============================================================ */
+
+export const PARTNER_TIERS = ["SPONSOR", "PARTNER", "SUPPORTER"] as const;
+export type PartnerTier = (typeof PARTNER_TIERS)[number];
+
+const partnerCoreSchema = z.object({
+  name: z.string().trim().min(2, "Nom trop court.").max(80, "Nom trop long."),
+  tier: z.enum(PARTNER_TIERS),
+  description: z.string().trim().min(2).max(500),
+  websiteUrl: z
+    .string()
+    .trim()
+    .url("URL invalide.")
+    .max(500)
+    .nullable()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : null)),
+  logoUrl: z
+    .string()
+    .trim()
+    .url("URL invalide.")
+    .max(500)
+    .nullable()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : null)),
+  initials: z
+    .string()
+    .trim()
+    .min(1, "Initiales requises.")
+    .max(4, "Max 4 caractères."),
+  order: z.number().int().nonnegative().max(1_000).default(0),
+  publishedAt: z.string().datetime().nullable().optional(),
+});
+
+export const adminPartnerCreateSchema = partnerCoreSchema;
+export const adminPartnerUpdateSchema = partnerCoreSchema.partial();
+
+export type AdminPartnerCreateBody = z.infer<typeof adminPartnerCreateSchema>;
+export type AdminPartnerUpdateBody = z.infer<typeof adminPartnerUpdateSchema>;
+
 /* ---------- /api/admin/badges ---------- */
 
 export const BADGE_RARITIES = ["COMMON", "RARE", "EPIC"] as const;

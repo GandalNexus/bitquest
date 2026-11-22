@@ -10,6 +10,7 @@ import {
   FlaskConical,
   Gauge,
   GraduationCap,
+  Handshake,
   LayoutDashboard,
   Lock,
   LogIn,
@@ -65,6 +66,7 @@ const NAV: NavItem[] = [
   { href: "/admin/users", label: "Utilisateurs", icon: Users, minRole: "ADMIN", section: "Communauté" },
   { href: "/admin/badges", label: "Badges", icon: Trophy, minRole: "ADMIN" },
   { href: "/admin/team-members", label: "Équipe", icon: UsersRound, minRole: "ADMIN" },
+  { href: "/admin/partners", label: "Sponsors", icon: Handshake, minRole: "ADMIN" },
 
   // Preuves & récompenses — ADMIN
   { href: "/admin/bitlab/attempts", label: "BitLab preuves", icon: FlaskConical, minRole: "ADMIN", section: "Preuves" },
