@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AcademyProviders } from "./providers";
+import { PublicNav } from "@/components/bitquest/public-nav";
 
 export const metadata: Metadata = {
   title: "Académie — BitQuest",
@@ -8,5 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default function AcademyLayout({ children }: { children: React.ReactNode }) {
-  return <AcademyProviders>{children}</AcademyProviders>;
+  return (
+    <AcademyProviders>
+      <PublicNav />
+      {children}
+    </AcademyProviders>
+  );
 }

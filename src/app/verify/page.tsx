@@ -2,6 +2,7 @@ import { CheckCircle2, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { verifyCertificate } from "@/lib/certificates/sign";
+import { PublicNav } from "@/components/bitquest/public-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,9 @@ export default async function VerifyPage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 py-10">
+    <>
+      <PublicNav />
+      <div className="mx-auto max-w-2xl space-y-6 px-4 py-10">
       <header>
         <h1 className="font-display text-3xl font-bold tracking-tight">
           Vérifier un certificat
@@ -216,6 +219,7 @@ export default async function VerifyPage({
         </ul>
       </section>
     </div>
+    </>
   );
 }
 
