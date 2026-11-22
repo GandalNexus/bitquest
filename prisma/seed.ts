@@ -311,6 +311,72 @@ async function main() {
   }
   console.log(`Équipe : ${seededMembers.length} membres seedés (idempotent)`);
 
+  /* ---- Sponsors & partenaires (landing /gandalnexus) ---- */
+  // Même logique que les membres : upsert idempotent par `name` logique, pas
+  // d'écrasement si un admin a édité en prod. Donne une base visible pour la
+  // section "Sponsors & partenaires" après `npm run db:seed`.
+  const seededPartners: Array<{
+    name: string;
+    tier: "SPONSOR" | "PARTNER" | "SUPPORTER";
+    description: string;
+    websiteUrl: string | null;
+    initials: string;
+    order: number;
+  }> = [
+    {
+      name: "LDK (Lightning Dev Kit)",
+      tier: "PARTNER",
+      description:
+        "Bibliothèque Rust open-source qui propulse BitLab via WebAssembly. Deux nœuds Lightning testnet + signet tournent dans ton navigateur grâce à leur travail.",
+      websiteUrl: "https://lightningdevkit.org",
+      initials: "LDK",
+      order: 10,
+    },
+    {
+      name: "mempool.space",
+      tier: "PARTNER",
+      description:
+        "Explorateur Bitcoin open-source utilisé pour vérifier les preuves TX/ADDRESS des quêtes BitQuest. API publique gratuite, sans compte requis.",
+      websiteUrl: "https://mempool.space",
+      initials: "MS",
+      order: 11,
+    },
+    {
+      name: "Blockstream",
+      tier: "PARTNER",
+      description:
+        "Fallback explorateur Bitcoin pour les vérifications de preuves. Service infrastructure ouvert, accessible depuis BitQuest sans authentification.",
+      websiteUrl: "https://blockstream.info",
+      initials: "BS",
+      order: 12,
+    },
+    {
+      name: "Open Source Contributors",
+      tier: "SUPPORTER",
+      description:
+        "Dizaines de contributeurs anonymes qui signalent les bugs, relisent les quêtes, traduisent les textes en wolof et en anglais.",
+      websiteUrl: null,
+      initials: "OSC",
+      order: 20,
+    },
+  ];
+  for (const p of seededPartners) {
+    const existing = await db.partner.findFirst({ where: { name: p.name } });
+    if (existing) continue;
+    await db.partner.create({
+      data: {
+        name: p.name,
+        tier: p.tier,
+        description: p.description,
+        websiteUrl: p.websiteUrl,
+        initials: p.initials,
+        order: p.order,
+        publishedAt: new Date(),
+      },
+    });
+  }
+  console.log(`Partenaires : ${seededPartners.length} entrées seedées (idempotent)`);
+
   /* ---- Feature flags (P3/P4) ---- */
   const seededFlags = [
     {
