@@ -1,0 +1,71 @@
+# .dockerignore — Contexte de build minimal pour Dockerfile.dev
+#
+# Ce fichier NE SUPPRIME RIEN du dépôt : il exclut uniquement des fichiers
+# du contexte envoyé au daemon Docker lors de `docker build`.
+# Les bind mounts (docker-compose.dev.yml) rendent de toute façon TOUT le
+# dossier projet disponible à l'exécution dans /app.
+
+# Dépendances (gérées par volume nommé)
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Lockfile Bun — conservé dans le dépôt mais inutile côté image npm
+bun.lock
+
+# Next.js
+.next
+out
+.vercel
+
+# TypeScript incremental
+*.tsbuildinfo
+next-env.d.ts
+
+# Build sortants
+build
+dist
+
+# Variables d'environnement locales (ne JAMAIS embarquer)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Git / CI
+.git
+.gitignore
+.github
+
+# IDE / éditeur
+.vscode
+.idea
+.DS_Store
+
+# Logs runtime
+*.log
+dev.log
+dev.out.log
+server.log
+
+# Outils Claude Code / divers
+.claude
+.z-ai-config
+.cursor
+
+# Tests / couverture
+coverage
+.nyc_output
+
+# Docs (volumineux, pas nécessaires au build de l'image)
+docs
+
+# Fichiers Docker eux-mêmes (évite les boucles si on les modifie)
+Dockerfile.dev
+docker-compose.dev.yml
+.dockerignore
+
+# Base SQLite — montée via bind mount, pas via contexte build
+db

@@ -95,76 +95,78 @@ docs: update README
 
 ### Database
 
-- Use Drizzle ORM for all queries
-- Create migrations for schema changes
-- Test migrations locally before committing
+- Use **Prisma** ORM for all queries (schema in `prisma/schema.prisma`).
+- Create migrations additively (no DROP / no rename) for backward compat.
+- All existing migrations ship with CI — see `prisma/migrations/`.
+- Index composites on hot paths (cf. LOT 39, 41).
 
-## Project Structure
+## Project Structure (actuel)
 
 ```
 bitquest/
-├── app/              # Next.js pages and routes
-│   ├── actions/      # Server Actions
-│   ├── dashboard/    # Dashboard pages
-│   └── ...
-├── components/       # Reusable React components
-├── db/              # Database configuration and schema
-├── public/          # Static assets
-└── middleware.ts    # Next.js middleware
+├── src/app/             # Next.js 16 pages + API routes
+│   ├── (admin)/         # Admin + Studio route groups
+│   ├── (app)/           # Pages apprenants (layout AppShell)
+│   ├── api/             # API handlers (REST-ish)
+│   └── academy/         # Catalogue académie public
+├── src/components/       # Composants réutilisables (shadcn-like)
+├── src/lib/              # Business logic, helpers, protocole BitLab
+├── prisma/              # Schema + migrations + seed.ts
+├── tests/e2e/           # Playwright scenarios
+├── scripts/             # Bash helpers (setup-dev, smoke, backup-postgres…)
+└── docs/                # 6 livrables publics (voir ci-dessous)
 ```
 
 ## Development Setup
 
-1. **Clone the repository**
+**Chemin rapide** (recommandé, Docker) :
 
-   ```bash
-   git clone https://github.com/your-username/bitquest.git
-   cd bitquest
-   ```
+```bash
+git clone <repo>
+cd bitquest
+./scripts/setup-dev.sh         # 6 étapes idempotentes, ~2 min
+# Variables optionnelles : SKIP_SEED=1, BASE=<url>
+```
 
-2. **Install dependencies**
-
-   ```bash
-   npm install
-   ```
-
-3. **Configure environment**
-
-   ```bash
-   cp .env.example .env
-   # Edit .env with your information
-   ```
-
-4. **Setup database**
-
-   ```bash
-   createdb bitquest
-   npx drizzle-kit generate
-   npx drizzle-kit push
-   ```
-
-5. **Start development server**
-   ```bash
-   npm run dev
-   ```
+Le script :
+1. Vérifie Docker + compose v2.
+2. Lance `docker-compose.dev.yml` (postgres + redis + app Next.js).
+3. Attend postgres healthy (polling jusqu'à 60s).
+4. Applique les migrations Prisma.
+5. Seed idempotent (users, quêtes, académie, ChapterQuest, flags).
+6. Smoke test routes (22 routes publiques).
 
 ## Testing
 
-Before submitting a PR:
+```bash
+# Unit (vitest) : 898 tests
+docker exec bitquest-dev npx vitest run
 
-1. Check that code compiles without errors
+# Typecheck
+docker exec bitquest-dev npx tsc --noEmit
 
-   ```bash
-   npm run build
-   ```
+# Lint
+docker exec bitquest-dev npx eslint src/
 
-2. Check linting
+# E2E Playwright (API-level, 23 scénarios)
+docker exec bitquest-dev npx playwright test tests/e2e/
 
-   ```bash
-   npm run lint
-   ```
+# Smoke HTTP (22 routes)
+./scripts/smoke-routes.sh
+```
 
-3. Manually test your changes
+Before submitting a PR, **all four must pass** (vitest + tsc + eslint +
+smoke). L'ajout d'une nouvelle route de mutation **sans CSRF** sera
+détecté par le gel de propriété (`src/lib/auth/csrf-coverage.test.ts`).
+
+## Documents publics (6 livrables)
+
+- `docs/FEATURES-INVENTORY.md` — matrice DONE/PARTIAL/VERIFY/TODO.
+- `docs/IMPLEMENTATION-STATUS.md` — critères d'acceptation P0→P3.
+- `docs/BITQUEST-BITLAB-INTEGRATION.md` — protocole bout-en-bout.
+- `docs/TECHNICAL-DEBT.md` — dette classée.
+- `docs/RELEASE-READINESS.md` — checklist prod + env vars.
+- `docs/CERTIFICATES_V1.md` — spec Certificate v1 HMAC.
 
 ## License
 

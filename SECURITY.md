@@ -49,6 +49,13 @@ We ask that you:
 We publicly acknowledge security researchers who report vulnerabilities
 responsibly (unless you prefer to remain anonymous).
 
+## Security Checklist (details)
+
+See [`docs/SECURITY_CHECKLIST.md`](./docs/SECURITY_CHECKLIST.md) for the full
+breakdown of in-place protections (auth, CSRF, RBAC, validation, rate limiting,
+observability, RGPD), a checklist for an external penetration test, and known
+limitations documented for audit.
+
 ## Security Best Practices
 
 ### For Users

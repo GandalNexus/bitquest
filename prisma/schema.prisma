@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -14,6 +14,7 @@ model User {
   passwordHash    String?
   isGuest         Boolean  @default(false)
   isBot           Boolean  @default(false)
+  role            String   @default("APPRENTICE") // APPRENTICE | EDITOR | ADMIN
   token           String   @unique
   xp              Int      @default(0)
   sats            Int      @default(0)
@@ -21,11 +22,21 @@ model User {
   streak          Int      @default(1)
   lastActiveDate  String?
   createdAt       DateTime @default(now())
+  deletedAt       DateTime? // soft-delete RGPD : row conservée pour l'audit, PII effacées à la suppression
+  emailVerifiedAt DateTime? // null = email non vérifié
+  verificationToken String? @unique // token actif courant (null une fois utilisé)
 
-  progress     UserQuestProgress[]
-  badges       UserBadge[]
-  transactions WalletTransaction[]
-  events       UserEvent[]
+  progress       UserQuestProgress[]
+  badges         UserBadge[]
+  transactions   WalletTransaction[]
+  events         UserEvent[]
+  lessonProgress LessonProgress[]
+  adminAuditLogs AdminAuditLog[]
+  dailyChallengeCompletions DailyChallengeCompletion[]
+  bitLabProofs BitLabProof[]
+  missionAttempts MissionAttempt[]
+  lightningRewards LightningReward[]
+  attestations    Attestation[]
 }
 
 model Quest {
@@ -43,9 +54,11 @@ model Quest {
   requiredLevel  Int    @default(1)
   missionType    String
   missionConfig  String // JSON config for the BitLab mission generator
+  missionKind    String @default("SIMULATED") // SIMULATED | BITLAB_PROOF (Phase 3)
 
   quizQuestions QuizQuestion[]
   progress      UserQuestProgress[]
+  chapters      ChapterQuest[]
 }
 
 model QuizQuestion {
@@ -58,8 +71,6 @@ model QuizQuestion {
   options     String // JSON array of options (empty for TRUE_FALSE)
   correct     String // JSON: { index } for MCQ, { bool } for TRUE_FALSE
   explanation String
-
-  quest2 String?
 }
 
 model UserQuestProgress {
@@ -119,7 +130,350 @@ model UserEvent {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String // QUEST_COMPLETED | BADGE_UNLOCKED | LEVEL_UP | SATS_EARNED | QUIZ_PASSED
+  type      String // QUEST_COMPLETED | BADGE_UNLOCKED | LEVEL_UP | SATS_EARNED | QUIZ_PASSED | LESSON_COMPLETED
   payload   String // JSON
   createdAt DateTime @default(now())
+}
+
+/* =============================================================
+ * ACADEMY  — Sprint 1B
+ * Parcours pédagogique structuré (Course → Chapter → Lesson),
+ * complémentaire du système de quêtes gamifiées.
+ * ============================================================= */
+
+model Course {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  subtitle    String
+  description String
+  coverIcon   String    @default("BookOpen")
+  order       Int
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  chapters Chapter[]
+}
+
+model Chapter {
+  id       String @id @default(cuid())
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  slug     String
+  title    String
+  summary  String
+  order    Int
+
+  lessons      Lesson[]
+  linkedQuests ChapterQuest[]
+
+  @@unique([courseId, slug])
+  @@index([courseId, order])
+}
+
+model Lesson {
+  id               String    @id @default(cuid())
+  chapterId        String
+  chapter          Chapter   @relation(fields: [chapterId], references: [id], onDelete: Restrict)
+  slug             String
+  title            String
+  summary          String
+  content          String
+  estimatedMinutes Int       @default(5)
+  order            Int
+  publishedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  progress LessonProgress[]
+
+  @@unique([chapterId, slug])
+  @@index([chapterId, order])
+}
+
+model LessonProgress {
+  userId      String
+  lessonId    String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+
+  @@id([userId, lessonId])
+  @@index([userId])
+}
+
+model ChapterQuest {
+  chapterId String
+  questId   String
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  quest     Quest   @relation(fields: [questId], references: [id], onDelete: Restrict)
+  order     Int
+  note      String?
+
+  @@id([chapterId, questId])
+  @@index([chapterId])
+}
+
+/* =============================================================
+ * ADMIN AUDIT LOG — Phase 2.3+
+ * Trace toutes les mutations admin (role change, CRUD contenu, etc.)
+ * ============================================================= */
+
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  actor     User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  action    String   // ROLE_CHANGE | COURSE_CREATE | COURSE_UPDATE | COURSE_DELETE | CHAPTER_* | LESSON_*
+  resource  String   // ex. "course:cmwb...", "lesson:cmw9..."
+  meta      String   // JSON snapshot (changements, contexte)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId])
+}
+
+/* =============================================================
+ * DAILY CHALLENGE — Phase 2.8
+ * Un défi par jour-calendrier. Pas de création/completion automatique,
+ * c'est un apport pédagogique léger qui vit à côté des quêtes.
+ * ============================================================= */
+
+model DailyChallenge {
+  id         String   @id @default(cuid())
+  date       String   @unique // ISO day "YYYY-MM-DD" — timezone UTC
+  title      String
+  prompt     String   // description courte
+  xpReward   Int      @default(10)
+  satsReward Int      @default(50)
+  createdAt  DateTime @default(now())
+
+  completions DailyChallengeCompletion[]
+}
+
+model DailyChallengeCompletion {
+  userId      String
+  challengeId String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge   DailyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  completedAt DateTime       @default(now())
+
+  @@id([userId, challengeId])
+  @@index([userId])
+}
+
+/* =============================================================
+ * BITLAB INTEGRATION — Phase 3 foundation
+ * Preuves cryptographiques de mission réelle (txid testnet4, invoice BOLT11).
+ * Pour l'instant, aucun Quest n'est câblé sur ce modèle — c'est une fondation
+ * à activer quête par quête dans un sprint ultérieur.
+ * ============================================================= */
+
+model BitLabProof {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questCode  String // code de la quête concernée (pas FK — on garde la preuve même si la quête est supprimée)
+  kind       String // TX | BLOCK | INVOICE | CHANNEL | ADDRESS
+  network    String // testnet4 | signet | regtest
+  payload    String // JSON { txid, blockHash, bolt11, … }
+  verifiedAt DateTime @default(now())
+  consumed   Boolean  @default(false) // true quand la preuve a déjà donné lieu à l'octroi de récompense
+
+  @@unique([userId, questCode, kind])
+  @@index([userId])
+  @@index([questCode])
+}
+
+/**
+ * MissionAttempt — Phase 4 (intégration unifiée GandalNexus)
+ *
+ * Trace durable d'une tentative de mission BitLab lancée depuis BitQuest.
+ * Résout le problème : avant, une mission exécutée dans BitLab pouvait être
+ * perdue si l'utilisateur fermait le navigateur avant la redirection de retour.
+ * Désormais, chaque deep-link crée une row ici qui survit à toutes les
+ * interruptions et permet la reprise + le suivi côté dashboard.
+ *
+ * État = machine finie. Transitions contrôlées côté serveur :
+ *   CREATED → IN_PROGRESS (challenge JWT consommé)
+ *   IN_PROGRESS → PROOF_PENDING (preuve reçue, pré-validation OK)
+ *   PROOF_PENDING → VERIFYING (format OK, appel mempool/LND)
+ *   VERIFYING → COMPLETED (preuve validée + récompense attribuée)
+ *   VERIFYING → FAILED (preuve rejetée)
+ *   {CREATED,IN_PROGRESS,PROOF_PENDING} → ABANDONED (user clique "abandonner")
+ *   {CREATED,IN_PROGRESS,PROOF_PENDING} → EXPIRED (TTL dépassé, 2h par défaut)
+ *
+ * La récompense finale reste attribuée par `/api/quests/[code]/progress`
+ * (mission_submit) ; `resultJson` ici n'est qu'un snapshot pour l'UI.
+ */
+model MissionAttempt {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questId     String
+  questCode   String // dénormalisé : la row survit à la suppression de la quête
+  kind        String // TX | BLOCK | INVOICE | CHANNEL | ADDRESS
+  network     String // testnet4 | signet | regtest
+  state       String    @default("CREATED") // CREATED | IN_PROGRESS | PROOF_PENDING | VERIFYING | COMPLETED | FAILED | EXPIRED | ABANDONED
+  launchedAt  DateTime  @default(now())
+  expiresAt   DateTime
+  completedAt DateTime?
+  abandonedAt DateTime?
+  failedAt    DateTime?
+  failReason  String? // message court en FR (null si succès)
+  proofId     String? // FK logique vers BitLabProof si COMPLETED (pas de FK dure : BitLabProof peut être upserted plus tard)
+  resultJson  String? // JSON snapshot { xpEarned, satsEarned, badgesEarned, questStatus }
+  returnTo    String? // URL de retour BitQuest, pour reprise interface
+
+  @@index([userId, state])
+  @@index([userId, launchedAt])
+  @@index([questCode])
+  @@index([state, expiresAt])
+}
+
+/**
+ * Journal d'audit de chaque soumission à /api/bitlab/proof.
+ * Enregistre les succès ET les refus pour permettre à l'ops de
+ * mesurer le taux de succès, détecter des tentatives abusives, et
+ * débuguer les problèmes BitLab/LND/mempool. Volumétrie attendue
+ * modérée (une entrée par tentative, pas par preuve vérifiée).
+ */
+model BitLabProofAttempt {
+  id            String   @id @default(cuid())
+  userId        String
+  questCode     String
+  kind          String // TX | BLOCK | INVOICE | CHANNEL | ADDRESS
+  network       String
+  outcome       String // ACCEPTED | REJECTED | NOT_FOUND | UNAVAILABLE | INVALID_JWT | MEMPOOL | BAD_REQUEST | RATE_LIMITED | DUPLICATE
+  reasonMessage String? // message court en français (facultatif)
+  latencyMs     Int // durée totale du handler
+  createdAt     DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([questCode, createdAt])
+  @@index([outcome, createdAt])
+}
+
+/**
+ * Feature flags dynamiques (P3). Permet d'activer/désactiver du code
+ * par environnement ou par utilisateur sans redéploiement. Deux modes :
+ *   - Global : `enabled` s'applique à tous.
+ *   - Per-user : `userIds` (JSON array) override — le flag est "on"
+ *     pour ces userIds même si enabled=false. Pattern release canary.
+ */
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String
+  enabled     Boolean  @default(false)
+  userIds     String   @default("[]")
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([key])
+}
+
+/**
+ * Attestation signée d'une réalisation d'apprentissage (P3). Snapshot
+ * immuable ; l'émission d'un véritable certificat (NIP, X.509, PDF
+ * signé) se greffera dessus plus tard via Certificate.
+ *
+ * Types :
+ *   - QUEST_COMPLETED : l'user a complété la quête `targetCode`.
+ *   - COURSE_COMPLETED : toutes les leçons publiées du cours lues.
+ *   - BADGE_EARNED : l'user a débloqué le badge `targetCode`.
+ */
+model Attestation {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        String
+  targetCode  String
+  metadata    String        @default("{}")
+  issuedAt    DateTime      @default(now())
+  Certificate Certificate[]
+
+  @@unique([userId, kind, targetCode])
+  @@index([userId, issuedAt])
+  @@index([userId, kind])
+  @@index([kind, targetCode])
+}
+
+/**
+ * Certificat exportable (P3, placeholder pour phase 5+). Référence une
+ * Attestation et ajoute les champs d'export (format, URL publique,
+ * signature externe). Simple snapshot JSON pour l'instant ; la
+ * signature cryptographique arrivera avec le module nostr/NIP.
+ */
+model Certificate {
+  id            String      @id @default(cuid())
+  attestationId String
+  attestation   Attestation @relation(fields: [attestationId], references: [id], onDelete: Cascade)
+  format        String
+  publicUrl     String?
+  signatureJson String      @default("{}")
+  issuedAt      DateTime    @default(now())
+
+  @@index([attestationId])
+  @@index([attestationId, format]) // idempotence lookup LOT 28
+}
+
+/**
+ * Récompense Lightning réelle (P4). Enregistre chaque tentative de
+ * paiement Lightning vers un invoice fourni par l'apprenant. Isolé
+ * strictement des « sats » simulés du jeu (champ `User.sats`) — ne
+ * jamais mélanger les deux flux comptables (manifesto GandalNexus).
+ *
+ * Status :
+ *   - PENDING : créé, LND pas encore sollicité ou en route.
+ *   - PAID    : LND a renvoyé un preimage — succès confirmé.
+ *   - FAILED  : LND a renvoyé une erreur (réseau, no route, expired,
+ *               cancelled). `failureReason` contient le message court.
+ *
+ * Activation : feature flag `lightning.rewards` (off par défaut) ET
+ * variables d'env LND configurées. Sans les deux : `sendReward()`
+ * refuse de créer la ligne et n'appelle jamais LND.
+ */
+/**
+ * Membre de l'équipe GandalNexus affiché sur la landing publique
+ * `/gandalnexus`. CRUD administré depuis `/admin/team-members`.
+ *
+ * - `publishedAt` null = brouillon (non affiché publiquement).
+ * - `order` croissant pour contrôler l'ordre d'affichage.
+ * - `initials` sert d'avatar fallback si `avatarUrl` absent (ex. "AD").
+ */
+model TeamMember {
+  id           String    @id @default(cuid())
+  name         String
+  role         String // ex. "Lead ingénieur · architecte"
+  contribution String // description longue (max ~1KB)
+  initials     String // 1-4 caractères, avatar fallback
+  avatarUrl    String? // URL image optionnelle
+  order        Int       @default(0)
+  publishedAt  DateTime? // null = brouillon
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([order])
+  @@index([publishedAt])
+}
+
+model LightningReward {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoiceBolt11  String // invoice fournie par l'utilisateur
+  amountMsat     Int // montant demandé (msats), copié depuis l'invoice
+  status         String    @default("PENDING") // PENDING | PAID | FAILED
+  preimageHex    String? // présent si status=PAID
+  feeMsat        Int? // frais LND effectivement payés
+  failureReason  String? // message court FR si status=FAILED
+  attemptContext String    @default("{}") // JSON libre : questCode, triggeredBy, etc.
+  createdAt      DateTime  @default(now())
+  paidAt         DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([userId, status, createdAt]) // dashboard rewards 30j LOT 21 + caps LOT 14
+  @@index([failureReason, createdAt]) // top failure reasons admin LOT 16
 }

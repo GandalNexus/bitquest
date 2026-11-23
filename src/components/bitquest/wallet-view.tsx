@@ -9,6 +9,8 @@ import { useWallet } from "@/lib/bitquest/hooks";
 import { formatDate, formatSats } from "@/lib/bitquest/client";
 import { OrbiteMark } from "./brand";
 import { EmptyState, ErrorState, LoadingState } from "./ui-bits";
+import { useT } from "@/i18n/locale-provider";
+import { useLocale } from "@/i18n/locale-provider";
 
 /* Icônes par type de transaction */
 const TX_META: Record<string, { icon: LucideIcon; className: string }> = {
@@ -22,25 +24,28 @@ const fadeUp = {
   animate: { opacity: 1, y: 0 },
 };
 
-function txTime(iso: string): string {
+function txTime(iso: string, localeTag: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return `${formatDate(iso)} · ${date.toLocaleTimeString("fr-FR", {
+  return `${formatDate(iso)} · ${date.toLocaleTimeString(localeTag, {
     hour: "2-digit",
     minute: "2-digit",
   })}`;
 }
 
 export function WalletView() {
+  const t = useT();
+  const { locale } = useLocale();
+  const localeTag = locale === "fr" ? "fr-FR" : "en-US";
   const walletQuery = useWallet();
 
   if (walletQuery.isLoading) {
-    return <LoadingState label="Ouverture de ton wallet pédagogique…" />;
+    return <LoadingState label={t("wallet.loading")} />;
   }
   if (walletQuery.isError || !walletQuery.data) {
     return (
       <ErrorState
-        message="Impossible de charger ton wallet. Vérifie ta connexion."
+        message={t("wallet.error")}
         onRetry={() => walletQuery.refetch()}
       />
     );
@@ -62,7 +67,7 @@ export function WalletView() {
           <CardContent className="relative space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Wallet pédagogique BitQuest
+                {t("wallet.hero.label")}
               </p>
               <Badge
                 variant="outline"
@@ -72,7 +77,7 @@ export function WalletView() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                 </span>
-                Lightning Sandbox · Testnet
+                {t("wallet.hero.badge")}
               </Badge>
             </div>
             <div className="space-y-1.5">
@@ -82,7 +87,7 @@ export function WalletView() {
               </p>
               <p className="flex items-center gap-1.5 text-sm text-emerald-500">
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
-                {formatSats(wallet.totalEarned)} sats cumulés
+                {t("wallet.hero.cumulative", { amount: formatSats(wallet.totalEarned) })}
               </p>
             </div>
           </CardContent>
@@ -93,25 +98,24 @@ export function WalletView() {
       <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.05 }}>
         <Card className="rounded-xl">
           <CardHeader>
-            <CardTitle>Plafond journalier</CardTitle>
-            <CardDescription>
-              Le montant maximum de satoshis que tu peux gagner aujourd&apos;hui.
-            </CardDescription>
+            <CardTitle>{t("wallet.cap.title")}</CardTitle>
+            <CardDescription>{t("wallet.cap.description")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Progress
               value={dailyPct}
               className="h-2.5"
-              aria-label={`Plafond journalier utilisé à ${dailyPct} %`}
+              aria-label={t("wallet.cap.aria", { pct: dailyPct })}
             />
             <p className="text-sm font-medium">
-              {formatSats(wallet.dailyUsed)} / {formatSats(wallet.dailyCap)} sats gagnés aujourd&apos;hui
+              {t("wallet.cap.progress", {
+                used: formatSats(wallet.dailyUsed),
+                cap: formatSats(wallet.dailyCap),
+              })}
             </p>
             <p className="flex items-start gap-2 rounded-lg border border-dashed bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-              Note pédagogique : les satoshis de BitQuest sont des récompenses d&apos;apprentissage —
-              volontairement faibles et plafonnées chaque jour. L&apos;objectif est de comprendre
-              l&apos;économie de Bitcoin, pas de spéculer.
+              {t("wallet.cap.note")}
             </p>
           </CardContent>
         </Card>
@@ -121,14 +125,14 @@ export function WalletView() {
       <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.1 }}>
         <Card className="rounded-xl">
           <CardHeader>
-            <CardTitle>Historique des gains</CardTitle>
-            <CardDescription>Chaque récompense, du plus récent au plus ancien.</CardDescription>
+            <CardTitle>{t("wallet.history.title")}</CardTitle>
+            <CardDescription>{t("wallet.history.description")}</CardDescription>
           </CardHeader>
           <CardContent>
             {wallet.transactions.length > 0 ? (
               <ul
                 className="max-h-96 space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar]:w-1.5"
-                aria-label="Historique des transactions"
+                aria-label={t("wallet.history.aria")}
               >
                 {wallet.transactions.map((tx) => {
                   const meta = TX_META[tx.type];
@@ -144,7 +148,7 @@ export function WalletView() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{tx.description}</p>
-                        <p className="text-xs text-muted-foreground">{txTime(tx.createdAt)}</p>
+                        <p className="text-xs text-muted-foreground">{txTime(tx.createdAt, localeTag)}</p>
                       </div>
                       {isCapped ? (
                         <span className="shrink-0 text-sm text-muted-foreground">0</span>
@@ -158,7 +162,11 @@ export function WalletView() {
                 })}
               </ul>
             ) : (
-              <EmptyState icon={Coins} title="Aucun gain pour l'instant" sub="Les quêtes t'attendent !" />
+              <EmptyState
+                icon={Coins}
+                title={t("wallet.history.empty.title")}
+                sub={t("wallet.history.empty.sub")}
+              />
             )}
           </CardContent>
         </Card>

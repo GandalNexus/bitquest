@@ -46,9 +46,26 @@ local-*
 *.log
 dev.log
 dev.out.log
-test
-prompt
+/test
+/prompt
 
 server.log
 # Skills directory
 /skills/
+
+# Snapshots locaux de la base SQLite (ne jamais versionner)
+# Note : depuis Phase 0.4, la base principale est Postgres (bitquest_postgres_data).
+# Les fichiers SQLite ci-dessous sont conservés pour l'historique mais ne sont
+# plus utilisés par l'app en dev.
+/db/*.bak*
+/db/*.db-journal
+/db/*.sqlite*
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# Postgres backups (scripts/backup-postgres.sh, voir docs/POSTGRES_PROD.md)
+/backups/
+*.dump.gz

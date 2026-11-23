@@ -1,23 +1,15 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
-  const userSession = request.cookies.get("user_session");
-  const { pathname } = request.nextUrl;
-
-  if (pathname === "/login" || pathname === "/signup" || pathname === "/") {
-    if (userSession && (pathname === "/login" || pathname === "/signup")) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-    return NextResponse.next();
-  }
-
-  if (pathname.startsWith("/dashboard") || pathname.startsWith("/quest")) {
-    if (!userSession) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-  }
-
+/**
+ * L'authentification BitQuest est entièrement client-side (localStorage + x-gn-user-id
+ * / x-gn-token). Les pages client affichent AuthScreen lorsqu'aucune session n'est
+ * détectée ; aucun redirect côté middleware n'est nécessaire pour l'instant.
+ *
+ * Ce middleware est conservé comme point d'ancrage pour la Phase 1 sécurité
+ * (cookies signés, protection CSRF, etc.).
+ */
+export function middleware(_request: NextRequest) {
   return NextResponse.next();
 }
 

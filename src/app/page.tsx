@@ -1,8 +1,7 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "next-themes";
-import { useState } from "react";
+import { Suspense, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { useBitQuest } from "@/lib/bitquest/store";
 import { useMe, useSessionHydration } from "@/lib/bitquest/hooks";
 import { AppShell } from "@/components/bitquest/app-shell";
@@ -14,6 +13,36 @@ import { ProfileView } from "@/components/bitquest/profile-view";
 import { WalletView } from "@/components/bitquest/wallet-view";
 import { Leaderboard } from "@/components/bitquest/leaderboard";
 import { LoadingState } from "@/components/bitquest/ui-bits";
+import {
+  buildBitlabSsoRedirectUrl,
+  isSafeReturnTo,
+} from "@/lib/auth/return-to";
+
+/**
+ * Lit le `returnTo` dans les query params si on est en retour d'un SSO
+ * BitLab (/api/auth/bitlab-sso sans session). Isolé sous une Suspense
+ * boundary car `useSearchParams()` l'impose en App Router.
+ */
+function ReturnToBridge() {
+  const searchParams = useSearchParams();
+  const sessionReady = useBitQuest((s) => s.sessionReady);
+  const userId = useBitQuest((s) => s.userId);
+  const returnTo = useMemo(() => {
+    const raw = searchParams?.get("returnTo");
+    return raw && isSafeReturnTo(raw) ? raw : null;
+  }, [searchParams]);
+
+  // Dès qu'une session est active, si on a un returnTo valide, on
+  // renavigue vers le flow SSO. BitQuest re-détectera son cookie et
+  // redirigera vers BitLab avec un launch_token frais.
+  useEffect(() => {
+    if (!sessionReady || !userId || !returnTo) return;
+    if (typeof window === "undefined") return;
+    window.location.replace(buildBitlabSsoRedirectUrl(returnTo));
+  }, [sessionReady, userId, returnTo]);
+
+  return null;
+}
 
 function BitQuestApp() {
   useSessionHydration();
@@ -36,7 +65,11 @@ function BitQuestApp() {
   }
 
   if (!userId) {
-    return <AuthScreen />;
+    return (
+      <Suspense fallback={null}>
+        <AuthScreen />
+      </Suspense>
+    );
   }
 
   if (isLoading && !data) {
@@ -63,6 +96,10 @@ function BitQuestApp() {
           code={activeQuestCode}
           onExit={closeQuest}
           onCompleted={closeQuest}
+          onGoToDashboard={() => {
+            setView("dashboard");
+            closeQuest();
+          }}
         />
       ) : (
         <>
@@ -78,20 +115,18 @@ function BitQuestApp() {
 }
 
 export default function Page() {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: { staleTime: 15_000, refetchOnWindowFocus: false },
-        },
-      }),
-  );
-
+  // ThemeProvider + QueryClientProvider sont désormais fournis par
+  // `src/app/providers.tsx` (monté depuis layout.tsx). Les déplacer
+  // hors de cette page client évite le warning React :
+  //   « Encountered a script tag while rendering React component »
+  // qu'émettait le script anti-FOUC de next-themes quand ThemeProvider
+  // vivait sous un boundary `"use client"`.
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-        <BitQuestApp />
-      </ThemeProvider>
-    </QueryClientProvider>
+    <>
+      <Suspense fallback={null}>
+        <ReturnToBridge />
+      </Suspense>
+      <BitQuestApp />
+    </>
   );
 }

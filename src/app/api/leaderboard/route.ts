@@ -7,7 +7,11 @@ export async function GET(req: Request) {
   if (!user) return unauthorized();
 
   const [top, badgeCounts] = await Promise.all([
-    db.user.findMany({ orderBy: [{ xp: "desc" }, { createdAt: "asc" }], take: 20 }),
+    db.user.findMany({
+      where: { deletedAt: null },
+      orderBy: [{ xp: "desc" }, { createdAt: "asc" }],
+      take: 20,
+    }),
     db.userBadge.groupBy({ by: ["userId"], _count: { userId: true } }),
   ]);
 

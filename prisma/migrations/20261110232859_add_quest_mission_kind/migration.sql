@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Quest" ADD COLUMN     "missionKind" TEXT NOT NULL DEFAULT 'SIMULATED';

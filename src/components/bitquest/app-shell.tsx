@@ -1,13 +1,16 @@
 "use client";
 
 import { useTheme } from "next-themes";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useBitQuest, type View } from "@/lib/bitquest/store";
-import { useMe } from "@/lib/bitquest/hooks";
-import { clearStoredSession } from "@/lib/bitquest/client";
+import { useMe, useIsAdmin, useIsEditor, useRole } from "@/lib/bitquest/hooks";
+import { api, clearStoredSession } from "@/lib/bitquest/client";
 import { XpBar } from "./ui-bits";
 import { OrbiteMark, QuestBubble } from "./brand";
 import { formatSats } from "@/lib/bitquest/client";
 import {
+  Award,
   LayoutDashboard,
   Map,
   User,
@@ -19,30 +22,50 @@ import {
   Sun,
   Moon,
   Compass,
+  PenSquare,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import { LanguageSwitch } from "@/i18n/language-switch";
+import { useT } from "@/i18n/locale-provider";
 
-const NAV: { view: View; label: string; icon: LucideIcon }[] = [
-  { view: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-  { view: "quests", label: "Quêtes", icon: Map },
-  { view: "profile", label: "Profil", icon: User },
-  { view: "wallet", label: "Wallet", icon: Wallet },
-  { view: "leaderboard", label: "Classement", icon: Trophy },
+/**
+ * NAV avec labels par clé i18n (résolues côté client via useT).
+ * Les clés sont statiques — pas de littéral côté hook.
+ */
+const NAV: { view: View; href: string; labelKey: string; icon: LucideIcon }[] = [
+  { view: "dashboard", href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { view: "quests", href: "/quests", labelKey: "nav.quests", icon: Map },
+  { view: "profile", href: "/profile", labelKey: "nav.profile", icon: User },
+  { view: "wallet", href: "/wallet", labelKey: "nav.wallet", icon: Wallet },
+  { view: "leaderboard", href: "/leaderboard", labelKey: "nav.leaderboard", icon: Trophy },
+  { view: "attestations", href: "/attestations", labelKey: "nav.attestations", icon: Award },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const view = useBitQuest((s) => s.view);
   const setView = useBitQuest((s) => s.setView);
   const user = useBitQuest((s) => s.user);
   const logout = useBitQuest((s) => s.logout);
   const { data } = useMe();
+  const isAdmin = useIsAdmin();
+  const isEditor = useIsEditor();
+  const role = useRole();
   const { theme, setTheme } = useTheme();
+  const t = useT();
   const [mounted, setMounted] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  /** Détermine l'onglet actif : URL si on est sur une route /dashboard|/quests|…, sinon store.view (mode SPA /) */
+  const isRouteMode = pathname !== null && pathname !== "/" && !pathname.startsWith("/academy");
+  const isActive = (href: string, v: View) => {
+    if (isRouteMode) return pathname === href || pathname.startsWith(href + "/");
+    return view === v;
+  };
 
   useEffect(() => {
     const t = window.setTimeout(() => setMounted(true), 0);
@@ -51,7 +74,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const me = data?.user ?? user;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch {
+      // Déconnexion locale même si le serveur ne répond pas.
+    }
     clearStoredSession();
     logout();
     window.location.reload();
@@ -66,14 +94,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3">
           {/* Lockup BitQuest : logo + bulle « Quest » (même pattern que « Lab » dans BitLab) */}
-          <button
+          <Link
+            href="/dashboard"
             className="flex items-center gap-2"
+            aria-label={t("nav.home")}
             onClick={() => setView("dashboard")}
-            aria-label="BitQuest — accueil"
           >
             <OrbiteMark className="h-8 w-8 shrink-0 text-foreground" />
             <QuestBubble className="hidden min-[400px]:inline-block" />
-          </button>
+          </Link>
 
           {/* Stats */}
           {me && (
@@ -98,10 +127,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
 
           <div className="ml-auto flex items-center gap-1.5">
+            {/* Accès contextuel Studio / Admin selon le rôle de la session.
+                 Rend le rôle visible dès le header — l'utilisateur comprend
+                 immédiatement ce qu'il peut faire. */}
+            {me && isEditor && !isAdmin && (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="hidden gap-1.5 border-emerald-500/40 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400 sm:inline-flex"
+                aria-label="Ouvrir le Studio éditorial"
+              >
+                <Link href="/studio">
+                  <PenSquare className="h-3.5 w-3.5" aria-hidden />
+                  Studio
+                </Link>
+              </Button>
+            )}
+            {me && isAdmin && (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="hidden gap-1.5 border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 sm:inline-flex"
+                aria-label="Ouvrir la console d'administration"
+              >
+                <Link href="/admin">
+                  <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+                  Admin
+                </Link>
+              </Button>
+            )}
+            {me && role !== "APPRENTICE" && (
+              <span
+                className="hidden rounded-md border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground sm:inline"
+                aria-label={`Rôle : ${role}`}
+              >
+                {role}
+              </span>
+            )}
+            <LanguageSwitch />
             <Button
               variant="ghost"
               size="icon"
-              aria-label={theme === "dark" ? "Passer en thème clair" : "Passer en thème sombre"}
+              aria-label={theme === "dark" ? t("nav.theme.toLight") : t("nav.theme.toDark")}
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             >
               {mounted && theme === "dark" ? (
@@ -110,7 +179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Moon className="h-4.5 w-4.5" />
               )}
             </Button>
-            <Button variant="ghost" size="icon" aria-label="Se déconnecter" onClick={handleLogout}>
+            <Button variant="ghost" size="icon" aria-label={t("nav.logout")} onClick={handleLogout}>
               <LogOut className="h-4.5 w-4.5" />
             </Button>
           </div>
@@ -137,22 +206,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Nav desktop */}
         <nav aria-label="Navigation principale" className="hidden border-t md:block">
           <div className="mx-auto flex w-full max-w-6xl gap-1 px-4">
-            {NAV.map((item) => (
-              <button
-                key={item.view}
-                onClick={() => setView(item.view)}
-                aria-current={view === item.view ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
-                  view === item.view
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </button>
-            ))}
+            {NAV.map((item) => {
+              const active = isActive(item.href, item.view);
+              return (
+                <Link
+                  key={item.view}
+                  href={item.href}
+                  onClick={() => setView(item.view)}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
+                    active
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {t(item.labelKey)}
+                </Link>
+              );
+            })}
           </div>
         </nav>
       </header>
@@ -167,20 +240,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         aria-label="Navigation mobile"
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-background/95 backdrop-blur md:hidden"
       >
-        {NAV.map((item) => (
-          <button
-            key={item.view}
-            onClick={() => setView(item.view)}
-            aria-current={view === item.view ? "page" : undefined}
-            className={cn(
-              "flex min-h-[56px] flex-col items-center justify-center gap-0.5 text-[10px] font-medium",
-              view === item.view ? "text-primary" : "text-muted-foreground",
-            )}
-          >
-            <item.icon className="h-5 w-5" />
-            {item.label.split(" ")[0]}
-          </button>
-        ))}
+        {NAV.map((item) => {
+          const active = isActive(item.href, item.view);
+          return (
+            <Link
+              key={item.view}
+              href={item.href}
+              onClick={() => setView(item.view)}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex min-h-[56px] flex-col items-center justify-center gap-0.5 text-[10px] font-medium",
+                active ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              <item.icon className="h-5 w-5" />
+              {t(item.labelKey).split(" ")[0]}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* ===== Footer sticky ===== */}

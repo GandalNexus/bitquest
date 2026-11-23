@@ -8,6 +8,7 @@ import { useLeaderboard } from "@/lib/bitquest/hooks";
 import { formatSats, type LeaderboardEntry } from "@/lib/bitquest/client";
 import { EmptyState, ErrorState, LoadingState } from "./ui-bits";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/locale-provider";
 
 /* Médailles du top 3 */
 const MEDAL_CLASS: Record<number, string> = {
@@ -21,7 +22,15 @@ const fadeUp = {
   animate: { opacity: 1, y: 0 },
 };
 
-function PodiumCard({ entry, place }: { entry: LeaderboardEntry; place: number }) {
+function PodiumCard({
+  entry,
+  place,
+  t,
+}: {
+  entry: LeaderboardEntry;
+  place: number;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
   const isFirst = place === 1;
   return (
     <div
@@ -54,7 +63,7 @@ function PodiumCard({ entry, place }: { entry: LeaderboardEntry; place: number }
       </div>
       <p className="mt-2 truncate font-bold">{entry.pseudo}</p>
       <p className="truncate text-xs text-muted-foreground">
-        Nv. {entry.levelInfo.level} · {entry.levelInfo.title}
+        {t("common.levelShort")} {entry.levelInfo.level} · {entry.levelInfo.title}
       </p>
       <p className={cn("mt-1.5 font-semibold text-primary", isFirst && "text-lg")}>
         {formatSats(entry.xp)} XP
@@ -63,7 +72,13 @@ function PodiumCard({ entry, place }: { entry: LeaderboardEntry; place: number }
   );
 }
 
-function RankRow({ entry }: { entry: LeaderboardEntry }) {
+function RankRow({
+  entry,
+  t,
+}: {
+  entry: LeaderboardEntry;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
   return (
     <li
       className={cn(
@@ -71,7 +86,6 @@ function RankRow({ entry }: { entry: LeaderboardEntry }) {
         entry.isMe && "ring-1 ring-primary bg-primary/5",
       )}
     >
-      {/* Rang */}
       <span
         className={cn(
           "w-9 shrink-0 text-center text-sm font-black tabular-nums",
@@ -80,7 +94,6 @@ function RankRow({ entry }: { entry: LeaderboardEntry }) {
       >
         #{entry.rank}
       </span>
-      {/* Pseudo + badges d'état */}
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <span className="truncate text-sm font-semibold">{entry.pseudo}</span>
         {entry.isBot && (
@@ -88,27 +101,25 @@ function RankRow({ entry }: { entry: LeaderboardEntry }) {
             variant="outline"
             className="shrink-0 border-zinc-500/30 px-1.5 py-0 text-[10px] text-zinc-400"
           >
-            bot
+            {t("leaderboard.badge.bot")}
           </Badge>
         )}
         {entry.isMe && (
-          <Badge className="shrink-0 bg-primary/15 px-1.5 py-0 text-[10px] text-primary">toi</Badge>
+          <Badge className="shrink-0 bg-primary/15 px-1.5 py-0 text-[10px] text-primary">
+            {t("leaderboard.badge.you")}
+          </Badge>
         )}
       </div>
-      {/* Niveau */}
       <span className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground sm:block">
-        Nv. {entry.levelInfo.level}
+        {t("common.levelShort")} {entry.levelInfo.level}
       </span>
-      {/* XP */}
       <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums">
         {formatSats(entry.xp)}
       </span>
-      {/* Badges */}
       <span className="hidden w-16 shrink-0 items-center justify-end gap-1 text-xs text-muted-foreground sm:flex">
         <Trophy className="h-3.5 w-3.5" aria-hidden />
         {entry.badges}
       </span>
-      {/* Streak */}
       <span className="hidden w-16 shrink-0 items-center justify-end gap-1 text-xs text-muted-foreground sm:flex">
         <Flame className="h-3.5 w-3.5 text-orange-500" aria-hidden />
         {entry.streak}
@@ -118,15 +129,16 @@ function RankRow({ entry }: { entry: LeaderboardEntry }) {
 }
 
 export function Leaderboard() {
+  const t = useT();
   const lbQuery = useLeaderboard();
 
   if (lbQuery.isLoading) {
-    return <LoadingState label="Classement en cours de calcul…" />;
+    return <LoadingState label={t("leaderboard.loading")} />;
   }
   if (lbQuery.isError || !lbQuery.data) {
     return (
       <ErrorState
-        message="Impossible de charger le classement. Vérifie ta connexion."
+        message={t("leaderboard.error")}
         onRetry={() => lbQuery.refetch()}
       />
     );
@@ -140,78 +152,71 @@ export function Leaderboard() {
 
   return (
     <div className="space-y-6">
-      {/* ===== Header ===== */}
       <motion.section {...fadeUp} transition={{ duration: 0.35 }} className="flex items-center gap-4">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Trophy className="h-6 w-6" aria-hidden />
         </div>
         <div>
-          <h1 className="font-display text-2xl font-black tracking-tight">Classement des aventuriers</h1>
-          <p className="text-sm text-muted-foreground">Top 20 par XP</p>
+          <h1 className="font-display text-2xl font-black tracking-tight">{t("leaderboard.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("leaderboard.subtitle")}</p>
         </div>
       </motion.section>
 
       {entries.length === 0 ? (
         <EmptyState
           icon={Trophy}
-          title="Classement vide pour l'instant"
-          sub="Sois le premier à gravir les rangs en terminant des quêtes."
+          title={t("leaderboard.empty.title")}
+          sub={t("leaderboard.empty.sub")}
         />
       ) : (
         <>
-          {/* ===== Podium (ordre visuel 2-1-3 sur desktop) ===== */}
           <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.05 }}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
               {podium[1] && (
                 <div className="order-2 sm:order-1">
-                  <PodiumCard entry={podium[1]} place={2} />
+                  <PodiumCard entry={podium[1]} place={2} t={t} />
                 </div>
               )}
               {podium[0] && (
                 <div className="order-1 sm:order-2">
-                  <PodiumCard entry={podium[0]} place={1} />
+                  <PodiumCard entry={podium[0]} place={1} t={t} />
                 </div>
               )}
               {podium[2] && (
                 <div className="order-3">
-                  <PodiumCard entry={podium[2]} place={3} />
+                  <PodiumCard entry={podium[2]} place={3} t={t} />
                 </div>
               )}
             </div>
           </motion.section>
 
-          {/* ===== Tableau ===== */}
           <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.1 }}>
             <Card className="rounded-xl">
               <CardHeader>
-                <CardTitle>Détail du classement</CardTitle>
-                <CardDescription>
-                  XP, badges et séries d&apos;activité des 20 premiers aventuriers.
-                </CardDescription>
+                <CardTitle>{t("leaderboard.detail.title")}</CardTitle>
+                <CardDescription>{t("leaderboard.detail.description")}</CardDescription>
               </CardHeader>
               <CardContent>
-                {/* En-têtes de colonnes (desktop) */}
                 <div
                   aria-hidden
                   className="mb-2 hidden items-center gap-3 px-3 text-[11px] uppercase tracking-wider text-muted-foreground sm:flex"
                 >
-                  <span className="w-9 shrink-0 text-center">Rang</span>
-                  <span className="min-w-0 flex-1">Aventurier</span>
-                  <span className="w-16 shrink-0 text-right">Niveau</span>
-                  <span className="w-24 shrink-0 text-right">XP</span>
-                  <span className="w-16 shrink-0 text-right">Badges</span>
-                  <span className="w-16 shrink-0 text-right">Série</span>
+                  <span className="w-9 shrink-0 text-center">{t("leaderboard.col.rank")}</span>
+                  <span className="min-w-0 flex-1">{t("leaderboard.col.adventurer")}</span>
+                  <span className="w-16 shrink-0 text-right">{t("leaderboard.col.level")}</span>
+                  <span className="w-24 shrink-0 text-right">{t("leaderboard.col.xp")}</span>
+                  <span className="w-16 shrink-0 text-right">{t("leaderboard.col.badges")}</span>
+                  <span className="w-16 shrink-0 text-right">{t("leaderboard.col.streak")}</span>
                 </div>
                 <ul
                   className="max-h-96 space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar]:w-1.5"
-                  aria-label="Liste classée des aventuriers"
+                  aria-label={t("leaderboard.aria.list")}
                 >
                   {top.map((entry) => (
-                    <RankRow key={entry.id} entry={entry} />
+                    <RankRow key={entry.id} entry={entry} t={t} />
                   ))}
                 </ul>
 
-                {/* Ta position si hors du top 20 */}
                 {meEntry && !meVisible && (
                   <div className="mt-3 flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2.5">
                     <span className="w-9 shrink-0 text-center text-sm font-black text-primary tabular-nums">
@@ -220,11 +225,11 @@ export function Leaderboard() {
                     <div className="flex min-w-0 flex-1 items-center gap-2">
                       <span className="truncate text-sm font-semibold">{meEntry.pseudo}</span>
                       <Badge className="shrink-0 bg-primary/15 px-1.5 py-0 text-[10px] text-primary">
-                        toi
+                        {t("leaderboard.badge.you")}
                       </Badge>
                     </div>
                     <span className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground sm:block">
-                      Nv. {meEntry.levelInfo.level}
+                      {t("common.levelShort")} {meEntry.levelInfo.level}
                     </span>
                     <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums">
                       {formatSats(meEntry.xp)}
@@ -241,7 +246,7 @@ export function Leaderboard() {
                 )}
                 {meEntry && !meVisible && (
                   <p className="mt-2 text-center text-xs text-muted-foreground">
-                    Ta position : #{meEntry.rank} — gagne de l&apos;XP pour intégrer le top 20 !
+                    {t("leaderboard.me.hint", { rank: meEntry.rank })}
                   </p>
                 )}
               </CardContent>

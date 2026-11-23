@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatSats } from "@/lib/bitquest/client";
 import { useToast } from "@/hooks/use-toast";
+import { useT, useLocale } from "@/i18n/locale-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,6 +98,7 @@ function MissionFrame({
   disabled?: boolean;
   onSubmit: (answer: Record<string, unknown>) => void;
 }) {
+  const t = useT();
   return (
     <div className="space-y-4">
       {children}
@@ -104,7 +106,7 @@ function MissionFrame({
         <div className="flex items-start gap-2 rounded-lg border border-dashed bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
           <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
-            <span className="font-medium">Indice : </span>
+            <span className="font-medium">{t("missionPanel.frame.hint.label")} </span>
             {hint}
           </span>
         </div>
@@ -117,10 +119,10 @@ function MissionFrame({
           onClick={() => answer && onSubmit(answer)}
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-          {submitting ? "Vérification en cours…" : "Soumettre à BitLab"}
+          {submitting ? t("missionPanel.frame.submitting") : t("missionPanel.frame.submit")}
         </Button>
         <span className="text-center text-xs text-muted-foreground sm:text-right">
-          Tentatives restantes : {Math.max(0, attemptsLeft)}
+          {t("missionPanel.frame.attemptsLeft", { count: Math.max(0, attemptsLeft) })}
         </span>
       </div>
     </div>
@@ -149,6 +151,9 @@ function BlockExplorerMission({
   onSubmit,
 }: MissionComponentProps) {
   const { toast } = useToast();
+  const t = useT();
+  const { locale } = useLocale();
+  const localeTag = locale === "fr" ? "fr-FR" : "en-US";
   const c = asRecord(challenge);
   const height = num(c.height);
   const hash = str(c.hash);
@@ -160,13 +165,13 @@ function BlockExplorerMission({
     try {
       await navigator.clipboard.writeText(hash);
       setCopied(true);
-      toast({ title: "Hash complet copié dans le presse-papiers" });
+      toast({ title: t("blockExplorer.toast.copied") });
       setTimeout(() => setCopied(false), 1800);
     } catch {
       toast({
         variant: "destructive",
-        title: "Copie impossible",
-        description: "Ton navigateur a refusé l'accès au presse-papiers.",
+        title: t("blockExplorer.toast.copyFailed.title"),
+        description: t("blockExplorer.toast.copyFailed.description"),
       });
     }
   };
@@ -191,7 +196,7 @@ function BlockExplorerMission({
             #{formatSats(height)}
           </div>
           <Badge variant="outline" className="border-primary/40 text-primary">
-            Bloc miné
+            {t("blockExplorer.mined")}
           </Badge>
         </div>
         <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2">
@@ -200,40 +205,46 @@ function BlockExplorerMission({
           </code>
           <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" onClick={copyHash}>
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-            {copied ? "Copié" : "Copier"}
+            {copied ? t("blockExplorer.copied") : t("blockExplorer.copy")}
           </Button>
         </div>
         <div className="space-y-1.5">
-          <MonoField label="Nonce" value={formatSats(num(c.nonce))} />
-          <MonoField label="Size" value={`${formatSats(num(c.size))} octets`} />
-          <MonoField label="Timestamp" value={new Date(str(c.timestamp)).toLocaleString("fr-FR")} />
-          <MonoField label="Miner" value={str(c.miner)} />
-          <MonoField label="Difficulty" value={str(c.difficulty)} />
-          <MonoField label="Transactions" value={formatSats(num(c.txCount))} />
+          <MonoField label={t("blockExplorer.field.nonce")} value={formatSats(num(c.nonce))} />
+          <MonoField
+            label={t("blockExplorer.field.size")}
+            value={t("blockExplorer.field.size.value", { size: formatSats(num(c.size)) })}
+          />
+          <MonoField
+            label={t("blockExplorer.field.timestamp")}
+            value={new Date(str(c.timestamp)).toLocaleString(localeTag)}
+          />
+          <MonoField label={t("blockExplorer.field.miner")} value={str(c.miner)} />
+          <MonoField label={t("blockExplorer.field.difficulty")} value={str(c.difficulty)} />
+          <MonoField label={t("blockExplorer.field.transactions")} value={formatSats(num(c.txCount))} />
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="bq-tx-count">Nombre de transactions</Label>
+          <Label htmlFor="bq-tx-count">{t("blockExplorer.input.txCount.label")}</Label>
           <Input
             id="bq-tx-count"
             type="number"
             inputMode="numeric"
             min={0}
-            placeholder="Recopie la valeur affichée"
+            placeholder={t("blockExplorer.input.txCount.placeholder")}
             value={txCount}
             onChange={(e) => setTxCount(e.target.value)}
             disabled={submitting || disabled}
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="bq-hash-suffix">6 derniers caractères du hash</Label>
+          <Label htmlFor="bq-hash-suffix">{t("blockExplorer.input.suffix.label")}</Label>
           <Input
             id="bq-hash-suffix"
             className="font-mono"
             maxLength={6}
-            placeholder="ex. 3f9a2c"
+            placeholder={t("blockExplorer.input.suffix.placeholder")}
             value={suffix}
             onChange={(e) => setSuffix(e.target.value)}
             disabled={submitting || disabled}
@@ -254,6 +265,7 @@ function KeyForgeMission({
   disabled,
   onSubmit,
 }: MissionComponentProps) {
+  const t = useT();
   const c = asRecord(challenge);
   const wif = str(c.wif);
   const pubkey = str(c.pubkey);
@@ -297,7 +309,7 @@ function KeyForgeMission({
           {phase === "idle" && (
             <Button type="button" className="h-10" onClick={forge}>
               <Zap className="h-4 w-4" />
-              Forger la paire de clés
+              {t("keyForge.forge")}
             </Button>
           )}
         </div>
@@ -306,7 +318,7 @@ function KeyForgeMission({
           <div className="overflow-hidden rounded-xl border bg-muted/30 p-4">
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              Génération des clés via l&apos;entropie du sandbox…
+              {t("keyForge.forging")}
             </div>
             <motion.div
               className="mt-3 h-1.5 rounded-full bg-primary/30"
@@ -326,21 +338,22 @@ function KeyForgeMission({
           >
             <div className="space-y-1.5">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="shrink-0 text-xs text-muted-foreground">WIF (clé privée)</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{t("keyForge.wif")}</span>
               </div>
               <code
                 className="block select-none break-all rounded-lg border bg-background px-3 py-2 font-mono text-xs blur-[2px]"
-                title="Clé privée masquée — ne jamais partager"
+                title={t("keyForge.wif.title")}
               >
                 {wif}
               </code>
-              <p className="text-[11px] text-rose-500">
-                Clé privée masquée — ne jamais partager, ne jamais la coller en ligne.
-              </p>
+              <p className="text-[11px] text-rose-500">{t("keyForge.wif.warning")}</p>
             </div>
-            <MonoField label="Clé publique" value={`${pubkey.slice(0, 20)}…${pubkey.slice(-8)}`} />
+            <MonoField
+              label={t("keyForge.pubkey")}
+              value={`${pubkey.slice(0, 20)}…${pubkey.slice(-8)}`}
+            />
             <div className="space-y-1">
-              <span className="text-xs text-muted-foreground">Adresse</span>
+              <span className="text-xs text-muted-foreground">{t("keyForge.address")}</span>
               <code className="block break-all rounded-lg border bg-background px-3 py-2 font-mono text-xs text-primary">
                 {address}
               </code>
@@ -350,20 +363,17 @@ function KeyForgeMission({
 
         {phase === "forged" && (
           <div className="space-y-1.5">
-            <Label htmlFor="bq-address-suffix">4 derniers caractères de l&apos;adresse</Label>
+            <Label htmlFor="bq-address-suffix">{t("keyForge.input.suffix.label")}</Label>
             <Input
               id="bq-address-suffix"
               className="max-w-xs font-mono"
               maxLength={4}
-              placeholder="ex. 7xk2"
+              placeholder={t("keyForge.input.suffix.placeholder")}
               value={suffix}
               onChange={(e) => setSuffix(e.target.value)}
               disabled={submitting || disabled}
             />
-            <p className="text-[11px] text-muted-foreground">
-              Réflexe de sécurité : vérifie toujours les derniers caractères d&apos;une adresse avant
-              d&apos;envoyer des fonds.
-            </p>
+            <p className="text-[11px] text-muted-foreground">{t("keyForge.input.suffix.hint")}</p>
           </div>
         )}
       </div>
@@ -381,6 +391,7 @@ function TxBuilderMission({
   disabled,
   onSubmit,
 }: MissionComponentProps) {
+  const t = useT();
   const c = asRecord(challenge);
   const variant = str(c.variant, "payment");
   const isConsolidation = variant === "consolidation";
@@ -410,10 +421,10 @@ function TxBuilderMission({
   const change = selectedSum - target - fee;
   const enough = selectedSum >= target + fee;
 
-  const speeds: { key: "slow" | "medium" | "fast"; label: string }[] = [
-    { key: "slow", label: "Lent" },
-    { key: "medium", label: "Moyen" },
-    { key: "fast", label: "Rapide" },
+  const speeds: { key: "slow" | "medium" | "fast"; labelKey: string }[] = [
+    { key: "slow", labelKey: "txBuilder.speed.slow" },
+    { key: "medium", labelKey: "txBuilder.speed.medium" },
+    { key: "fast", labelKey: "txBuilder.speed.fast" },
   ];
 
   const answer = selected.length > 0 && speed ? { selected, speed } : null;
@@ -431,9 +442,13 @@ function TxBuilderMission({
         {isConsolidation && (
           <Alert>
             <Activity className="h-4 w-4" />
-            <AlertTitle>Consolidation</AlertTitle>
+            <AlertTitle>{t("txBuilder.consolidation.title")}</AlertTitle>
             <AlertDescription>
-              {str(c.label)} — sélectionne TOUS les UTXO ({selected.length}/{utxos.length} sélectionnés).
+              {t("txBuilder.consolidation.description", {
+                label: str(c.label),
+                selected: selected.length,
+                total: utxos.length,
+              })}
             </AlertDescription>
           </Alert>
         )}
@@ -441,14 +456,14 @@ function TxBuilderMission({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-xl border bg-muted/30 p-3">
             <div className="text-xs text-muted-foreground">
-              {isConsolidation ? "Total du wallet" : "Montant à envoyer"}
+              {isConsolidation ? t("txBuilder.walletTotal") : t("txBuilder.amountToSend")}
             </div>
             <div className="text-lg font-bold text-primary">
               {formatSats(isConsolidation ? num(c.total) : target)} sats
             </div>
           </div>
           <div className="min-w-0 rounded-xl border bg-muted/30 p-3">
-            <div className="text-xs text-muted-foreground">Destinataire</div>
+            <div className="text-xs text-muted-foreground">{t("txBuilder.recipient")}</div>
             <code className="block truncate font-mono text-xs" title={recipient}>
               {recipient}
             </code>
@@ -456,7 +471,7 @@ function TxBuilderMission({
         </div>
 
         <div className="space-y-2">
-          <Label>UTXO disponibles (coche ceux à dépenser)</Label>
+          <Label>{t("txBuilder.utxos.label")}</Label>
           <div className="space-y-2">
             {utxos.map((u) => (
               <label
@@ -470,7 +485,7 @@ function TxBuilderMission({
                   checked={selected.includes(u.id)}
                   onCheckedChange={() => toggle(u.id)}
                   disabled={submitting || disabled}
-                  aria-label={`UTXO ${u.id}`}
+                  aria-label={t("txBuilder.utxo.aria", { id: u.id })}
                 />
                 <code className="min-w-0 flex-1 truncate font-mono text-xs" title={u.id}>
                   {u.id}
@@ -481,15 +496,19 @@ function TxBuilderMission({
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="text-muted-foreground">
-              Sélectionné :{" "}
+              {t("txBuilder.selected.label")}{" "}
               <span className="font-semibold text-foreground">{formatSats(selectedSum)} sats</span>
-              {isConsolidation && ` · ${selected.length}/${utxos.length} UTXO`}
+              {isConsolidation &&
+                t("txBuilder.selected.consolidation", {
+                  selected: selected.length,
+                  total: utxos.length,
+                })}
             </span>
             {!isConsolidation && (
               <span className={cn("font-medium", enough ? "text-emerald-500" : "text-rose-500")}>
                 {enough
-                  ? `Suffisant — change estimé : ${formatSats(Math.max(0, change))} sats`
-                  : `Insuffisant — il manque ${formatSats(Math.max(0, missing))} sats`}
+                  ? t("txBuilder.enough", { change: formatSats(Math.max(0, change)) })
+                  : t("txBuilder.notEnough", { missing: formatSats(Math.max(0, missing)) })}
               </span>
             )}
             {isConsolidation && speed && (
@@ -497,15 +516,15 @@ function TxBuilderMission({
                 className={cn("font-medium", selectedSum - fee > 0 ? "text-emerald-500" : "text-rose-500")}
               >
                 {selectedSum - fee > 0
-                  ? `Change estimé après frais : ${formatSats(selectedSum - fee)} sats`
-                  : "Les frais dépassent le total sélectionné"}
+                  ? t("txBuilder.consolidation.change", { change: formatSats(selectedSum - fee) })
+                  : t("txBuilder.consolidation.feesTooHigh")}
               </span>
             )}
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label>Vitesse de confirmation (frais)</Label>
+          <Label>{t("txBuilder.speed.label")}</Label>
           <RadioGroup
             className="grid grid-cols-1 gap-2 sm:grid-cols-3"
             value={speed ?? ""}
@@ -523,7 +542,7 @@ function TxBuilderMission({
               >
                 <RadioGroupItem id={`bq-speed-${s.key}`} value={s.key} />
                 <span className="min-w-0">
-                  <span className="block font-medium">{s.label}</span>
+                  <span className="block font-medium">{t(s.labelKey)}</span>
                   <span className="block text-xs text-muted-foreground">
                     {formatSats(feeSats[s.key])} sats
                   </span>
@@ -547,6 +566,7 @@ function FeeOptMission({
   disabled,
   onSubmit,
 }: MissionComponentProps) {
+  const t = useT();
   const c = asRecord(challenge);
   const vbytes = num(c.vbytes);
   const feeRatesRaw = asRecord(c.feeRates);
@@ -555,7 +575,7 @@ function FeeOptMission({
     medium: num(feeRatesRaw.medium),
     fast: num(feeRatesRaw.fast),
   };
-  const mempool = str(c.mempool, "état du mempool inconnu");
+  const mempool = str(c.mempool, t("feeOpt.mempool.default"));
   const nextBlockRate = num(c.nextBlockRate);
 
   const [speed, setSpeed] = useState<"slow" | "medium" | "fast" | null>(null);
@@ -563,10 +583,10 @@ function FeeOptMission({
 
   const answer = speed && totalFee !== "" ? { speed, totalFee: Number(totalFee) } : null;
 
-  const rates: { key: "slow" | "medium" | "fast"; label: string }[] = [
-    { key: "slow", label: "Lent" },
-    { key: "medium", label: "Moyen" },
-    { key: "fast", label: "Rapide" },
+  const rates: { key: "slow" | "medium" | "fast"; labelKey: string }[] = [
+    { key: "slow", labelKey: "txBuilder.speed.slow" },
+    { key: "medium", labelKey: "txBuilder.speed.medium" },
+    { key: "fast", labelKey: "txBuilder.speed.fast" },
   ];
 
   return (
@@ -581,25 +601,24 @@ function FeeOptMission({
       <div className="space-y-4">
         <Alert>
           <Activity className="h-4 w-4" />
-          <AlertTitle>Mempool : {mempool}</AlertTitle>
+          <AlertTitle>{t("feeOpt.mempool.title", { state: mempool })}</AlertTitle>
           <AlertDescription>
-            Taux estimé pour le prochain bloc : {nextBlockRate} sats/vByte. Taille de ta transaction :{" "}
-            {formatSats(vbytes)} vBytes.
+            {t("feeOpt.mempool.description", { rate: nextBlockRate, size: formatSats(vbytes) })}
           </AlertDescription>
         </Alert>
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {rates.map((r) => (
             <div key={r.key} className="rounded-xl border bg-muted/30 p-3 text-center">
-              <div className="text-xs text-muted-foreground">{r.label}</div>
+              <div className="text-xs text-muted-foreground">{t(r.labelKey)}</div>
               <div className="text-lg font-bold">{feeRates[r.key]}</div>
-              <div className="text-[11px] text-muted-foreground">sats/vByte</div>
+              <div className="text-[11px] text-muted-foreground">{t("feeOpt.rates.unit")}</div>
             </div>
           ))}
         </div>
 
         <div className="space-y-2">
-          <Label>Vitesse choisie</Label>
+          <Label>{t("feeOpt.speed.label")}</Label>
           <RadioGroup
             className="grid grid-cols-1 gap-2 sm:grid-cols-3"
             value={speed ?? ""}
@@ -616,28 +635,26 @@ function FeeOptMission({
                 )}
               >
                 <RadioGroupItem id={`bq-fee-${r.key}`} value={r.key} />
-                <span className="font-medium">{r.label}</span>
+                <span className="font-medium">{t(r.labelKey)}</span>
               </Label>
             ))}
           </RadioGroup>
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="bq-total-fee">Frais totaux en sats (taux × {formatSats(vbytes)} vBytes)</Label>
+          <Label htmlFor="bq-total-fee">{t("feeOpt.total.label", { size: formatSats(vbytes) })}</Label>
           <Input
             id="bq-total-fee"
             type="number"
             inputMode="numeric"
             min={0}
             className="max-w-xs"
-            placeholder="ex. 2000"
+            placeholder={t("feeOpt.total.placeholder")}
             value={totalFee}
             onChange={(e) => setTotalFee(e.target.value)}
             disabled={submitting || disabled}
           />
-          <p className="text-[11px] text-muted-foreground">
-            À toi de calculer : frais = taux (sats/vByte) × taille (vBytes).
-          </p>
+          <p className="text-[11px] text-muted-foreground">{t("feeOpt.total.hint")}</p>
         </div>
       </div>
     </MissionFrame>
@@ -665,6 +682,7 @@ function MineNonceMission({
   onSubmit,
 }: MissionComponentProps) {
   const { toast } = useToast();
+  const t = useT();
   const c = asRecord(challenge);
   const header = str(c.header);
   const prefix = str(c.prefix, "000");
@@ -714,8 +732,11 @@ function MineNonceMission({
             setHashCount(hashes);
             setProgressPct(100);
             toast({
-              title: "Hash valide trouvé !",
-              description: `Nonce ${n} après ${hashes} hash calculés.`,
+              title: t("mineNonce.toast.found.title"),
+              description: t("mineNonce.toast.found.description", {
+                nonce: n,
+                hashes,
+              }),
             });
             return;
           }
@@ -747,10 +768,10 @@ function MineNonceMission({
       <div className="space-y-4">
         <div className="space-y-1.5 rounded-xl border bg-muted/30 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">En-tête du bloc (header)</span>
+            <span className="text-xs text-muted-foreground">{t("mineNonce.header")}</span>
             <Badge variant="outline" className="gap-1 border-amber-500/40 text-amber-500">
               <Pickaxe className="h-3 w-3" />
-              Cible : hash commençant par « {prefix} »
+              {t("mineNonce.target", { prefix })}
             </Badge>
           </div>
           <code className="block break-all rounded-lg border bg-background px-3 py-2 font-mono text-xs">
@@ -760,13 +781,13 @@ function MineNonceMission({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="bq-nonce">Nonce à soumettre</Label>
+            <Label htmlFor="bq-nonce">{t("mineNonce.input.nonce.label")}</Label>
             <Input
               id="bq-nonce"
               type="number"
               inputMode="numeric"
               min={0}
-              placeholder="Trouve le bon nonce"
+              placeholder={t("mineNonce.input.nonce.placeholder")}
               value={nonce}
               onChange={(e) => setNonce(e.target.value)}
               disabled={submitting || disabled}
@@ -781,12 +802,12 @@ function MineNonceMission({
               disabled={mining || submitting || disabled}
             >
               {mining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pickaxe className="h-4 w-4" />}
-              {mining ? "Minage en cours…" : "Miner automatiquement"}
+              {mining ? t("mineNonce.mining") : t("mineNonce.mine")}
             </Button>
             {mining && (
               <Button type="button" variant="ghost" className="h-10" onClick={stopMining}>
                 <Square className="h-4 w-4" />
-                Stop
+                {t("mineNonce.stop")}
               </Button>
             )}
           </div>
@@ -796,16 +817,16 @@ function MineNonceMission({
           <div className="space-y-1.5">
             <Progress value={progressPct} className="h-2" />
             <div className="flex flex-wrap justify-between gap-2 font-mono text-[11px] text-muted-foreground">
-              <span>nonce courant : {currentNonce}</span>
-              <span>{formatSats(hashCount)} hash calculés</span>
-              <span>{formatSats(hashrate)} H/s</span>
+              <span>{t("mineNonce.current", { nonce: currentNonce })}</span>
+              <span>{t("mineNonce.hashes", { count: formatSats(hashCount) })}</span>
+              <span>{t("mineNonce.hashrate", { rate: formatSats(hashrate) })}</span>
             </div>
           </div>
         )}
 
         {foundHash && (
           <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">Hash valide trouvé</span>
+            <span className="text-xs text-muted-foreground">{t("mineNonce.found")}</span>
             <code className="block break-all rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 font-mono text-xs text-emerald-500">
               {foundHash}
             </code>
@@ -826,6 +847,7 @@ function LnChannelMission({
   disabled,
   onSubmit,
 }: MissionComponentProps) {
+  const t = useT();
   const c = asRecord(challenge);
   const myBalance = num(c.myBalance);
   const dustLimit = num(c.dustLimit);
@@ -867,12 +889,12 @@ function LnChannelMission({
     >
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-muted/30 p-3">
-          <span className="text-sm text-muted-foreground">Solde BitLab disponible</span>
+          <span className="text-sm text-muted-foreground">{t("lnChannel.balance")}</span>
           <span className="text-lg font-bold text-amber-500">{formatSats(myBalance)} sats</span>
         </div>
 
         <div className="space-y-2">
-          <Label>Choisis un pair pour ouvrir un canal</Label>
+          <Label>{t("lnChannel.peerSelect")}</Label>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {peers.map((p, i) => (
               <button
@@ -895,7 +917,7 @@ function LnChannelMission({
                     {p.name}
                   </span>
                   <Badge variant="outline" className="border-amber-500/40 text-amber-500">
-                    min. {formatSats(p.minCapacity)} sats
+                    {t("lnChannel.peer.minCapacity", { min: formatSats(p.minCapacity) })}
                   </Badge>
                 </div>
                 <code
@@ -905,9 +927,9 @@ function LnChannelMission({
                   {p.pubkey.slice(0, 16)}…{p.pubkey.slice(-6)}
                 </code>
                 <div className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
-                  <span>uptime {p.uptime} %</span>
-                  <span>{formatSats(p.channels)} canaux</span>
-                  <span>frais base {p.baseFee} sat</span>
+                  <span>{t("lnChannel.peer.uptime", { pct: p.uptime })}</span>
+                  <span>{t("lnChannel.peer.channels", { count: formatSats(p.channels) })}</span>
+                  <span>{t("lnChannel.peer.baseFee", { fee: p.baseFee })}</span>
                 </div>
               </button>
             ))}
@@ -915,29 +937,34 @@ function LnChannelMission({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="bq-capacity">Capacité locale du canal (sats)</Label>
+          <Label htmlFor="bq-capacity">{t("lnChannel.capacity.label")}</Label>
           <Input
             id="bq-capacity"
             type="number"
             inputMode="numeric"
             min={0}
             className="max-w-xs"
-            placeholder="ex. 50000"
+            placeholder={t("lnChannel.capacity.placeholder")}
             value={capacity}
             onChange={(e) => setCapacity(e.target.value)}
             disabled={submitting || disabled}
           />
           <p className="text-[11px] text-muted-foreground">
-            Contraintes : capacité ≥ {peer ? formatSats(peer.minCapacity) : "min. du pair"} sats (exigence du
-            pair), ≥ {formatSats(dustLimit)} sats (dust limit) et ≤ {formatSats(myBalance)} sats (ton solde).
+            {t("lnChannel.capacity.constraints", {
+              min: peer ? formatSats(peer.minCapacity) : t("lnChannel.capacity.fallback"),
+              dust: formatSats(dustLimit),
+              balance: formatSats(myBalance),
+            })}
           </p>
           {peer && capacityNum !== null && !valid && (
             <p className="text-[11px] font-medium text-rose-500">
-              Capacité invalide pour {peer.name} — ajuste-la pour respecter les contraintes ci-dessus.
+              {t("lnChannel.capacity.invalid", { peer: peer.name })}
             </p>
           )}
-          {valid && (
-            <p className="text-[11px] font-medium text-emerald-500">Capacité valide pour {peer?.name}.</p>
+          {valid && peer && (
+            <p className="text-[11px] font-medium text-emerald-500">
+              {t("lnChannel.capacity.valid", { peer: peer.name })}
+            </p>
           )}
         </div>
       </div>
@@ -955,6 +982,7 @@ function LnInvoiceMission({
   disabled,
   onSubmit,
 }: MissionComponentProps) {
+  const t = useT();
   const c = asRecord(challenge);
   const bolt11 = str(c.bolt11);
   const payeeNode = str(c.payeeNode);
@@ -978,46 +1006,45 @@ function LnInvoiceMission({
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Receipt className="h-3.5 w-3.5" />
-            Facture BOLT11 · émise par <span className="font-medium text-foreground">{payeeNode}</span>
+            {t("lnInvoice.emitter")} <span className="font-medium text-foreground">{payeeNode}</span>
           </div>
           <pre className="overflow-x-auto rounded-lg border bg-background px-3 py-2 font-mono text-xs leading-relaxed whitespace-nowrap">
             {bolt11}
           </pre>
-          <p className="text-[11px] text-muted-foreground">Description : {description}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {t("lnInvoice.description", { description })}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="bq-invoice-amount">Montant (sats)</Label>
+            <Label htmlFor="bq-invoice-amount">{t("lnInvoice.amount")}</Label>
             <Input
               id="bq-invoice-amount"
               type="number"
               inputMode="numeric"
               min={0}
-              placeholder="Décode-le de la facture"
+              placeholder={t("lnInvoice.decodeHint")}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               disabled={submitting || disabled}
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="bq-invoice-expiry">Expiration (secondes)</Label>
+            <Label htmlFor="bq-invoice-expiry">{t("lnInvoice.expiry")}</Label>
             <Input
               id="bq-invoice-expiry"
               type="number"
               inputMode="numeric"
               min={0}
-              placeholder="Décode-le de la facture"
+              placeholder={t("lnInvoice.decodeHint")}
               value={expiry}
               onChange={(e) => setExpiry(e.target.value)}
               disabled={submitting || disabled}
             />
           </div>
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          La facture est du texte lisible si tu sais où regarder : le montant suit le préfixe « lntb » et
-          l&apos;expiration suit le marqueur « exp ».
-        </p>
+        <p className="text-[11px] text-muted-foreground">{t("lnInvoice.hint")}</p>
       </div>
     </MissionFrame>
   );
@@ -1033,6 +1060,7 @@ function MultisigMission({
   disabled,
   onSubmit,
 }: MissionComponentProps) {
+  const t = useT();
   const c = asRecord(challenge);
   const policy = str(c.policy, "2-of-3");
   const m = num(c.m, 2);
@@ -1064,14 +1092,22 @@ function MultisigMission({
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="border-primary/40 text-primary">
             <ShieldCheck className="h-3 w-3" />
-            Politique {policy}
+            {t("multisig.policy", { policy })}
           </Badge>
-          {txLabel && <span className="truncate text-xs text-muted-foreground">Transaction : {txLabel}</span>}
+          {txLabel && (
+            <span className="truncate text-xs text-muted-foreground">
+              {t("multisig.tx", { label: txLabel })}
+            </span>
+          )}
         </div>
 
         <div className="space-y-2">
           <Label>
-            Coche les {m} clés qui signeront ({signers.length}/{m} sélectionnées, {n} disponibles)
+            {t("multisig.signers.label", {
+              m,
+              selected: signers.length,
+              n,
+            })}
           </Label>
           <div className="space-y-2">
             {keys.map((k, i) => (
@@ -1086,7 +1122,7 @@ function MultisigMission({
                   checked={signers.includes(i)}
                   onCheckedChange={() => toggle(i)}
                   disabled={submitting || disabled}
-                  aria-label={`Signer avec ${k.label}`}
+                  aria-label={t("multisig.signer.aria", { label: k.label })}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{k.label}</span>
@@ -1116,6 +1152,7 @@ function TaprootMission({
   disabled,
   onSubmit,
 }: MissionComponentProps) {
+  const t = useT();
   const c = asRecord(challenge);
   const internalKey = str(c.internalKey);
   const question = str(c.question);
@@ -1138,7 +1175,7 @@ function TaprootMission({
     >
       <div className="space-y-4">
         <div className="space-y-1.5">
-          <span className="text-xs text-muted-foreground">Clé interne</span>
+          <span className="text-xs text-muted-foreground">{t("taproot.internalKey")}</span>
           <code className="block break-all rounded-lg border bg-background px-3 py-2 font-mono text-xs">
             {internalKey}
           </code>
@@ -1147,7 +1184,7 @@ function TaprootMission({
         <p className="text-sm font-medium leading-relaxed">{question}</p>
 
         <div className="space-y-2">
-          <Label>Sortie P2TR candidate</Label>
+          <Label>{t("taproot.output.label")}</Label>
           <RadioGroup
             className="space-y-2"
             value={choice !== null ? String(choice) : ""}
@@ -1165,7 +1202,9 @@ function TaprootMission({
               >
                 <RadioGroupItem id={`bq-taproot-${i}`} value={String(i)} />
                 <span className="min-w-0">
-                  <span className="block text-sm font-medium">Sortie {i + 1}</span>
+                  <span className="block text-sm font-medium">
+                    {t("taproot.output.item", { num: i + 1 })}
+                  </span>
                   <code className="block truncate font-mono text-[11px] text-muted-foreground" title={key}>
                     {key.slice(0, 24)}…{key.slice(-8)}
                   </code>
@@ -1176,7 +1215,7 @@ function TaprootMission({
         </div>
 
         <div className="space-y-2">
-          <Label>Chemin de dépense</Label>
+          <Label>{t("taproot.path.label")}</Label>
           <RadioGroup
             className="grid grid-cols-1 gap-2 sm:grid-cols-2"
             value={path ?? ""}
@@ -1192,9 +1231,9 @@ function TaprootMission({
             >
               <RadioGroupItem id="bq-path-key" value="key" />
               <span className="min-w-0">
-                <span className="block font-medium">Key path (signature Schnorr)</span>
+                <span className="block font-medium">{t("taproot.path.key")}</span>
                 <span className="block text-[11px] text-muted-foreground">
-                  Dépense directe sur la clé tweakée
+                  {t("taproot.path.key.description")}
                 </span>
               </span>
             </Label>
@@ -1207,9 +1246,11 @@ function TaprootMission({
             >
               <RadioGroupItem id="bq-path-script" value="script" />
               <span className="min-w-0">
-                <span className="block font-medium">Script path</span>
+                <span className="block font-medium">{t("taproot.path.script")}</span>
                 <span className="block text-[11px] text-muted-foreground">
-                  Chemins alternatifs{scriptPaths.length > 0 ? ` : ${scriptPaths.join(", ")}` : ""}
+                  {scriptPaths.length > 0
+                    ? t("taproot.path.script.description.list", { list: scriptPaths.join(", ") })
+                    : t("taproot.path.script.description")}
                 </span>
               </span>
             </Label>
@@ -1221,12 +1262,13 @@ function TaprootMission({
 }
 
 function UnknownMission({ challenge }: { challenge: Record<string, unknown> }) {
+  const t = useT();
   return (
     <Alert variant="destructive">
       <CircleAlert className="h-4 w-4" />
-      <AlertTitle>Type de mission inconnu</AlertTitle>
+      <AlertTitle>{t("missionPanel.unknown.title")}</AlertTitle>
       <AlertDescription>
-        BitLab ne reconnaît pas cet exercice. Reviens à la carte et relance la quête.
+        {t("missionPanel.unknown.description")}
         <code className="mt-2 block max-h-32 overflow-y-auto break-all font-mono text-[11px]">
           {JSON.stringify(challenge)}
         </code>
@@ -1238,6 +1280,7 @@ function UnknownMission({ challenge }: { challenge: Record<string, unknown> }) {
 /* ============ Panneau principal ============ */
 
 export function MissionPanel(props: MissionPanelProps) {
+  const t = useT();
   const { missionType, challenge, brief, hint, attemptsLeft, submitting, lastFeedback, onSubmit, disabled } =
     props;
 
@@ -1259,11 +1302,9 @@ export function MissionPanel(props: MissionPanelProps) {
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
           <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
         </span>
-        <span className="truncate font-mono text-xs text-muted-foreground">
-          BitLab Sandbox · Testnet connecté
-        </span>
+        <span className="truncate font-mono text-xs text-muted-foreground">{t("missionPanel.header")}</span>
         <Badge variant="outline" className="ml-auto shrink-0 border-emerald-500/40 text-emerald-500">
-          Exercice guidé
+          {t("missionPanel.guidedBadge")}
         </Badge>
       </div>
 
@@ -1271,7 +1312,7 @@ export function MissionPanel(props: MissionPanelProps) {
         {brief && (
           <Alert>
             <Lightbulb className="h-4 w-4 text-amber-500" />
-            <AlertTitle>Mission :</AlertTitle>
+            <AlertTitle>{t("missionPanel.brief.title")}</AlertTitle>
             <AlertDescription>{brief}</AlertDescription>
           </Alert>
         )}
@@ -1299,11 +1340,11 @@ export function MissionPanel(props: MissionPanelProps) {
         {lastFeedback && !lastFeedback.success && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Soumission refusée par BitLab</AlertTitle>
+            <AlertTitle>{t("missionPanel.feedback.title")}</AlertTitle>
             <AlertDescription>
               {lastFeedback.feedback}
               <span className="mt-1 block font-medium">
-                Tentatives restantes : {Math.max(0, attemptsLeft)}
+                {t("missionPanel.frame.attemptsLeft", { count: Math.max(0, attemptsLeft) })}
               </span>
             </AlertDescription>
           </Alert>

@@ -1,9 +1,33 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, loadStoredSession, clearStoredSession } from "./client";
+import { api, loadStoredSession, clearStoredSession, type Role } from "./client";
 import { useBitQuest } from "./store";
 import { useEffect } from "react";
+
+const ROLE_RANK: Record<Role, number> = { APPRENTICE: 0, EDITOR: 1, ADMIN: 2 };
+
+function roleOf(value: unknown): Role {
+  return value === "ADMIN" || value === "EDITOR" || value === "APPRENTICE"
+    ? value
+    : "APPRENTICE";
+}
+
+/** Rôle de l'utilisateur courant (APPRENTICE par défaut si pas de session). */
+export function useRole(): Role {
+  const user = useBitQuest((s) => s.user);
+  return roleOf(user?.role);
+}
+
+/** `true` si rôle ≥ EDITOR (EDITOR ou ADMIN). */
+export function useIsEditor(): boolean {
+  return ROLE_RANK[useRole()] >= ROLE_RANK.EDITOR;
+}
+
+/** `true` si rôle === ADMIN. */
+export function useIsAdmin(): boolean {
+  return useRole() === "ADMIN";
+}
 
 export function useHasSession() {
   const userId = useBitQuest((s) => s.userId);
@@ -69,6 +93,54 @@ export function useWallet() {
   });
 }
 
+/**
+ * Stats d'activité BitLab de l'utilisateur courant (I4 — tuile
+ * "Missions pratiques" du dashboard). Rafraîchi quand une preuve
+ * vient d'être consommée via `useInvalidateAll`.
+ */
+export function useMyBitlabStats() {
+  const enabled = useHasSession();
+  return useQuery({
+    queryKey: ["me", "bitlab-stats"],
+    queryFn: api.myBitlabStats,
+    enabled,
+    retry: 1,
+  });
+}
+
+/**
+ * Attestations de l'utilisateur courant (LOT 26/27). Alimenté par
+ * le handler event-bus `quest.completed` → Attestation. Tuile
+ * dashboard + page dédiée `/attestations`.
+ */
+export function useMyAttestations() {
+  const enabled = useHasSession();
+  return useQuery({
+    queryKey: ["me", "attestations"],
+    queryFn: api.myAttestations,
+    enabled,
+    retry: 1,
+  });
+}
+
+/**
+ * Liste des tentatives BitLab de l'utilisateur (LOT 4). `state` filtre
+ * sur les tentatives actives (reprise de mission) ou toutes (historique).
+ * Variants cache-indépendants via inclusion de `state` + `limit` dans la clé.
+ */
+export function useMyBitlabAttempts(
+  state: "active" | "all" = "all",
+  limit = 20,
+) {
+  const enabled = useHasSession();
+  return useQuery({
+    queryKey: ["me", "bitlab-attempts", state, limit],
+    queryFn: () => api.myBitlabAttempts(state, limit),
+    enabled,
+    retry: 1,
+  });
+}
+
 export function useLeaderboard() {
   const enabled = useHasSession();
   return useQuery({
@@ -87,6 +159,7 @@ export function useInvalidateAll() {
     qc.invalidateQueries({ queryKey: ["quests"] });
     qc.invalidateQueries({ queryKey: ["wallet"] });
     qc.invalidateQueries({ queryKey: ["leaderboard"] });
+    qc.invalidateQueries({ queryKey: ["me", "bitlab-stats"] });
   };
 }
 

@@ -1,5 +1,9 @@
 import { db } from "@/lib/db";
 import { authenticate, unauthorized, rateLimit } from "@/lib/bitquest/session";
+import { isCookieAuthenticated, requireCsrf } from "@/lib/auth/csrf";
+import { logger } from "@/lib/log";
+
+const log = logger("quest-progress");
 import {
   XP_RULES,
   QUIZ_PASS_THRESHOLD,
@@ -11,6 +15,11 @@ import {
   publicUser,
 } from "@/lib/bitquest/progression";
 import { generateMission, validateMission } from "@/lib/bitquest/missions";
+import { parseJsonBody, questProgressBodySchema } from "@/lib/validation/schemas";
+import { consumeBitlabProof } from "@/lib/bitlab/consume";
+import { fireProofAttempt } from "@/lib/bitlab/audit";
+import { snapshotAttemptResult } from "@/lib/bitlab/attempt";
+import { emit } from "@/lib/event-bus";
 
 type XpResult = Awaited<ReturnType<typeof awardXp>>;
 
@@ -29,12 +38,17 @@ async function touchStreak(userId: string) {
 export async function POST(req: Request, { params }: { params: Promise<{ code: string }> }) {
   const user = await authenticate(req);
   if (!user) return unauthorized();
-  if (!rateLimit("progress:" + user.id, 100, 60_000)) {
+  if (isCookieAuthenticated(req)) {
+    const csrf = requireCsrf(req, user.token);
+    if (!csrf.ok) return csrf.response;
+  }
+  if (!(await rateLimit("progress:" + user.id, 100, 60_000))) {
     return Response.json({ error: "Trop de requêtes, ralentis un peu." }, { status: 429 });
   }
   const { code } = await params;
-  const body = await req.json();
-  const action = body.action as string;
+  const parsed = await parseJsonBody(req, questProgressBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
   const quest = await db.quest.findUnique({
     where: { code },
@@ -57,7 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
   try {
     /* ---------- START ---------- */
-    if (action === "start") {
+    if (body.action === "start") {
       await touchStreak(user.id);
       let p = await ensureProgress();
       if (p.status === "AVAILABLE") {
@@ -67,11 +81,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     }
 
     /* ---------- LECTURE DE SECTION THÉORIQUE ---------- */
-    if (action === "read_section") {
+    if (body.action === "read_section") {
       await touchStreak(user.id);
       let p = await ensureProgress();
       const total = (JSON.parse(quest.theorySections) as unknown[]).length;
-      const index = Math.floor(Number(body.sectionIndex));
+      const index = body.sectionIndex;
       if (index < 0 || index >= total) {
         return Response.json({ error: "Section invalide." }, { status: 400 });
       }
@@ -99,10 +113,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     }
 
     /* ---------- SOUMISSION DU QUIZ ---------- */
-    if (action === "quiz_submit") {
+    if (body.action === "quiz_submit") {
       await touchStreak(user.id);
       let p = await ensureProgress();
-      const answers = Array.isArray(body.answers) ? body.answers : [];
+      const answers = body.answers;
       if (answers.length !== quest.quizQuestions.length) {
         return Response.json({ error: "Réponses incomplètes." }, { status: 400 });
       }
@@ -162,7 +176,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     }
 
     /* ---------- DÉMARRAGE MISSION BITLAB ---------- */
-    if (action === "mission_start") {
+    if (body.action === "mission_start") {
       await touchStreak(user.id);
       const p = await ensureProgress();
       if (p.quizBestScore < QUIZ_PASS_THRESHOLD) {
@@ -196,26 +210,108 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     }
 
     /* ---------- SOUMISSION MISSION BITLAB ---------- */
-    if (action === "mission_submit") {
+    if (body.action === "mission_submit") {
       await touchStreak(user.id);
       const p = await ensureProgress();
-      if (!p.missionSession) {
-        return Response.json(
-          { error: "Aucune mission en cours. Lance d'abord la mission dans BitLab." },
-          { status: 400 },
-        );
-      }
       if (p.status === "COMPLETED") {
         return Response.json({ error: "Quête déjà complétée." }, { status: 400 });
       }
       if (p.missionAttempts >= MISSION_MAX_ATTEMPTS) {
         return Response.json({ error: "Nombre maximum de tentatives atteint." }, { status: 429 });
       }
-      const session = JSON.parse(p.missionSession) as {
-        challenge: Record<string, unknown>;
-        expected: Record<string, unknown>;
-      };
-      const result = validateMission(quest.missionType, session, body.answer ?? {});
+
+      /**
+       * Phase 3 : les quêtes BITLAB_PROOF utilisent une vraie preuve
+       * (testnet/signet) persistée via /api/bitlab/proof. On consomme
+       * une BitLabProof non-consumed à la place du simulated validator.
+       *
+       * Consommation atomique via `consumeBitlabProof` (updateMany conditionnel) :
+       * garantit qu'un replay de `mission_submit` ne crédite les récompenses
+       * qu'une seule fois, même en cas de requêtes concurrentes (P0.2).
+       */
+      let result: { success: boolean; feedback: string; proof?: Record<string, unknown> };
+      if (quest.missionKind === "BITLAB_PROOF") {
+        const startedAt = Date.now();
+        const consumption = await consumeBitlabProof(db.bitLabProof, user.id, quest.code);
+
+        if (consumption.status === "NO_PROOF") {
+          await db.userQuestProgress.update({
+            where: { id: p.id },
+            data: { missionAttempts: p.missionAttempts + 1 },
+          });
+          const refreshed = await db.userQuestProgress.findUniqueOrThrow({ where: { id: p.id } });
+          return Response.json({
+            success: false,
+            feedback:
+              "Aucune preuve BitLab enregistrée. Soumets d'abord ta preuve via /api/bitlab/proof.",
+            attemptsLeft: Math.max(0, MISSION_MAX_ATTEMPTS - refreshed.missionAttempts),
+            progress: refreshed,
+          });
+        }
+
+        if (consumption.status === "DUPLICATE") {
+          // Replay après consommation. On NE crédite PAS les récompenses et on
+          // trace un outcome DUPLICATE dans l'audit log BitLab.
+          const existing = consumption.existing;
+          fireProofAttempt({
+            userId: user.id,
+            questCode: quest.code,
+            kind: existing.kind,
+            network: existing.network,
+            outcome: "DUPLICATE",
+            reasonMessage: "mission_submit après consommation de la preuve",
+            startedAt,
+          });
+          const refreshed = await db.userQuestProgress.findUniqueOrThrow({ where: { id: p.id } });
+          const alreadyCompleted = refreshed.status === "COMPLETED";
+          return Response.json({
+            success: alreadyCompleted,
+            idempotent: true,
+            feedback: alreadyCompleted
+              ? "Mission déjà validée — aucune récompense supplémentaire attribuée."
+              : "Preuve BitLab déjà utilisée pour cette quête.",
+            proof: alreadyCompleted && refreshed.missionProof
+              ? (JSON.parse(refreshed.missionProof) as Record<string, unknown>)
+              : undefined,
+            progress: refreshed,
+            attemptsLeft: Math.max(0, MISSION_MAX_ATTEMPTS - refreshed.missionAttempts),
+          });
+        }
+
+        // consumption.status === "CONSUMED"
+        const proof = consumption.proof;
+        const parsedPayload = (() => {
+          try {
+            return JSON.parse(proof.payload) as Record<string, unknown>;
+          } catch {
+            return {};
+          }
+        })();
+        result = {
+          success: true,
+          feedback: "Preuve BitLab vérifiée — mission validée !",
+          proof: {
+            type: proof.kind.toLowerCase(),
+            network: proof.network,
+            verifiedAt: proof.verifiedAt.toISOString(),
+            ...parsedPayload,
+          },
+        };
+      } else {
+        // Chemin historique SIMULATED : validator local.
+        if (!p.missionSession) {
+          return Response.json(
+            { error: "Aucune mission en cours. Lance d'abord la mission dans BitLab." },
+            { status: 400 },
+          );
+        }
+        const session = JSON.parse(p.missionSession) as {
+          challenge: Record<string, unknown>;
+          expected: Record<string, unknown>;
+        };
+        result = validateMission(quest.missionType, session, body.answer);
+      }
+
       await db.userQuestProgress.update({
         where: { id: p.id },
         data: { missionAttempts: p.missionAttempts + 1 },
@@ -231,20 +327,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
         });
       }
 
-      /* ---- Mission réussie : XP mission + complétion de quête ---- */
-      let xp: XpResult | null = null;
-      if (!p.missionProof) {
-        xp = await awardXp(user.id, XP_RULES.MISSION_SUCCESS, "mission");
-      }
-      await db.userQuestProgress.update({
-        where: { id: p.id },
-        data: { missionProof: JSON.stringify(result.proof), status: "COMPLETED", completedAt: new Date() },
+      /* ---- Mission réussie : complétion atomique de la quête ----
+       * updateMany conditionnel sur `status != COMPLETED` garantit que les
+       * récompenses (XP mission, XP complétion, sats, events) ne sont
+       * attribuées qu'une seule fois même en cas de double soumission
+       * concurrente (P0.2 — idempotence stricte). */
+      const completion = await db.userQuestProgress.updateMany({
+        where: { id: p.id, status: { not: "COMPLETED" } },
+        data: {
+          missionProof: JSON.stringify(result.proof),
+          status: "COMPLETED",
+          completedAt: new Date(),
+        },
       });
+      const justCompleted = completion.count > 0;
 
-      // Bonus de complétion (une seule fois)
+      let xp: XpResult | null = null;
       let bonusXp: XpResult | null = null;
-      const wasCompleted = p.completedAt !== null;
-      if (!wasCompleted) {
+      let satsResult = { granted: 0, fullReward: 0, streakBonusPct: 0, capped: false, streakBonus: 0 };
+
+      if (justCompleted) {
+        if (!p.missionProof) {
+          xp = await awardXp(user.id, XP_RULES.MISSION_SUCCESS, "mission");
+        }
         bonusXp = await awardXp(user.id, XP_RULES.QUEST_BONUS, "completion");
         await db.userEvent.create({
           data: {
@@ -253,12 +358,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             payload: JSON.stringify({ questCode: quest.code, questTitle: quest.title, proof: result.proof }),
           },
         });
-      }
 
-      /* ---- Récompenses sats (plafond journalier + bonus streak) ---- */
-      const fresh = await db.user.findUniqueOrThrow({ where: { id: user.id } });
-      let satsResult = { granted: 0, fullReward: 0, streakBonusPct: 0, capped: false, streakBonus: 0 };
-      if (!wasCompleted) {
+        /* ---- Récompenses sats (plafond journalier + bonus streak) ---- */
+        const fresh = await db.user.findUniqueOrThrow({ where: { id: user.id } });
         satsResult = await awardSats(user.id, quest.satsReward, fresh.streak, quest.title);
         await db.user.update({
           where: { id: user.id },
@@ -282,6 +384,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       const finalUser = await db.user.findUniqueOrThrow({ where: { id: user.id } });
       const finalProgress = await db.userQuestProgress.findUniqueOrThrow({ where: { id: p.id } });
 
+      // LOT 4A — snapshot des récompenses dans la MissionAttempt active (si une
+      // existe). Permet à la liste "Mes missions" (dashboard + bitlab) d'afficher
+      // les gains sans refaire un join progress ↔ attempt. No-op silencieux si
+      // pas d'attempt en cours (compat ascendante : les anciens flux sans
+      // deep-link n'en créent pas).
+      if (justCompleted) {
+        const totalXpEarned = (xp?.xpGained ?? 0) + (bonusXp?.xpGained ?? 0);
+        await snapshotAttemptResult({
+          userId: user.id,
+          questCode: quest.code,
+          result: {
+            questStatus: "COMPLETED",
+            xpEarned: totalXpEarned,
+            satsEarned: satsResult.granted,
+            satsCapped: satsResult.capped,
+            streakBonusPct: satsResult.streakBonusPct,
+            badges: newBadges.map((b) => ({ code: b.code, name: b.name })),
+            completedAt: new Date().toISOString(),
+          },
+        });
+        // Event-bus : les handlers (attestations, analytics, Nostr…)
+        // s'abonnent via `on("quest.completed", …)`. Non bloquant : si
+        // un handler throw ou prend du temps, la réponse HTTP n'attend
+        // pas (Promise.allSettled interne).
+        void emit("quest.completed", {
+          userId: user.id,
+          questCode: quest.code,
+          xpEarned: totalXpEarned,
+          satsEarned: satsResult.granted,
+        });
+      }
+
       return Response.json({
         success: true,
         feedback: result.feedback,
@@ -289,7 +423,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
         progress: finalProgress,
         xp,
         bonusXp,
-        sats: wasCompleted ? null : satsResult,
+        sats: justCompleted ? satsResult : null,
+        idempotent: !justCompleted,
         user: publicUser(finalUser),
         badges: newBadges,
       });
@@ -297,7 +432,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
     return Response.json({ error: "Action inconnue." }, { status: 400 });
   } catch (e) {
-    console.error("progress error", e);
+    log.error({ err: e, questCode: code, action: body.action, userId: user.id }, "progress handler failed");
     return Response.json({ error: "Erreur serveur." }, { status: 500 });
   }
 }

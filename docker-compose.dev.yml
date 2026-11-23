@@ -1,0 +1,138 @@
+# docker-compose.dev.yml — Environnement de développement reproductible pour BitQuest.
+#
+# Ce fichier NE REMPLACE PAS le docker-compose.yml (PostgreSQL) existant.
+# Usage : docker compose -f docker-compose.dev.yml <commande>
+# Voir docs/DOCKER_DEVELOPMENT.md pour toutes les commandes.
+#
+# Persistance :
+#   - Code source : bind mount ./ → /app (modifs host visibles instantanément)
+#   - node_modules : volume Docker nommé (isolation Linux ≠ macOS, binaires natifs)
+#   - .next (cache) : volume Docker nommé (accélère les rebuilds)
+#   - SQLite : bind mount ./db → /app/db (le fichier custom.db reste sur le host)
+
+services:
+  bitquest-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: bitquest-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      # Postgres via le service `postgres` défini ci-dessous.
+      - DATABASE_URL=postgresql://bitquest:bitquest_dev_password@postgres:5432/bitquest?schema=public
+      # Redis pour le rate-limit distribué (fallback in-memory si indispo).
+      - REDIS_URL=redis://redis:6379
+      # HMR fiable sur macOS (osxfs/virtiofs ne propage pas toujours inotify).
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      # Désactive la télémétrie Next (évite les appels réseau au démarrage).
+      - NEXT_TELEMETRY_DISABLED=1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      # Code source complet, en mode "cached" pour les perfs sur macOS.
+      - ./:/app:cached
+      # node_modules isolé : les binaires natifs du conteneur Linux ne
+      # doivent jamais être exposés à / écrasés par le host macOS.
+      - node_modules:/app/node_modules
+      # Cache Next.js : accélère les démarrages, isolé du host.
+      - next_cache:/app/.next
+      # Base SQLite : bind mount explicite pour garantir que le fichier
+      # custom.db existant est le MÊME que celui vu par le conteneur,
+      # et qu'il reste visible/sauvegardable depuis le Mac.
+      - ./db:/app/db
+    stdin_open: true
+    tty: true
+    working_dir: /app
+    # La commande est également définie dans le Dockerfile.dev ; on la
+    # redéclare ici pour qu'elle soit évidente à la lecture du compose.
+    command: ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]
+
+  # PostgreSQL : backend de production, remplace SQLite depuis Phase 0.4.
+  postgres:
+    image: postgres:16-alpine
+    container_name: bitquest-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: bitquest
+      POSTGRES_PASSWORD: bitquest_dev_password
+      POSTGRES_DB: bitquest
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bitquest"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # Redis utilisé pour le rate-limit distribué. Optionnel en dev : si on
+  # arrête ce service (ou si REDIS_URL est vide), le code retombe sur
+  # une Map en mémoire (voir src/lib/cache/redis.ts).
+  redis:
+    image: redis:7-alpine
+    container_name: bitquest-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # LND testnet (opt-in via `--profile lnd`).
+  # Utilise neutrino comme backend (pas de bitcoind local requis). Permet
+  # de tester le flux CHANNEL end-to-end sans infra lourde. Setup
+  # one-time du wallet documenté dans docs/DOCKER_LND.md.
+  #
+  # Démarrage :
+  #   docker compose -f docker-compose.dev.yml --profile lnd up -d lnd
+  lnd:
+    image: lightninglabs/lnd:v0.18.4-beta
+    container_name: bitquest-lnd
+    profiles: ["lnd"]
+    ports:
+      - "10009:10009" # gRPC
+      - "8081:8080"   # REST (8081 pour éviter collision avec autres services)
+    volumes:
+      - lnd_data:/root/.lnd
+      # Script de wallet unlock + password injectés depuis le host.
+      - ./scripts/lnd:/scripts:ro
+    command:
+      - lnd
+      - --noseedbackup
+      - --bitcoin.active
+      - --bitcoin.testnet
+      - --bitcoin.node=neutrino
+      - --neutrino.connect=btcd-testnet.lightning.computer
+      - --neutrino.connect=testnet.aranguren.org
+      - --rpclisten=0.0.0.0:10009
+      - --restlisten=0.0.0.0:8080
+      - --tlsextradomain=bitquest-lnd
+      - --tlsextradomain=lnd
+      - --alias=bitquest-dev
+      - --debuglevel=info
+    restart: unless-stopped
+    healthcheck:
+      # tls.cert apparaît dès que lnd est up ; lightning server est prêt
+      # quand /v1/getinfo répond (après wallet create+unlock).
+      test: ["CMD-SHELL", "test -f /root/.lnd/tls.cert"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  node_modules:
+    name: bitquest_node_modules
+  next_cache:
+    name: bitquest_next_cache
+  redis_data:
+    name: bitquest_redis_data
+  postgres_data:
+    name: bitquest_postgres_data
+  lnd_data:
+    name: bitquest_lnd_data

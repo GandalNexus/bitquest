@@ -1,27 +1,46 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { formatDistanceToNow } from "date-fns";
-import { fr } from "date-fns/locale";
 import {
+  AlertCircle,
   ArrowRight,
+  Award,
   CheckCircle2,
+  Clock,
   Coins,
   Flame,
+  FlaskConical,
+  GraduationCap,
   Map,
+  PenSquare,
+  Play,
+  ShieldCheck,
   Sparkles,
   Star,
+  Target,
   TrendingUp,
   Trophy,
+  XCircle,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useMe, useQuests } from "@/lib/bitquest/hooks";
-import { formatSats, type MeEvent, type QuestState } from "@/lib/bitquest/client";
+import {
+  useIsAdmin,
+  useIsEditor,
+  useMe,
+  useMyAttestations,
+  useMyBitlabAttempts,
+  useMyBitlabStats,
+  useQuests,
+} from "@/lib/bitquest/hooks";
+import { formatSats } from "@/lib/bitquest/client";
 import type { View } from "@/lib/bitquest/store";
+import { useAppendTheme } from "@/lib/theme-sync";
 import {
   BadgeIcon,
   EmptyState,
@@ -30,11 +49,19 @@ import {
   RewardChips,
   StatCard,
   rarityStyles,
-  statusLabels,
   trackStyles,
 } from "./ui-bits";
+import {
+  TRACK_ORDER,
+  eventText,
+  isNewUser,
+  pickNextQuest,
+  relativeTime,
+} from "./dashboard.utils";
+import { DailyChallengeTile } from "./daily-challenge-tile";
+import { useT } from "@/i18n/locale-provider";
 
-/* ============ Helpers ============ */
+/* ============ Helpers visuels (non testables car React) ============ */
 
 function LevelRing({ pct, level }: { pct: number; level: number }) {
   const radius = 34;
@@ -68,17 +95,6 @@ function LevelRing({ pct, level }: { pct: number; level: number }) {
   );
 }
 
-const STATUS_PRIORITY = ["IN_PROGRESS", "THEORY_DONE", "QUIZ_PASSED", "AVAILABLE"];
-
-function pickNextQuest(quests: QuestState[]): QuestState | undefined {
-  const candidates = quests
-    .filter((q) => q.status !== "COMPLETED" && !q.locked)
-    .sort(
-      (a, b) => a.order - b.order || STATUS_PRIORITY.indexOf(a.status) - STATUS_PRIORITY.indexOf(b.status),
-    );
-  return candidates[0];
-}
-
 const EVENT_META: Record<string, { icon: LucideIcon; className: string }> = {
   QUEST_COMPLETED: { icon: CheckCircle2, className: "text-emerald-500" },
   BADGE_UNLOCKED: { icon: Trophy, className: "text-amber-500" },
@@ -86,56 +102,542 @@ const EVENT_META: Record<string, { icon: LucideIcon; className: string }> = {
   SATS_EARNED: { icon: Coins, className: "text-amber-500" },
 };
 
-function eventText(e: MeEvent): string {
-  const p = e.payload ?? {};
-  switch (e.type) {
-    case "QUEST_COMPLETED": {
-      const title = typeof p.questTitle === "string" ? p.questTitle : "une quête";
-      return `Quête terminée : ${title}`;
-    }
-    case "BADGE_UNLOCKED": {
-      const name = typeof p.badgeName === "string" ? p.badgeName : "un badge";
-      return `Badge débloqué : ${name}`;
-    }
-    case "LEVEL_UP": {
-      const to = Number(p.to);
-      return Number.isFinite(to) ? `Niveau ${to} atteint` : "Niveau supérieur atteint";
-    }
-    case "SATS_EARNED": {
-      const amount = Number(p.amount);
-      return Number.isFinite(amount) ? `+${formatSats(amount)} sats gagnés` : "Satoshis gagnés";
-    }
-    default:
-      return "Événement d'aventure";
-  }
-}
-
-function relativeTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  try {
-    return formatDistanceToNow(date, { addSuffix: true, locale: fr });
-  } catch {
-    return "—";
-  }
-}
-
 const fadeUp = {
   initial: { opacity: 0, y: 14 },
   animate: { opacity: 1, y: 0 },
 };
 
-const TRACK_ORDER = ["INITIATION", "INTERMEDIATE", "ADVANCED", "SPECIAL"] as const;
+/* ============ Sous-composants additifs (Sprint 1A) ============ */
+
+/**
+ * D2 — Tuile Académie : lien vers le module Académie (Sprint 1B).
+ */
+function AcademyTeaser() {
+  const titleId = "dashboard-academy-title";
+  return (
+    <motion.section
+      {...fadeUp}
+      transition={{ duration: 0.35, delay: 0.18 }}
+      aria-labelledby={titleId}
+    >
+      <Card className="h-full rounded-xl">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div className="min-w-0">
+            <CardTitle
+              id={titleId}
+              className="flex items-center gap-2 text-base sm:text-lg"
+            >
+              <GraduationCap className="h-5 w-5 text-primary" aria-hidden />
+              Académie BitQuest
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Cours structurés et leçons illustrées pour approfondir Bitcoin au-delà des quêtes.
+            </CardDescription>
+          </div>
+          <Badge
+            variant="outline"
+            className="shrink-0 border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
+          >
+            Disponible
+          </Badge>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Parcours thématiques, chapitres et leçons pédagogiques — ouvre l&apos;Académie pour
+            commencer ou reprendre un cours.
+          </p>
+          <Button asChild className="w-full sm:w-auto">
+            <Link href="/academy">
+              Explorer l&apos;Académie
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+/**
+ * I4 — Tuile "Missions pratiques" : rend visible l'activité BitLab
+ * (laboratoire pratique) directement dans le dashboard BitQuest pour
+ * matérialiser l'intégration GandalNexus unifiée. L'utilisateur voit
+ * son nombre de preuves vérifiées, sa dernière mission et un accès
+ * direct à BitLab.
+ *
+ * Silencieux en cas d'erreur réseau (ne doit pas casser le dashboard).
+ */
+/* ============================================================
+ * LOT 27 — Tuile Attestations
+ *
+ * Expose le compteur d'Attestations immuables de l'utilisateur, créées
+ * automatiquement par le handler event-bus LOT 25. Masquée si aucune
+ * (zéro bruit UI pour les nouveaux comptes).
+ * ============================================================ */
+function AttestationsTile() {
+  const titleId = "dashboard-attestations-title";
+  const { data, isLoading, isError } = useMyAttestations();
+
+  if (isError) return null;
+  const count = data?.items.length ?? 0;
+  if (!isLoading && count === 0) return null; // Pas de tuile si zéro
+
+  const last = data?.items[0];
+  return (
+    <motion.section
+      {...fadeUp}
+      transition={{ duration: 0.35, delay: 0.24 }}
+      aria-labelledby={titleId}
+    >
+      <Card className="h-full rounded-xl">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div className="min-w-0">
+            <CardTitle
+              id={titleId}
+              className="flex items-center gap-2 text-base sm:text-lg"
+            >
+              <Award className="h-5 w-5 text-primary" aria-hidden />
+              Mes attestations
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Chaque quête complétée génère une attestation immuable
+              (socle NIP/Nostr).
+            </CardDescription>
+          </div>
+          <Badge
+            variant="outline"
+            className="shrink-0 border-primary/40 bg-primary/10 text-primary"
+          >
+            {count}
+          </Badge>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-1 text-sm">
+            {last && (
+              <>
+                <p className="text-muted-foreground">
+                  Dernière :{" "}
+                  <span className="text-foreground font-medium">{last.targetTitle}</span>
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {new Date(last.issuedAt).toLocaleDateString("fr-FR", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </p>
+              </>
+            )}
+          </div>
+          <Button asChild variant="outline" className="w-full shrink-0 sm:w-auto">
+            <Link href="/attestations">
+              Voir toutes
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+function BitlabActivityTile() {
+  const titleId = "dashboard-bitlab-title";
+  const { data, isLoading, isError } = useMyBitlabStats();
+  const bitlabUrl = process.env.NEXT_PUBLIC_BITLAB_URL ?? null;
+  const withTheme = useAppendTheme();
+
+  // En cas d'erreur, on masque la tuile — comportement non bloquant
+  // (c'est un ajout d'intégration, pas un module critique).
+  if (isError) return null;
+
+  const proofCount = data?.proofCount ?? 0;
+  const consumedCount = data?.consumedCount ?? 0;
+  const lastProof = data?.lastProof ?? null;
+  const hasActivity = proofCount > 0;
+
+  return (
+    <motion.section
+      {...fadeUp}
+      transition={{ duration: 0.35, delay: 0.22 }}
+      aria-labelledby={titleId}
+    >
+      <Card className="h-full rounded-xl">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div className="min-w-0">
+            <CardTitle
+              id={titleId}
+              className="flex items-center gap-2 text-base sm:text-lg"
+            >
+              <FlaskConical className="h-5 w-5 text-primary" aria-hidden />
+              Missions pratiques
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Laboratoire BitLab — tes expériences Bitcoin et Lightning validées côté serveur.
+            </CardDescription>
+          </div>
+          {hasActivity ? (
+            <Badge
+              variant="outline"
+              className="shrink-0 border-primary/40 bg-primary/10 text-primary"
+            >
+              {proofCount} preuve{proofCount > 1 ? "s" : ""}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="shrink-0 text-muted-foreground">
+              À démarrer
+            </Badge>
+          )}
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-1 text-sm">
+            {isLoading ? (
+              <p className="text-muted-foreground">Chargement…</p>
+            ) : hasActivity && lastProof ? (
+              <>
+                <p className="text-muted-foreground">
+                  Dernière mission :{" "}
+                  <span className="text-foreground font-medium">{lastProof.questTitle}</span>
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {lastProof.kind} · {lastProof.network} · {relativeTime(lastProof.verifiedAt)}
+                  {consumedCount > 0 && (
+                    <>
+                      {" · "}
+                      {consumedCount} récompensée{consumedCount > 1 ? "s" : ""}
+                    </>
+                  )}
+                </p>
+              </>
+            ) : (
+              <p className="text-muted-foreground">
+                Ouvre BitLab pour pratiquer : construis une transaction, génère une facture
+                Lightning ou explore la mempool. Chaque preuve vérifiée nourrit ta progression.
+              </p>
+            )}
+          </div>
+          {bitlabUrl && (
+            <Button asChild variant="outline" className="w-full shrink-0 sm:w-auto">
+              <a href={withTheme(bitlabUrl)} target="_blank" rel="noopener noreferrer">
+                Ouvrir BitLab
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </a>
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+/* ============================================================
+ * LOT 4B — Tuile "Missions en cours"
+ *
+ * Affiche jusqu'à 3 tentatives actives (CREATED, IN_PROGRESS,
+ * PROOF_PENDING, VERIFYING) avec un bouton "Reprendre dans BitLab".
+ * Si aucune active, retombe sur les 3 dernières terminées pour nourrir
+ * la vue "historique récent".
+ *
+ * Non bloquant : erreur réseau → tuile masquée (comme BitlabActivityTile).
+ * ============================================================ */
+
+/** Métadonnées d'affichage par état d'attempt. */
+const ATTEMPT_STATE_META: Record<
+  string,
+  { label: string; icon: LucideIcon; classes: string }
+> = {
+  CREATED: { label: "Lancée", icon: Play, classes: "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+  IN_PROGRESS: { label: "En cours", icon: Play, classes: "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+  PROOF_PENDING: { label: "Preuve en attente", icon: Clock, classes: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  VERIFYING: { label: "Vérification", icon: Clock, classes: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  COMPLETED: { label: "Terminée", icon: CheckCircle2, classes: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+  FAILED: { label: "Échouée", icon: XCircle, classes: "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400" },
+  EXPIRED: { label: "Expirée", icon: AlertCircle, classes: "border-muted-foreground/30 text-muted-foreground" },
+  ABANDONED: { label: "Abandonnée", icon: AlertCircle, classes: "border-muted-foreground/30 text-muted-foreground" },
+};
+
+function AttemptStateBadge({ state }: { state: string }) {
+  const meta = ATTEMPT_STATE_META[state] ?? ATTEMPT_STATE_META.ABANDONED;
+  const Icon = meta.icon;
+  return (
+    <Badge variant="outline" className={`gap-1 ${meta.classes}`}>
+      <Icon className="h-3 w-3" aria-hidden />
+      {meta.label}
+    </Badge>
+  );
+}
+
+function ActiveMissionsTile() {
+  const titleId = "dashboard-active-missions-title";
+  const { data: active, isLoading } = useMyBitlabAttempts("active", 5);
+  const { data: all } = useMyBitlabAttempts("all", 10);
+  const bitlabUrl = process.env.NEXT_PUBLIC_BITLAB_URL ?? null;
+  const withTheme = useAppendTheme();
+
+  const activeAttempts = active?.attempts ?? [];
+  const recentCompleted = (all?.attempts ?? [])
+    .filter((a) => ["COMPLETED", "FAILED", "EXPIRED", "ABANDONED"].includes(a.state))
+    .slice(0, 3);
+
+  // Masque la tuile si rien à montrer ET pas en cours de chargement
+  // (évite une tuile fantôme sur un compte sans activité BitLab).
+  if (!isLoading && activeAttempts.length === 0 && recentCompleted.length === 0) {
+    return null;
+  }
+
+  return (
+    <motion.section
+      {...fadeUp}
+      transition={{ duration: 0.35, delay: 0.24 }}
+      aria-labelledby={titleId}
+    >
+      <Card className="h-full rounded-xl">
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div className="min-w-0">
+            <CardTitle
+              id={titleId}
+              className="flex items-center gap-2 text-base sm:text-lg"
+            >
+              <Target className="h-5 w-5 text-primary" aria-hidden />
+              Missions en cours
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Reprends là où tu t&apos;étais arrêté, ou consulte tes dernières tentatives.
+            </CardDescription>
+          </div>
+          {activeAttempts.length > 0 && (
+            <Badge variant="outline" className="shrink-0 border-primary/40 bg-primary/10 text-primary">
+              {activeAttempts.length} active{activeAttempts.length > 1 ? "s" : ""}
+            </Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLoading ? (
+            <p className="text-muted-foreground text-sm">Chargement…</p>
+          ) : (
+            <>
+              {activeAttempts.length > 0 && (
+                <ul className="space-y-2" aria-label="Tentatives actives">
+                  {activeAttempts.slice(0, 3).map((a) => (
+                    <li
+                      key={a.id}
+                      className="flex flex-col gap-2 rounded-md border bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-sm">{a.questTitle}</span>
+                          <AttemptStateBadge state={a.state} />
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                          {a.kind} · {a.network} · lancée {relativeTime(a.launchedAt)}
+                        </p>
+                      </div>
+                      {bitlabUrl && (
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0"
+                        >
+                          <a
+                            href={a.returnTo ? `/quests/${a.questCode}` : withTheme(bitlabUrl)}
+                            rel="noopener noreferrer"
+                          >
+                            Reprendre
+                            <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                          </a>
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {recentCompleted.length > 0 && (
+                <div className="space-y-2">
+                  {activeAttempts.length > 0 && (
+                    <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                      Récentes
+                    </p>
+                  )}
+                  <ul className="space-y-2" aria-label="Tentatives récentes">
+                    {recentCompleted.map((a) => (
+                      <li
+                        key={a.id}
+                        className="flex flex-col gap-1 rounded-md border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium">{a.questTitle}</span>
+                            <AttemptStateBadge state={a.state} />
+                          </div>
+                          <p className="text-muted-foreground text-xs">
+                            {a.kind} · {a.network} ·{" "}
+                            {relativeTime(a.completedAt ?? a.failedAt ?? a.launchedAt)}
+                            {a.result && typeof (a.result as { xpEarned?: number }).xpEarned === "number" && (
+                              <>
+                                {" · "}+{(a.result as { xpEarned: number }).xpEarned} XP
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+/**
+ * D3 — Bannière d'onboarding pour les comptes tout neufs (0 XP, 0 événement, 0 quête terminée).
+ * Rappelle la boucle d'apprentissage avant de laisser l'utilisateur plonger dans la quête Genesis.
+ */
+function OnboardingBanner({ onStart }: { onStart: () => void }) {
+  const titleId = "dashboard-onboarding-title";
+  const steps: { icon: LucideIcon; title: string; sub: string }[] = [
+    { icon: Sparkles, title: "Lis & valide", sub: "Lis une section et réussis le quiz à 70 %." },
+    { icon: Target, title: "Pratique", sub: "Réalise la mission pour ancrer la notion." },
+    { icon: Trophy, title: "Récompense", sub: "Gagne XP, badges et sats pédagogiques." },
+  ];
+  return (
+    <motion.section
+      {...fadeUp}
+      transition={{ duration: 0.35, delay: 0.08 }}
+      aria-labelledby={titleId}
+    >
+      <Card className="rounded-xl border-primary/30 bg-primary/5">
+        <CardHeader>
+          <CardTitle id={titleId} className="flex items-center gap-2 text-base sm:text-lg">
+            <Sparkles className="h-5 w-5 text-primary" aria-hidden />
+            Bienvenue sur BitQuest
+          </CardTitle>
+          <CardDescription>
+            Trois étapes pour chaque quête. Ton aventure commence par la Genèse de Bitcoin.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <ol className="grid gap-3 sm:grid-cols-3" aria-label="Boucle d'apprentissage">
+            {steps.map(({ icon: Icon, title, sub }, i) => (
+              <li
+                key={title}
+                className="flex items-start gap-3 rounded-lg border bg-background/60 p-3"
+              >
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
+                  aria-hidden
+                >
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Étape {i + 1}
+                  </div>
+                  <div className="text-sm font-medium">{title}</div>
+                  <div className="text-xs text-muted-foreground">{sub}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <div className="flex justify-end">
+            <Button onClick={onStart} className="w-full sm:w-auto">
+              Commencer la quête Genesis
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
+
+/* ============ Tuile contextuelle par rôle (EDITOR / ADMIN) ============ */
+
+/**
+ * Tuile « Studio » ou « Admin » affichée uniquement si le user a un rôle
+ * élevé. Rend immédiatement visible depuis le dashboard ce qu'un éditeur
+ * ou admin peut faire en plus d'un apprenant.
+ */
+function RoleActionsTile() {
+  const isAdmin = useIsAdmin();
+  const isEditor = useIsEditor();
+  if (!isEditor) return null;
+
+  return (
+    <motion.section {...fadeUp} transition={{ duration: 0.35 }}>
+      <Card className="rounded-xl border-primary/30 bg-primary/[0.03]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            {isAdmin ? (
+              <ShieldCheck className="h-4 w-4 text-primary" aria-hidden />
+            ) : (
+              <PenSquare className="h-4 w-4 text-emerald-500" aria-hidden />
+            )}
+            {isAdmin ? "Console d'administration" : "Studio éditorial"}
+          </CardTitle>
+          <CardDescription>
+            {isAdmin
+              ? "Gestion complète de la plateforme : utilisateurs, contenu, modération, audit."
+              : "Crée et publie des cours, chapitres, leçons et quêtes pour l'Académie."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {isAdmin ? (
+            <>
+              <Button asChild size="sm">
+                <Link href="/admin">
+                  <ShieldCheck className="h-4 w-4" aria-hidden />
+                  Ouvrir Admin
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/studio">
+                  <PenSquare className="h-4 w-4" aria-hidden />
+                  Studio
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <Button asChild size="sm">
+              <Link href="/studio">
+                <PenSquare className="h-4 w-4" aria-hidden />
+                Ouvrir le Studio
+              </Link>
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </motion.section>
+  );
+}
 
 /* ============ Dashboard ============ */
 
+/**
+ * Dashboard — utilisable à la fois en mode SPA (via props onOpenQuest/onNavigate)
+ * et en mode routes (sans props : navigation via Link / router.push).
+ */
 export function Dashboard({
   onOpenQuest,
   onNavigate,
 }: {
-  onOpenQuest: (code: string) => void;
-  onNavigate: (view: View) => void;
-}) {
+  onOpenQuest?: (code: string) => void;
+  onNavigate?: (view: View) => void;
+} = {}) {
+  const router = useRouter();
+  const t = useT();
+  const openQuest = (code: string) => {
+    if (onOpenQuest) onOpenQuest(code);
+    else router.push(`/quests/${code}`);
+  };
+  const navigate = (view: View) => {
+    if (onNavigate) onNavigate(view);
+    else router.push(`/${view}`);
+  };
   const meQuery = useMe();
   const questsQuery = useQuests();
 
@@ -162,24 +664,50 @@ export function Dashboard({
   const recentBadges = meQuery.data.badges.slice(0, 4);
   const recentEvents = meQuery.data.events.slice(0, 8);
 
+  /** D3 — compte tout neuf : affiche la bannière d'onboarding en plus du Hero. */
+  const showOnboarding = isNewUser({
+    completedCount: completedQuests.length,
+    eventCount: meQuery.data.events.length,
+    xp: me.xp,
+  });
+
+  /** Code de la première quête disponible pour l'onboarding (toujours Genesis dans le seed actuel). */
+  const firstAvailableCode =
+    quests.find((q) => q.status === "AVAILABLE" && !q.locked)?.code ?? "genesis";
+
+  /* --- Identifiants pour aria-labelledby (D6) --- */
+  const heroId = "dashboard-hero-title";
+  const statsId = "dashboard-stats-title";
+  const nextQuestId = "dashboard-next-title";
+  const tracksId = "dashboard-tracks-title";
+  const badgesId = "dashboard-badges-title";
+  const activityId = "dashboard-activity-title";
+
   return (
     <div className="space-y-6">
       {/* ===== Hero ===== */}
-      <motion.section {...fadeUp} transition={{ duration: 0.35 }}>
+      <motion.section
+        {...fadeUp}
+        transition={{ duration: 0.35 }}
+        aria-labelledby={heroId}
+      >
         <Card className="rounded-xl">
           <CardContent className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             <div className="min-w-0 text-center sm:text-left">
-              <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                Bonjour, {me.pseudo}
+              <h1
+                id={heroId}
+                className="font-display text-2xl font-bold tracking-tight sm:text-3xl"
+              >
+                {t("dashboard.greeting", { name: me.pseudo })}
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Niv. {level.level} · {level.title}
+                {t("dashboard.level", { level: level.level, title: level.title })}
               </p>
-              {!allCompleted && remaining > 0 && (
+              {!allCompleted && remaining > 0 && !showOnboarding && (
                 <p className="mt-2 max-w-md text-sm">
                   {remaining === 1
-                    ? "Une quête t'attend encore : chaque victoire rapproche du rang de Maître Satoshi !"
-                    : `${remaining} quêtes t'attendent encore : chaque victoire rapproche du rang de Maître Satoshi !`}
+                    ? t("dashboard.remaining.one")
+                    : t("dashboard.remaining.many", { count: remaining })}
                 </p>
               )}
             </div>
@@ -187,12 +715,18 @@ export function Dashboard({
               <LevelRing pct={level.pct} level={level.level} />
               <div className="space-y-1 text-sm">
                 <div className="font-semibold">
-                  {formatSats(me.xp)} XP <span className="font-normal text-muted-foreground">au total</span>
+                  {formatSats(me.xp)} XP{" "}
+                  <span className="font-normal text-muted-foreground">
+                    {t("dashboard.xp.total")}
+                  </span>
                 </div>
                 <div className="text-muted-foreground">
                   {level.next !== null
-                    ? `${formatSats(level.needed - level.into)} XP avant Nv. ${level.level + 1}`
-                    : "Niveau maximum atteint"}
+                    ? t("dashboard.xp.before.next", {
+                        remaining: formatSats(level.needed - level.into),
+                        next: level.level + 1,
+                      })
+                    : t("dashboard.xp.max")}
                 </div>
               </div>
             </div>
@@ -200,21 +734,38 @@ export function Dashboard({
         </Card>
       </motion.section>
 
+      {/* ===== Onboarding (D3 — nouveaux comptes uniquement) ===== */}
+      {showOnboarding && <OnboardingBanner onStart={() => openQuest(firstAvailableCode)} />}
+
+      {/* ===== Défi du jour (Phase 2.8) ===== */}
+      <DailyChallengeTile />
+
       {/* ===== StatCards ===== */}
       <motion.section
         {...fadeUp}
         transition={{ duration: 0.35, delay: 0.05 }}
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
-        aria-label="Statistiques d'aventurier"
+        aria-labelledby={statsId}
       >
-        <StatCard icon={Star} label="XP total" value={formatSats(me.xp)} />
+        <h2 id={statsId} className="sr-only">
+          Statistiques d&apos;aventurier
+        </h2>
+        <StatCard icon={Star} label={t("dashboard.stat.xp")} value={formatSats(me.xp)} />
         <StatCard
           icon={Map}
-          label="Quêtes terminées"
+          label={t("dashboard.stat.quests")}
           value={questsQuery.isLoading ? "…" : `${completedQuests.length} / ${totalQuests}`}
         />
-        <StatCard icon={Trophy} label="Badges débloqués" value={meQuery.data.badges.length} />
-        <StatCard icon={Coins} label="Solde sats" value={`${formatSats(me.sats)} sats`} />
+        <StatCard
+          icon={Trophy}
+          label={t("dashboard.stat.badges")}
+          value={meQuery.data.badges.length}
+        />
+        <StatCard
+          icon={Coins}
+          label={t("dashboard.stat.sats")}
+          value={`${formatSats(me.sats)} sats`}
+        />
       </motion.section>
 
       {/* ===== Grille principale ===== */}
@@ -222,21 +773,25 @@ export function Dashboard({
         {/* --- Colonne gauche --- */}
         <div className="space-y-4 lg:col-span-2">
           {/* Continuer l'apprentissage */}
-          <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.1 }}>
+          <motion.section
+            {...fadeUp}
+            transition={{ duration: 0.35, delay: 0.1 }}
+            aria-labelledby={nextQuestId}
+          >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle>Continuer l&apos;apprentissage</CardTitle>
-                <CardDescription>Ta prochaine étape sur le chemin de Bitcoin.</CardDescription>
+                <CardTitle id={nextQuestId}>{t("dashboard.next.title")}</CardTitle>
+                <CardDescription>{t("dashboard.next.description")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {nextQuest ? (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className={trackStyles[nextQuest.track]?.badge}>
-                        {trackStyles[nextQuest.track]?.label ?? nextQuest.track}
+                        {t(`tracks.${nextQuest.track}`)}
                       </Badge>
                       <Badge variant="outline" className="text-muted-foreground">
-                        {statusLabels[nextQuest.status] ?? nextQuest.status}
+                        {t(`status.${nextQuest.status}`)}
                       </Badge>
                     </div>
                     <div>
@@ -250,9 +805,12 @@ export function Dashboard({
                       <Button
                         size="lg"
                         className="h-10 w-full sm:w-auto"
-                        onClick={() => onOpenQuest(nextQuest.code)}
+                        onClick={() => openQuest(nextQuest.code)}
                       >
-                        {nextQuest.status === "AVAILABLE" ? "Commencer" : "Reprendre"} : {nextQuest.title}
+                        {nextQuest.status === "AVAILABLE"
+                          ? t("dashboard.next.cta.start")
+                          : t("dashboard.next.cta.resume")}{" "}
+                        : {nextQuest.title}
                         <ArrowRight className="h-4 w-4" aria-hidden />
                       </Button>
                     </div>
@@ -260,29 +818,28 @@ export function Dashboard({
                 ) : allCompleted ? (
                   <div className="flex flex-col items-center gap-3 py-6 text-center">
                     <Sparkles className="h-8 w-8 text-primary" aria-hidden />
-                    <p className="font-semibold">Toutes les quêtes terminées, Maître Satoshi !</p>
+                    <p className="font-semibold">{t("dashboard.next.allDone.title")}</p>
                     <p className="text-sm text-muted-foreground">
-                      Tu maîtrises désormais les fondamentaux de Bitcoin et du Lightning Network. Compare ton
-                      XP aux autres aventuriers.
+                      {t("dashboard.next.allDone.sub")}
                     </p>
-                    <Button size="lg" className="h-10" onClick={() => onNavigate("leaderboard")}>
-                      Voir le classement
+                    <Button size="lg" className="h-10" onClick={() => navigate("leaderboard")}>
+                      {t("dashboard.next.allDone.cta")}
                       <Trophy className="h-4 w-4" aria-hidden />
                     </Button>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3 py-6 text-center">
-                    <p className="font-medium">Aucune quête accessible pour l&apos;instant.</p>
+                    <p className="font-medium">{t("dashboard.next.none.title")}</p>
                     <p className="text-sm text-muted-foreground">
-                      Continue de gagner de l&apos;XP pour débloquer la suite du parcours.
+                      {t("dashboard.next.none.sub")}
                     </p>
                     <Button
                       variant="outline"
                       size="lg"
                       className="h-10"
-                      onClick={() => onNavigate("leaderboard")}
+                      onClick={() => navigate("leaderboard")}
                     >
-                      Voir le classement
+                      {t("dashboard.next.allDone.cta")}
                     </Button>
                   </div>
                 )}
@@ -291,17 +848,20 @@ export function Dashboard({
           </motion.section>
 
           {/* Progression par parcours */}
-          <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.15 }}>
+          <motion.section
+            {...fadeUp}
+            transition={{ duration: 0.35, delay: 0.15 }}
+            aria-labelledby={tracksId}
+          >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle>Progression par parcours</CardTitle>
-                <CardDescription>
-                  Quatre pistes, de l&apos;initiation aux événements spéciaux.
-                </CardDescription>
+                <CardTitle id={tracksId}>{t("dashboard.tracks.title")}</CardTitle>
+                <CardDescription>{t("dashboard.tracks.description")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {TRACK_ORDER.map((track) => {
                   const style = trackStyles[track];
+                  const trackLabel = t(`tracks.${track}`);
                   const trackQuests = quests.filter((q) => q.track === track);
                   const done = trackQuests.filter((q) => q.status === "COMPLETED").length;
                   const total = trackQuests.length;
@@ -312,12 +872,15 @@ export function Dashboard({
                         variant="outline"
                         className={`w-28 justify-center shrink-0 ${style?.badge ?? ""}`}
                       >
-                        {style?.label ?? track}
+                        {trackLabel}
                       </Badge>
                       <Progress
                         value={pct}
                         className="h-2 flex-1"
-                        aria-label={`Progression ${style?.label ?? track} : ${pct} %`}
+                        aria-label={t("dashboard.tracks.progress.aria", {
+                          track: trackLabel,
+                          pct,
+                        })}
                       />
                       <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
                         {done}/{total}
@@ -326,21 +889,40 @@ export function Dashboard({
                   );
                 })}
                 {quests.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Les quêtes se chargent…</p>
+                  <p className="text-sm text-muted-foreground">{t("dashboard.tracks.loading")}</p>
                 )}
               </CardContent>
             </Card>
           </motion.section>
+
+          {/* D2 — Tuile Académie "Bientôt disponible" */}
+          <AcademyTeaser />
+
+          {/* I4 — Tuile Missions pratiques (intégration BitLab unifiée) */}
+          <BitlabActivityTile />
+
+          {/* LOT 4B — Tuile Missions en cours (reprise + historique) */}
+          <ActiveMissionsTile />
+
+          {/* LOT 27 — Tuile Attestations (socle preuve exportable Nostr) */}
+          <AttestationsTile />
+
+          {/* Tuile contextuelle Studio / Admin (visible uniquement si EDITOR+) */}
+          <RoleActionsTile />
         </div>
 
         {/* --- Colonne droite --- */}
         <div className="space-y-4">
           {/* Badges récents */}
-          <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.2 }}>
+          <motion.section
+            {...fadeUp}
+            transition={{ duration: 0.35, delay: 0.2 }}
+            aria-labelledby={badgesId}
+          >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle>Badges récents</CardTitle>
-                <CardDescription>Tes dernières récompenses de collectionneur.</CardDescription>
+                <CardTitle id={badgesId}>{t("dashboard.badges.title")}</CardTitle>
+                <CardDescription>{t("dashboard.badges.description")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {recentBadges.length > 0 ? (
@@ -359,7 +941,7 @@ export function Dashboard({
                             variant="outline"
                             className={`shrink-0 ${rarity?.badge ?? rarityStyles.COMMON.badge}`}
                           >
-                            {rarity?.label ?? "Commun"}
+                            {t(`rarity.${badge.rarity}`)}
                           </Badge>
                         </li>
                       );
@@ -369,17 +951,17 @@ export function Dashboard({
                   <div className="space-y-3">
                     <EmptyState
                       icon={Trophy}
-                      title="Aucun badge pour l'instant"
-                      sub="Complète ta première quête !"
+                      title={t("dashboard.badges.empty.title")}
+                      sub={t("dashboard.badges.empty.sub")}
                     />
                     <div className="text-center">
                       <Button
                         variant="link"
                         size="sm"
                         className="text-muted-foreground"
-                        onClick={() => onNavigate("quests")}
+                        onClick={() => navigate("quests")}
                       >
-                        Aller vers les quêtes
+                        {t("dashboard.badges.empty.cta")}
                         <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                       </Button>
                     </div>
@@ -390,23 +972,31 @@ export function Dashboard({
           </motion.section>
 
           {/* Activité récente */}
-          <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.25 }}>
+          <motion.section
+            {...fadeUp}
+            transition={{ duration: 0.35, delay: 0.25 }}
+            aria-labelledby={activityId}
+          >
             <Card className="h-full rounded-xl">
               <CardHeader>
-                <CardTitle>Activité récente</CardTitle>
-                <CardDescription>Le journal de ton aventure.</CardDescription>
+                <CardTitle id={activityId}>{t("dashboard.activity.title")}</CardTitle>
+                <CardDescription>{t("dashboard.activity.description")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {recentEvents.length > 0 ? (
                   <ul
                     className="max-h-64 space-y-3 overflow-y-auto pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/30 [&::-webkit-scrollbar]:w-1.5"
+                    aria-live="polite"
                     aria-label="Journal d'activité"
                   >
                     {recentEvents.map((event, i) => {
                       const meta = EVENT_META[event.type];
                       const Icon = meta?.icon ?? Sparkles;
                       return (
-                        <li key={`${event.type}-${event.createdAt}-${i}`} className="flex items-start gap-3">
+                        <li
+                          key={`${event.type}-${event.createdAt}-${i}`}
+                          className="flex items-start gap-3"
+                        >
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
                             <Icon
                               className={`h-4 w-4 ${meta?.className ?? "text-muted-foreground"}`}
@@ -415,7 +1005,9 @@ export function Dashboard({
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm leading-snug">{eventText(event)}</p>
-                            <p className="text-xs text-muted-foreground">{relativeTime(event.createdAt)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {relativeTime(event.createdAt)}
+                            </p>
                           </div>
                         </li>
                       );
@@ -423,8 +1015,7 @@ export function Dashboard({
                   </ul>
                 ) : (
                   <p className="py-4 text-center text-sm text-muted-foreground">
-                    Aucune activité pour l&apos;instant — lance-toi sur une quête, l&apos;histoire
-                    s&apos;écrit avec toi.
+                    {t("dashboard.activity.empty")}
                   </p>
                 )}
               </CardContent>
@@ -441,8 +1032,9 @@ export function Dashboard({
           className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground"
         >
           <Flame className="h-3.5 w-3.5 text-orange-500" aria-hidden />
-          Série d&apos;activité : {me.streak} jour{me.streak > 1 ? "s" : ""} — reviens demain pour un bonus
-          accru.
+          {me.streak === 1
+            ? t("dashboard.streak.one", { count: me.streak })
+            : t("dashboard.streak.many", { count: me.streak })}
         </motion.p>
       )}
     </div>

@@ -13,6 +13,7 @@ export type QuestWithState = {
   xpReward: number;
   satsReward: number;
   missionType: string;
+  missionKind: string;
   totalSections: number;
   totalQuiz: number;
   status: string;
@@ -69,6 +70,7 @@ export async function getQuestsWithState(userId: string): Promise<QuestWithState
       xpReward: quest.xpReward,
       satsReward: quest.satsReward,
       missionType: quest.missionType,
+      missionKind: quest.missionKind,
       totalSections: quest.theorySections ? (JSON.parse(quest.theorySections) as unknown[]).length : 0,
       totalQuiz: quest.quizQuestions.length,
       status: p?.status ?? "AVAILABLE",
