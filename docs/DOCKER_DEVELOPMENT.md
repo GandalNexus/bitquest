@@ -282,13 +282,34 @@ docker compose -f docker-compose.dev.yml run --rm bitquest-dev \
 docker compose -f docker-compose.dev.yml up
 ```
 
-**Permanent prevention**: the repo ships an `.npmrc` with
-`include=optional` so every `npm ci`/`npm install` keeps the
-cross-platform binaries. If that file disappears, re-add:
+**Permanent prevention**: the repo pins all lightningcss platform
+binaries as explicit root-level `optionalDependencies` in `package.json`
+(not just transitive via `lightningcss`). This is critical because
+`npm install --no-save` creates "orphan" packages that npm **actively
+prunes** on any subsequent npm operation (including the implicit ones
+triggered by `npx next dev`) — that's why the fast-fix above comes
+back broken after a few minutes if the dep isn't declared at root.
 
-```
-# .npmrc
-include=optional
+On macOS the non-matching binaries (`lightningcss-linux-*`,
+`lightningcss-win32-*`) are declared but skipped at install time —
+zero disk cost on the host. On the Linux container the matching
+binary is installed and preserved. A matching `.npmrc` with
+`include=optional` reinforces this.
+
+If these entries disappear from `package.json`, re-add them (under
+`optionalDependencies`, not `dependencies`):
+
+```json
+"optionalDependencies": {
+  "lightningcss-darwin-arm64": "1.33.0",
+  "lightningcss-darwin-x64": "1.33.0",
+  "lightningcss-linux-arm64-gnu": "1.33.0",
+  "lightningcss-linux-arm64-musl": "1.33.0",
+  "lightningcss-linux-x64-gnu": "1.33.0",
+  "lightningcss-linux-x64-musl": "1.33.0",
+  "lightningcss-win32-arm64-msvc": "1.33.0",
+  "lightningcss-win32-x64-msvc": "1.33.0"
+}
 ```
 
 ### 8.5 Full reset (last resort)
