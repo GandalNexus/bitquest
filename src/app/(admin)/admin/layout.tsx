@@ -9,6 +9,7 @@ import {
   Flame,
   FlaskConical,
   Gauge,
+  Globe,
   GraduationCap,
   Handshake,
   LayoutDashboard,
@@ -76,6 +77,7 @@ const NAV: NavItem[] = [
 
   // Système — ADMIN
   { href: "/admin/feature-flags", label: "Feature flags", icon: Flag, minRole: "ADMIN", section: "Système" },
+  { href: "/admin/landing-config", label: "Config landing", icon: Globe, minRole: "ADMIN" },
   { href: "/admin/audit", label: "Audit log", icon: ClipboardList, minRole: "ADMIN" },
   { href: "/admin/health", label: "État service", icon: Activity, minRole: "ADMIN" },
 ];

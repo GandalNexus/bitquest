@@ -486,6 +486,21 @@ model Partner {
   @@index([tier])
 }
 
+// Singleton config consommé par la landing statique (repo `landing/`).
+// Permet aux admins de changer les URL de redirection à tout moment sans
+// toucher au code HTML — essentiel quand l'hébergement migre (ex. Vercel
+// → Cloudflare). Les URL par défaut restent dans la landing comme
+// fallback si l'API publique est injoignable.
+model LandingConfig {
+  id            String   @id @default("singleton") // forcé à "singleton" : 1 seule ligne par environnement
+  bitquestUrl   String // URL publique de BitQuest
+  bitlabUrl     String // URL publique de BitLab
+  githubOrgUrl  String   @default("https://github.com/GandalNexus")
+  verifyUrl     String // URL de vérification d'un certificat BitQuest
+  updatedAt     DateTime @updatedAt
+  updatedBy     String? // userId de l'admin ayant modifié en dernier (traçabilité)
+}
+
 model LightningReward {
   id             String    @id @default(cuid())
   userId         String

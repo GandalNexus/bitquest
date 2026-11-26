@@ -419,6 +419,37 @@ export const adminPartnerUpdateSchema = partnerCoreSchema.partial();
 export type AdminPartnerCreateBody = z.infer<typeof adminPartnerCreateSchema>;
 export type AdminPartnerUpdateBody = z.infer<typeof adminPartnerUpdateSchema>;
 
+/* ---------- /api/admin/landing-config ---------- */
+
+// URL validator restrictive mais pratique : http(s), longueur bornée.
+// Accepte localhost pour le dev. Rejette les schemas exotiques
+// (javascript:, data:, file:…) via l'allow-list sur protocol.
+const landingUrlSchema = z
+  .string()
+  .trim()
+  .min(1, "URL requise.")
+  .max(2048, "URL trop longue (max 2048).")
+  .refine(
+    (v) => {
+      try {
+        const u = new URL(v);
+        return u.protocol === "https:" || u.protocol === "http:";
+      } catch {
+        return false;
+      }
+    },
+    { message: "URL invalide : http(s) requis." },
+  );
+
+export const adminLandingConfigUpdateSchema = z.object({
+  bitquestUrl: landingUrlSchema,
+  bitlabUrl: landingUrlSchema,
+  githubOrgUrl: landingUrlSchema,
+  verifyUrl: landingUrlSchema,
+});
+
+export type AdminLandingConfigUpdateBody = z.infer<typeof adminLandingConfigUpdateSchema>;
+
 /* ---------- /api/admin/badges ---------- */
 
 export const BADGE_RARITIES = ["COMMON", "RARE", "EPIC"] as const;
