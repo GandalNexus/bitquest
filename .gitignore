@@ -34,6 +34,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# Whitelist : templates sans secrets, versionnés pour que les opérateurs
+# aient un point de départ (à remplir avec `openssl rand -hex 32`).
+!.env.example
+!.env.prod.example
 
 # vercel
 .vercel

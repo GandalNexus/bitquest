@@ -1,0 +1,231 @@
+# docker-compose.prod.yml — Production BitQuest stack.
+#
+# DIFFERENCES vs docker-compose.dev.yml / docker-compose.yml :
+# - Secrets injected via environment (no hardcoded password in YAML).
+# - Postgres and Redis do NOT publish ports on the host — only the app
+#   container (+ an eventual reverse proxy) can reach them via the
+#   internal Docker network `bitquest_internal`.
+# - Postgres config enforces logical replication off, md5/scram-sha-256
+#   auth, and runs with `--auth=scram-sha-256` as default.
+# - Redis config enforces a passphrase + binds only to the compose network.
+# - `restart: unless-stopped` everywhere so systemd / docker daemon picks
+#   services back up after a reboot.
+# - Healthchecks are stricter than dev (shorter intervals so monitoring
+#   catches drift faster).
+# - No LND service by default — enable via `--profile lnd` once the
+#   wallet setup has been done out-of-band (see docs/DOCKER_LND.md).
+# - No bind mounts of the source code — the app runs from the image.
+#
+# USAGE :
+#   cp .env.prod.example .env.prod   # fill the 7 generated secrets
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+#
+# HARDENING CHECKLIST : docs/POSTGRES_PROD_HARDENING.md
+
+services:
+  app:
+    image: ${BITQUEST_IMAGE:-ghcr.io/gandalnexus/bitquest:latest}
+    container_name: bitquest-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      # Postgres via internal hostname `postgres`. SSL ignored inside the
+      # Docker network ; add `?sslmode=require` if the DB ever moves off
+      # the host (managed Postgres, remote VM, …).
+      - DATABASE_URL=postgresql://${POSTGRES_APP_USER:?}:${POSTGRES_APP_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-bitquest}?connect_timeout=5
+      - REDIS_URL=redis://default:${REDIS_PASSWORD:?}@redis:6379
+      - REDIS_REQUIRED=1
+      # Application secrets. The env validator refuses to boot if any
+      # is empty, under 32 chars, or starts with `placeholder` /
+      # `change-me`. Generate them with `openssl rand -hex 32`.
+      - CSRF_SECRET=${CSRF_SECRET:?}
+      - BITLAB_JWT_SECRET=${BITLAB_JWT_SECRET:?}
+      - BITLAB_LAUNCH_SECRET=${BITLAB_LAUNCH_SECRET:?}
+      - BITLAB_SIGN_SECRET=${BITLAB_SIGN_SECRET:?}
+      - CERTIFICATE_SIGN_SECRET=${CERTIFICATE_SIGN_SECRET:?}
+      # CORS allow-list : comma-separated list of exact origins
+      # (`https://...`). The env validator refuses any `*` or
+      # localhost entry in production.
+      - BITLAB_ALLOWED_ORIGINS=${BITLAB_ALLOWED_ORIGINS:?}
+      # Public URLs exposed to the browser bundle.
+      - NEXT_PUBLIC_BITLAB_URL=${NEXT_PUBLIC_BITLAB_URL:?}
+      - NEXT_PUBLIC_BITQUEST_HOST=${NEXT_PUBLIC_BITQUEST_HOST:?}
+      # Observability (optional — Sentry no-op without DSN).
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN:-}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      # Bind only to loopback — put a reverse proxy (Caddy / Nginx / Traefik)
+      # in front with TLS termination. If you host app + proxy on the same
+      # VM, keep this `127.0.0.1:3000:3000` and forward from 443.
+      - "127.0.0.1:3000:3000"
+    networks:
+      - bitquest_internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: bitquest-db
+    restart: unless-stopped
+    # NO `ports:` section — Postgres is reachable only from containers
+    # on `bitquest_internal`. If you absolutely need host access (one-off
+    # psql, backup pull), do `docker compose exec postgres psql ...`.
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-bitquest}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:-bitquest}
+      # scram-sha-256 is the default on Postgres 16 ; make it explicit.
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Optional : mount a pg_hba.conf override if you need stricter
+      # client authentication (reject non-SSL, reject non-scram, …).
+      # - ./ops/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    networks:
+      - bitquest_internal
+    command:
+      - postgres
+      - -c
+      - log_statement=ddl
+      - -c
+      - log_min_duration_statement=500
+      - -c
+      - log_connections=on
+      - -c
+      - log_disconnections=on
+      - -c
+      - max_connections=100
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-bitquest} -d ${POSTGRES_DB:-bitquest}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  redis:
+    image: redis:7-alpine
+    container_name: bitquest-redis
+    restart: unless-stopped
+    # NO `ports:` either — Redis stays internal.
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?}
+      # No RDB snapshot to disk : our use (rate-limit + anti-replay
+      # nonces + sessions) is ephemeral. If you want to survive restarts,
+      # set `--save 60 1000` and mount redis_data.
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - "256mb"
+      - --maxmemory-policy
+      - allkeys-lru
+      # Protected-mode is implicit when requirepass is set — leave it.
+    volumes:
+      - redis_data:/data
+    networks:
+      - bitquest_internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # Backup runner — runs on a cron inside the container.
+  # Enable with : `docker compose --profile backup up -d backup`
+  backup:
+    image: postgres:16-alpine
+    container_name: bitquest-backup
+    profiles: ["backup"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - PGUSER=${POSTGRES_SUPERUSER:-bitquest}
+      - PGPASSWORD=${POSTGRES_SUPERUSER_PASSWORD:?}
+      - PGHOST=postgres
+      - PGDATABASE=${POSTGRES_DB:-bitquest}
+      - RETENTION=${BACKUP_RETENTION:-14}
+    volumes:
+      - ./backups:/backups
+    networks:
+      - bitquest_internal
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        apk add --no-cache gzip tini >/dev/null
+        echo "[backup] service started — daily at 03:15 UTC, keeps ${RETENTION} files"
+        while true; do
+          sleep $$(( ($$(date -u -d 'tomorrow 03:15' +%s) - $$(date -u +%s)) % 86400 ))
+          TS="$$(date -u +%Y%m%dT%H%M%SZ)"
+          FILE="/backups/bitquest-$${TS}.dump.gz"
+          echo "[backup] $${TS} → $${FILE}"
+          pg_dump --format=custom --no-owner --no-acl | gzip -9 > "$${FILE}"
+          # Rotation : keep last ${RETENTION} files.
+          ls -1t /backups/bitquest-*.dump.gz 2>/dev/null \
+            | tail -n +$$(( RETENTION + 1 )) | xargs -r rm -f
+          echo "[backup] done, $$(ls -1 /backups/bitquest-*.dump.gz 2>/dev/null | wc -l) files retained"
+        done
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  bitquest_internal:
+    name: bitquest_internal
+    driver: bridge
+    # Pas d'IP exposée vers l'extérieur — seul ce réseau interne connecte app ↔ DB ↔ Redis.
+
+volumes:
+  postgres_data:
+    name: bitquest_postgres_data_prod
+  redis_data:
+    name: bitquest_redis_data_prod
