@@ -245,11 +245,27 @@ runs `npm ci` and the resulting `node_modules` ends up inside the Linux
 container's named volume, the Linux binary is missing and PostCSS
 cannot load Tailwind.
 
-**Fast fix** (keeps the volume, just adds the missing binary):
+**Fast fix** (keeps the volume, adds the missing binary and bridges the
+two paths Turbopack tries):
 
 ```bash
-docker compose -f docker-compose.dev.yml run --rm bitquest-dev \
+# 1. Install the native optional dep that npm dropped
+docker compose -f docker-compose.dev.yml exec bitquest-dev \
   npm install lightningcss-linux-x64-gnu@1.33.0 --no-save --force
+
+# 2. Symlink the binary to the fallback path that Turbopack also tries
+#    (lightningcss/node/index.js line 19 falls back to `../*.node` when
+#    `require('lightningcss-<platform>')` fails under the Turbopack bundler)
+docker compose -f docker-compose.dev.yml exec bitquest-dev \
+  ln -sfv ../lightningcss-linux-x64-gnu/lightningcss.linux-x64-gnu.node \
+          node_modules/lightningcss/lightningcss.linux-x64-gnu.node
+
+# 3. Purge the Turbopack cache (the previous failed PostCSS resolution is
+#    baked into `.next/dev/build/chunks/*`)
+docker compose -f docker-compose.dev.yml exec bitquest-dev \
+  sh -c "find .next -mindepth 1 -maxdepth 1 -exec rm -rf {} +"
+
+# 4. Restart
 docker compose -f docker-compose.dev.yml restart bitquest-dev
 ```
 
