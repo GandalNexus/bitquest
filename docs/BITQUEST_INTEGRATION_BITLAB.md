@@ -1,179 +1,179 @@
-# Intégration BitQuest ↔ BitLab — 2026-11-09
+# BitQuest ↔ BitLab Integration — 2026-11-09
 
-> Analyse technique de l'intégration entre BitQuest (`./`) et BitLab (`../bitlab/`), basée sur l'exploration du dépôt BitLab (`../bitlab/src/`, `../bitlab/package.json`, `../bitlab/README.md`). **Aucune modification de BitLab n'est proposée dans cette phase d'audit.**
-
----
-
-## 1. État actuel : rien n'est branché
-
-BitQuest contient 8 types de missions `block_explorer`, `key_forge`, `tx_builder`, `mine_nonce`, `ln_channel`, `ln_invoice`, `multisig_sign`, `taproot_tweak` (`src/lib/bitquest/missions.ts`), **toutes exécutées en simulation serveur**. Le texte UI mentionne "BitLab Sandbox" (`src/components/bitquest/mission-panel.tsx`), mais aucune ligne de code ne contacte le dépôt BitLab :
-
-- Pas d'URL `bitlab.*` dans le code.
-- Pas d'écouteur `window.addEventListener("message", ...)` dédié.
-- Pas de requête HTTP sortante vers BitLab.
-- Pas d'import de `@scure/*`, `@noble/*`, aucune lib Lightning.
-
-**L'intégration doit être conçue et construite à partir de zéro.**
+> Technical analysis of the integration between BitQuest (`./`) and BitLab (`../bitlab/`), based on the exploration of the BitLab repository (`../bitlab/src/`, `../bitlab/package.json`, `../bitlab/README.md`). **No modification of BitLab is proposed in this audit phase.**
 
 ---
 
-## 2. Ce que BitLab offre à BitQuest
+## 1. Current state: nothing is wired
 
-Extraits confirmés par lecture directe de `../bitlab/` :
+BitQuest contains 8 mission types `block_explorer`, `key_forge`, `tx_builder`, `mine_nonce`, `ln_channel`, `ln_invoice`, `multisig_sign`, `taproot_tweak` (`src/lib/bitquest/missions.ts`), **all executed in server-side simulation**. The UI text mentions "BitLab Sandbox" (`src/components/bitquest/mission-panel.tsx`), but no line of code contacts the BitLab repository:
 
-### 2.1 Modèle de sécurité (`../bitlab/README.md:26-33`)
-- Clés privées et mnémoniques **uniquement dans le navigateur** (IndexedDB).
-- Le backend BitLab est un **proxy en lecture seule** vers `mempool.space` + broadcast de transactions brutes (`../bitlab/src/app/api/bitcoin/route.ts:245-422`).
-- Zéro authentification utilisateur BitLab.
-- Deux nœuds LDK réels compilés en WASM, exécutés dans un Web Worker.
+- No `bitlab.*` URL in the code.
+- No dedicated `window.addEventListener("message", ...)` listener.
+- No outbound HTTP request to BitLab.
+- No `@scure/*`, `@noble/*` imports, no Lightning lib.
 
-### 2.2 Routes API exposées par BitLab
+**The integration must be designed and built from scratch.**
 
-| Méthode | Route | Rôle |
+---
+
+## 2. What BitLab offers to BitQuest
+
+Excerpts confirmed by direct reading of `../bitlab/`:
+
+### 2.1 Security model (`../bitlab/README.md:26-33`)
+- Private keys and mnemonics **only in the browser** (IndexedDB).
+- The BitLab backend is a **read-only proxy** to `mempool.space` + broadcast of raw transactions (`../bitlab/src/app/api/bitcoin/route.ts:245-422`).
+- Zero BitLab user authentication.
+- Two real LDK nodes compiled to WASM, executed in a Web Worker.
+
+### 2.2 API routes exposed by BitLab
+
+| Method | Route | Role |
 |---|---|---|
 | GET | `/api` | Health check |
-| GET | `/api/bitcoin?path=...&network=...` | Proxy Esplora avec allow-list regex |
+| GET | `/api/bitcoin?path=...&network=...` | Esplora proxy with regex allow-list |
 | POST | `/api/bitcoin?path=tx&network=...` | Broadcast raw tx hex |
-| POST | `/api/mine/submit` | Submit Testnet4/Regtest bloc miné |
-| GET | `/api/regtest/info` | État regtest embarqué |
-| POST | `/api/regtest/faucet` | Faucet regtest |
-| POST | `/api/regtest/mine` | Mine N blocs regtest |
+| POST | `/api/mine/submit` | Submit Testnet4/Regtest mined block |
+| GET | `/api/regtest/info` | Embedded regtest state |
+| POST | `/api/regtest/faucet` | Regtest faucet |
+| POST | `/api/regtest/mine` | Mine N regtest blocks |
 
-**Aucune route BitLab n'est conçue pour produire ou valider une preuve pour un service tiers.** BitLab est aujourd'hui un **client riche autonome**.
+**No BitLab route is designed to produce or validate a proof for a third-party service.** BitLab is today an **autonomous rich client**.
 
-### 2.3 Capacités Lightning (`../bitlab/src/lib/lightning.ts`)
+### 2.3 Lightning capabilities (`../bitlab/src/lib/lightning.ts`)
 
-- `lnLab.createInvoice(node, amount, desc, expiry)` → BOLT11 signé.
+- `lnLab.createInvoice(node, amount, desc, expiry)` → signed BOLT11.
 - `lnLab.createOffer(node, amount, desc)` → BOLT12.
-- `lnLab.payInvoice(node, bolt11, amount)` → événement `payment_sent` dans le journal.
-- **Pas d'exposition WebLN standard** (`window.webln` non implémenté).
+- `lnLab.payInvoice(node, bolt11, amount)` → `payment_sent` event in the journal.
+- **No standard WebLN exposure** (`window.webln` not implemented).
 
 ---
 
-## 3. Compatibilité technique
+## 3. Technical compatibility
 
-| Critère | BitQuest | BitLab | Verdict |
+| Criterion | BitQuest | BitLab | Verdict |
 |---|---|---|---|
 | Next.js | 16.1.1 | 16.4.3 | ✅ Compatible |
 | React | 19.0.0 | 19.3.1 | ✅ Compatible |
 | TypeScript | 5.x | 5.9.3 | ✅ |
-| Shadcn/ui + Radix | Oui | Oui | ✅ Design system réutilisable |
+| Shadcn/ui + Radix | Yes | Yes | ✅ Reusable design system |
 | Zustand | 5.0.6 | 5.0.16 | ✅ |
 | TanStack Query | 5.82 | 5.104 | ✅ |
-| Base de données | SQLite (cible Postgres) | Aucune (IndexedDB browser) | ⚠️ Isolement total |
-| Authentification | Session custom | Aucune | ⚠️ SSO à concevoir |
-| Runtime | Node | Bun ≥ 1.2 | ⚠️ À harmoniser ou documenter |
-| Licence | AGPL-3.0 | MIT | ✅ MIT ⊂ AGPL ; BitQuest peut consommer BitLab |
+| Database | SQLite (target Postgres) | None (browser IndexedDB) | ⚠️ Full isolation |
+| Authentication | Custom session | None | ⚠️ SSO to design |
+| Runtime | Node | Bun ≥ 1.2 | ⚠️ To harmonize or document |
+| License | AGPL-3.0 | MIT | ✅ MIT ⊂ AGPL; BitQuest can consume BitLab |
 
 ---
 
-## 4. Trois architectures d'intégration possibles
+## 4. Three possible integration architectures
 
-### Option A — iframe + postMessage (MVP rapide)
+### Option A — iframe + postMessage (fast MVP)
 
 ```
-BitQuest ──(ouvre)──> <iframe src="bitlab.io/?mission=...&challenge=JWT">
+BitQuest ──(opens)──> <iframe src="bitlab.io/?mission=...&challenge=JWT">
    ▲                       │
-   │                       │ user agit
+   │                       │ user acts
    │                       │
    └──(postMessage)────────┘  { proof: txid, bolt11, ... }
           │
           ▼
-   BitQuest /api/bitlab/proof : vérifie contre mempool.space
+   BitQuest /api/bitlab/proof: verifies against mempool.space
 ```
 
-**Avantages** : zéro changement côté BitLab si on se contente d'un iframe passif + lecture des preuves affichées. Pas de CORS si BitLab active CORS sur les routes concernées.
-**Inconvénients** : UX lourde (iframe dans page), parsing des preuves fragile, risque si l'utilisateur dépose la preuve manuellement.
+**Benefits**: zero change on the BitLab side if we're content with a passive iframe + reading of displayed proofs. No CORS if BitLab enables CORS on the relevant routes.
+**Drawbacks**: heavy UX (iframe in page), fragile proof parsing, risk if the user drops the proof manually.
 
-### Option B — Deep-link + JWT challenge/response (recommandé)
+### Option B — Deep-link + JWT challenge/response (recommended)
 
 ```
-BitQuest émet un MissionChallenge (JWT signé HS256, expiry 1h) contenant :
+BitQuest issues a MissionChallenge (JWT signed HS256, expiry 1h) containing:
   { userId, questCode, missionKind, network, requiredAction, nonce }
          │
          ▼
 redirect https://bitlab.gandalnexus.io/?mission=<id>&challenge=<jwt>&returnTo=<url>
          │
-BitLab lit le JWT, précharge la bonne UI (tx-builder ou lightning)
+BitLab reads the JWT, preloads the right UI (tx-builder or lightning)
          │
-user agit : construit tx, ouvre canal, mine bloc, paie invoice
+user acts: builds tx, opens channel, mines block, pays invoice
          │
 BitLab POST → https://bitquest.gandalnexus.io/api/bitlab/proof
    { challenge: jwt, proof: { kind: "TXID"|"BOLT11"|"BLOCK_HASH", value, network } }
          │
-BitQuest vérifie :
-  - signature du JWT (non expiré, nonce non consommé)
-  - preuve :
-      TXID → mempool.space/{network}/api/tx/{txid}, vérifier outputs attendus
-      BOLT11 → bibliothèque bolt11-decoder, montant + description
+BitQuest verifies:
+  - JWT signature (not expired, nonce not consumed)
+  - proof:
+      TXID → mempool.space/{network}/api/tx/{txid}, verify expected outputs
+      BOLT11 → bolt11-decoder library, amount + description
       BLOCK_HASH → mempool.space/{network}/api/block/{hash}
          │
-BitQuest marque la quête COMPLETED, journalise dans BitLabProof
+BitQuest marks the quest COMPLETED, logs in BitLabProof
 ```
 
-**Avantages** :
-- Aucune clé privée ne traverse les deux apps.
-- Validation 100 % serveur côté BitQuest.
+**Benefits**:
+- No private key crosses the two apps.
+- 100% server-side validation on the BitQuest side.
 - Replay-safe (nonce + expiry).
-- Compatible avec déploiements séparés.
+- Compatible with separate deployments.
 
-**Inconvénients** :
-- Nécessite une petite modification côté BitLab (lecture du query param + envoi de la preuve en fin d'action). Changement minime, à discuter avec le mainteneur BitLab.
-- Deux redirections pour l'utilisateur (UX à soigner).
+**Drawbacks**:
+- Requires a small modification on the BitLab side (reading the query param + sending the proof at the end of the action). Minimal change, to be discussed with the BitLab maintainer.
+- Two redirects for the user (UX to polish).
 
-**Effort** : ~10 jours-dev, essentiellement côté BitQuest.
+**Effort**: ~10 dev-days, mostly on the BitQuest side.
 
-### Option C — Monorepo + app shell commun (long terme)
+### Option C — Monorepo + common app shell (long term)
 
 ```
 /gandalnexus-monorepo
    ├─ apps/bitquest
    ├─ apps/bitlab
-   ├─ packages/ui          (shadcn partagé)
-   ├─ packages/bitcoin-core (preuves, vérifs)
+   ├─ packages/ui          (shared shadcn)
+   ├─ packages/bitcoin-core (proofs, verifications)
    └─ packages/auth        (session + JWT)
 ```
 
-**Avantages** : same-origin possible (`/learn` et `/lab` sur le même domaine), Zustand store partagé, type safety transversale, un seul pipeline CI/CD, économies de code.
+**Benefits**: same-origin possible (`/learn` and `/lab` on the same domain), shared Zustand store, transverse type safety, a single CI/CD pipeline, code savings.
 
-**Inconvénients** :
-- Refonte lourde, > 3 semaines.
-- Couplage fort : un bug dans un package peut bloquer les deux apps.
-- Réorganisation des licences (BitLab MIT, BitQuest AGPL-3.0) à documenter.
+**Drawbacks**:
+- Heavy refactor, > 3 weeks.
+- Strong coupling: a bug in one package can block both apps.
+- License reorganization (BitLab MIT, BitQuest AGPL-3.0) to document.
 
-**Effort** : ~20 jours-dev.
+**Effort**: ~20 dev-days.
 
 ---
 
-## 5. Recommandation
+## 5. Recommendation
 
 | Horizon | Reco |
 |---|---|
-| **Court terme** (phase 2-3 roadmap) | Option **B** : deep-link + JWT challenge/response. Permet de livrer une intégration réelle sans compromettre la sécurité, avec un impact minimal sur BitLab. |
-| **Long terme** (après mise en prod stable) | Évaluer Option **C** si l'équipe grandit et si on vise une offre GandalNexus unifiée (sidebar commune, navigation fluide). Ne pas précipiter : on perdrait l'indépendance de BitLab (MIT, projet grand-public) si l'on mélange de l'AGPL-3.0 dans son code. |
+| **Short term** (phase 2-3 roadmap) | Option **B**: deep-link + JWT challenge/response. Allows delivering a real integration without compromising security, with minimal impact on BitLab. |
+| **Long term** (after stable production launch) | Evaluate Option **C** if the team grows and if we target a unified GandalNexus offering (common sidebar, fluid navigation). Don't rush: we would lose BitLab's independence (MIT, general-public project) if we mix AGPL-3.0 into its code. |
 
-**Option A (iframe) non recommandée** : fragilité et UX inférieures à l'option B pour un effort équivalent.
+**Option A (iframe) not recommended**: fragility and UX inferior to option B for equivalent effort.
 
 ---
 
-## 6. Flux fonctionnel cible (option B détaillée)
+## 6. Target functional flow (option B detailed)
 
-Exemple : quête `tx-basics` (Anatomie d'une transaction) sur Testnet4.
+Example: quest `tx-basics` (Anatomy of a transaction) on Testnet4.
 
-### 6.1 Étapes
+### 6.1 Steps
 
-1. **Dans BitQuest** : l'apprenant termine la théorie, passe le quiz à 70 %.
-2. Le bouton "Lancer la mission dans BitLab" devient actif. Il déclenche `POST /api/bitlab/challenge` qui renvoie :
+1. **In BitQuest**: the learner finishes the theory, passes the quiz at 70%.
+2. The "Launch mission in BitLab" button becomes active. It triggers `POST /api/bitlab/challenge` which returns:
    ```json
    {
      "challengeJwt": "eyJ...",
      "deepLinkUrl": "https://bitlab.gandalnexus.io/?mission=tx-basics&challenge=eyJ..."
    }
    ```
-3. L'apprenant clique. **Redirection** vers BitLab (nouvel onglet recommandé pour préserver l'état BitQuest).
-4. **Dans BitLab** : le query param `mission=tx-basics` active l'onglet tx-builder. Le JWT est lu, affiché en bandeau ("Mission BitQuest : construis une transaction de X sats vers Y"). Le JWT n'est **pas** envoyé au serveur BitLab, seulement affiché à l'utilisateur et stocké en mémoire locale.
-5. L'apprenant construit la transaction, la signe (clé en IndexedDB), la broadcast via `POST /api/bitcoin?path=tx&network=testnet4` (service BitLab existant).
-6. BitLab reçoit un `txid`. Il POSTe alors vers BitQuest :
+3. The learner clicks. **Redirect** to BitLab (new tab recommended to preserve BitQuest state).
+4. **In BitLab**: the `mission=tx-basics` query param activates the tx-builder tab. The JWT is read, displayed as a banner ("BitQuest Mission: build a transaction of X sats to Y"). The JWT is **not** sent to the BitLab server, only displayed to the user and stored in local memory.
+5. The learner builds the transaction, signs it (key in IndexedDB), broadcasts it via `POST /api/bitcoin?path=tx&network=testnet4` (existing BitLab service).
+6. BitLab receives a `txid`. It then POSTs to BitQuest:
    ```http
    POST https://bitquest.gandalnexus.io/api/bitlab/proof
    Content-Type: application/json
@@ -183,16 +183,16 @@ Exemple : quête `tx-basics` (Anatomie d'une transaction) sur Testnet4.
      "proof": { "kind": "TXID", "value": "abcd1234...", "network": "testnet4" }
    }
    ```
-7. **Dans BitQuest** : `/api/bitlab/proof` :
-   - Vérifie la signature du JWT.
-   - Vérifie que le `nonce` n'a pas déjà été consommé (table `RewardIdempotencyKey`).
-   - Fetch `https://mempool.space/testnet4/api/tx/{txid}`.
-   - Compare les outputs à l'attendu stocké dans `missionConfig`.
-   - Si OK : marque `UserQuestProgress.status = COMPLETED`, attribue XP + sats, journalise un `BitLabProof`, retourne `200 OK`.
-8. BitLab affiche "Mission validée !" et propose un `returnTo` vers BitQuest.
-9. **Retour BitQuest** : le dashboard reflète la quête complétée, badge éventuel débloqué.
+7. **In BitQuest**: `/api/bitlab/proof`:
+   - Verifies the JWT signature.
+   - Verifies that the `nonce` has not already been consumed (`RewardIdempotencyKey` table).
+   - Fetches `https://mempool.space/testnet4/api/tx/{txid}`.
+   - Compares outputs to the expected stored in `missionConfig`.
+   - If OK: marks `UserQuestProgress.status = COMPLETED`, assigns XP + sats, logs a `BitLabProof`, returns `200 OK`.
+8. BitLab displays "Mission validated!" and offers a `returnTo` to BitQuest.
+9. **Return to BitQuest**: the dashboard reflects the completed quest, possible badge unlocked.
 
-### 6.2 Modèle JWT
+### 6.2 JWT model
 
 ```json
 {
@@ -210,81 +210,81 @@ Exemple : quête `tx-basics` (Anatomie d'une transaction) sur Testnet4.
 }
 ```
 
-Signé `HS256` avec un secret stocké uniquement côté BitQuest. BitLab n'a pas besoin de le vérifier, seulement de le transporter.
+Signed `HS256` with a secret stored only on the BitQuest side. BitLab doesn't need to verify it, only to transport it.
 
-### 6.3 Vérifications anti-abus
+### 6.3 Anti-abuse verifications
 
-- `jti` unique ; conservé dans `RewardIdempotencyKey` jusqu'à `exp`.
-- Rate limit par `userId` (5 tentatives / heure).
-- Détection : un même `txid` qui apparaît pour deux users différents → flaguer.
-- Timestamp : la tx doit être postérieure au `iat` du challenge (évite de rejouer une ancienne transaction).
-
----
-
-## 7. Changements minimaux à demander côté BitLab
-
-Pour l'option B, les patchs attendus côté BitLab sont minimaux (ne pas réaliser dans cette phase d'audit) :
-
-1. **Lecture du query param `mission` dans `../bitlab/src/app/page.tsx`** : sélection de l'onglet en fonction (tx-builder, lightning, mineur, etc.).
-2. **Lecture du query param `challenge`** : stockage en mémoire, affichage d'un bandeau "Mission BitQuest en cours".
-3. **Hook de completion** : lorsqu'une action réussit (tx broadcast, invoice payée, bloc miné), déclencher une fonction `reportProof(proof)` qui POSTe vers l'URL `returnTo` + endpoint `/api/bitlab/proof`.
-4. **CORS** : autoriser `Origin: https://bitquest.gandalnexus.io` sur le endpoint retour (ce sera BitQuest qui l'expose, pas BitLab, donc en fait rien à faire côté BitLab si c'est un simple fetch côté client BitLab).
-
-**Effort BitLab estimé** : 2-3 jours. À chiffrer et planifier avec le mainteneur BitLab lors d'une phase ultérieure.
+- `jti` unique; kept in `RewardIdempotencyKey` until `exp`.
+- Rate limit per `userId` (5 attempts / hour).
+- Detection: the same `txid` appearing for two different users → flag.
+- Timestamp: the tx must be later than the `iat` of the challenge (prevents replaying an old transaction).
 
 ---
 
-## 8. Alternatives sans modification de BitLab
+## 7. Minimal changes to request on the BitLab side
 
-Si BitLab ne peut pas être modifié dans l'immédiat, trois substituts sont possibles côté BitQuest :
+For option B, the expected patches on the BitLab side are minimal (not to be done in this audit phase):
 
-1. **Preuve "copier-coller"** : l'apprenant ouvre BitLab seul, réalise l'action, copie le `txid`/`bolt11` et le colle dans BitQuest. Validation serveur identique. UX dégradée mais fonctionnelle.
-2. **Garder la simulation serveur** (existant) en phase 1 et faire évoluer BitLab en parallèle. La promesse "learn → practice" devient "learn → practice-simulated". À assumer dans la communication produit.
-3. **Un "proxy practice" côté BitQuest** : BitQuest embarque un sous-ensemble minimal de BitLab (ex. juste le mini tx-builder pour une mission) dans une iframe sandboxée, sans attendre BitLab. **Déconseillé** : duplication du code, viole le principe DRY entre les deux apps.
+1. **Reading the `mission` query param in `../bitlab/src/app/page.tsx`**: tab selection accordingly (tx-builder, lightning, miner, etc.).
+2. **Reading the `challenge` query param**: storage in memory, display of a "BitQuest Mission in progress" banner.
+3. **Completion hook**: when an action succeeds (tx broadcast, invoice paid, block mined), trigger a `reportProof(proof)` function that POSTs to the `returnTo` URL + endpoint `/api/bitlab/proof`.
+4. **CORS**: allow `Origin: https://bitquest.gandalnexus.io` on the return endpoint (this will be BitQuest that exposes it, not BitLab, so actually nothing to do on the BitLab side if it's a simple fetch on the BitLab client side).
 
----
-
-## 9. Contraintes de licence
-
-- BitLab : **MIT** (permissive).
-- BitQuest : **AGPL-3.0** (copyleft fort).
-
-BitQuest peut **consommer** BitLab sans conflit, à condition que la distribution de BitQuest reste AGPL-3.0 et que le code BitLab consommé soit redistribué sous MIT (préserver l'avis de licence).
-
-À **éviter** : copier du code BitQuest (AGPL) dans BitLab (MIT) — cela "contaminerait" BitLab.
-À **éviter** : fusionner le dépôt dans un monorepo sans séparer clairement les packages par licence.
+**BitLab effort estimated**: 2-3 days. To be scoped and planned with the BitLab maintainer in a later phase.
 
 ---
 
-## 10. Checklist d'intégration (tickets à ouvrir)
+## 8. Alternatives without BitLab modification
+
+If BitLab cannot be modified immediately, three substitutes are possible on the BitQuest side:
+
+1. **"Copy-paste" proof**: the learner opens BitLab alone, performs the action, copies the `txid`/`bolt11` and pastes it into BitQuest. Identical server-side validation. Degraded but functional UX.
+2. **Keep server simulation** (existing) in phase 1 and evolve BitLab in parallel. The "learn → practice" promise becomes "learn → practice-simulated". To be assumed in product communication.
+3. **A "proxy practice" on the BitQuest side**: BitQuest embeds a minimal subset of BitLab (e.g. just the mini tx-builder for a mission) in a sandboxed iframe, without waiting for BitLab. **Discouraged**: code duplication, violates the DRY principle between the two apps.
+
+---
+
+## 9. License constraints
+
+- BitLab: **MIT** (permissive).
+- BitQuest: **AGPL-3.0** (strong copyleft).
+
+BitQuest can **consume** BitLab without conflict, provided that the BitQuest distribution remains AGPL-3.0 and that the consumed BitLab code is redistributed under MIT (preserving the license notice).
+
+To **avoid**: copying BitQuest code (AGPL) into BitLab (MIT) — this would "contaminate" BitLab.
+To **avoid**: merging the repository into a monorepo without clearly separating packages by license.
+
+---
+
+## 10. Integration checklist (tickets to open)
 
 - [ ] `ADR-01 Integration BitLab — Option B retained`
 - [ ] `[BitQuest] Model BitLabProof (Prisma migration)`
 - [ ] `[BitQuest] Model RewardIdempotencyKey (Prisma migration)`
 - [ ] `[BitQuest] Service MempoolClient (fetch mempool.space, timeout, retries)`
-- [ ] `[BitQuest] Lib bolt11-decoder vérifiée (choisir paquet maintenu, audit sec)`
+- [ ] `[BitQuest] Lib bolt11-decoder verified (choose maintained package, sec audit)`
 - [ ] `[BitQuest] POST /api/bitlab/challenge (issue JWT)`
 - [ ] `[BitQuest] POST /api/bitlab/proof (verify + reward)`
-- [ ] `[BitQuest] UI bouton deep-link dans mission-panel.tsx`
-- [ ] `[BitQuest] JWT secret rotation policy documentée`
-- [ ] `[BitLab] (ultérieurement) Lecture query param + bandeau mission + reportProof hook`
-- [ ] `[Doc] Guide apprenant : "Comment valider une mission dans BitLab"`
-- [ ] `[Sec] Pentest du flux challenge/proof`
+- [ ] `[BitQuest] UI deep-link button in mission-panel.tsx`
+- [ ] `[BitQuest] JWT secret rotation policy documented`
+- [ ] `[BitLab] (later) Query param reading + mission banner + reportProof hook`
+- [ ] `[Doc] Learner guide: "How to validate a mission in BitLab"`
+- [ ] `[Sec] Pentest of the challenge/proof flow`
 
 ---
 
-## 11. Risques et mitigations
+## 11. Risks and mitigations
 
-| Risque | Impact | Mitigation |
+| Risk | Impact | Mitigation |
 |---|---|---|
-| Un `txid` existant mais qui ne correspond pas à l'exercice | Fraude XP/sats | Comparer outputs / montants au challenge |
-| Challenge volé via log/URL | Replay potentiel | Nonce + idempotency key + expiry court |
-| `mempool.space` indisponible | Blocage des validations | Timeout, fallback vers un second explorateur (blockstream.info), queue de vérification async |
-| BitLab modifié par un contributeur et casse le hook | Rupture silencieuse de l'intégration | Tests contract côté BitQuest (mock de la preuve attendue), monitoring du taux de preuves valides |
-| Licence AGPL-3.0 "contamine" BitLab | Perte d'adoption BitLab | Garder les repos séparés, ne jamais importer de code AGPL dans BitLab |
-| Lightning testnet instable | Missions LN bloquées | Prévoir des missions Testnet3 **et** Regtest (BitLab gère les deux) |
+| An existing `txid` that does not correspond to the exercise | XP/sats fraud | Compare outputs / amounts to the challenge |
+| Challenge stolen via log/URL | Potential replay | Nonce + idempotency key + short expiry |
+| `mempool.space` unavailable | Validation blocking | Timeout, fallback to a second explorer (blockstream.info), async verification queue |
+| BitLab modified by a contributor and breaks the hook | Silent integration breakage | Contract tests on the BitQuest side (mock of expected proof), monitoring of valid proof rate |
+| AGPL-3.0 license "contaminates" BitLab | Loss of BitLab adoption | Keep repos separate, never import AGPL code into BitLab |
+| Unstable Lightning testnet | LN missions blocked | Plan Testnet3 **and** Regtest missions (BitLab handles both) |
 
 ---
 
-**Rédigé le** : 2026-11-09
-**Prochain livrable** : `BITQUEST_ROADMAP.md`
+**Written on**: 2026-11-09
+**Next deliverable**: `BITQUEST_ROADMAP.md`

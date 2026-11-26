@@ -1,310 +1,309 @@
-# Phase 3 — BitLab Integration
+# PHASE_3 — BitLab Integration
 
-**Date de création** : 2026-11-10
-**Dernière mise à jour** : 2026-11-11
-**Statut** : chaîne bout-en-bout opérationnelle pour 5 quêtes
-(`tx-basics`, `utxo`, `fees-mempool`, `lightning-invoice`, `lightning`) ;
-`CHANNEL` supporté sur mainnet (mempool.space) et testnet/signet/regtest
-via LND REST externe (infra dédiée dans `docker-compose.dev.yml`, profile
-`lnd`). Audit log activé. Deep-link signé HMAC optionnel. Export CSV
-depuis la console admin.
+**Creation date**: 2026-11-10
+**Last update**: 2026-11-11
+**Status**: end-to-end pipeline operational for 5 quests
+(`tx-basics`, `utxo`, `fees-mempool`, `lightning-invoice`, `lightning`);
+`CHANNEL` supported on mainnet (mempool.space) and testnet/signet/regtest
+via external LND REST (dedicated infra in `docker-compose.dev.yml`, profile
+`lnd`). Audit log enabled. Optional HMAC-signed deep-link. CSV export
+from the admin console.
 
-## Ce qui est livré
+## What Is Delivered
 
-### Modèle de données
-- `BitLabProof` : preuve persistée par `(userId, questCode, kind)`
-- 5 kinds : `TX | BLOCK | INVOICE | CHANNEL | ADDRESS`
-- 3 réseaux : `testnet4 | signet | regtest` (mainnet explicitement refusé
-  côté tx/block pour conserver la pédagogie « pas de vraie valeur »)
-- Flag `consumed` consommé par `/api/quests/[code]/progress` quand la
-  mission est validée (voir *Wiring quête*)
+### Data model
+- `BitLabProof`: proof persisted per `(userId, questCode, kind)`
+- 5 kinds: `TX | BLOCK | INVOICE | CHANNEL | ADDRESS`
+- 3 networks: `testnet4 | signet | regtest` (mainnet explicitly refused
+  on the tx/block side to preserve the pedagogy "no real value")
+- `consumed` flag consumed by `/api/quests/[code]/progress` when the
+  mission is validated (see *Quest wiring*)
 
-### Service `MempoolClient`
+### `MempoolClient` service
 - `src/lib/bitlab/mempool.ts`
 - `getTransaction(network, txid)`, `getBlock(network, hash)`,
   `getAddressStats(network, address)` (P0.4)
-- Fallback automatique `mempool.space` → `blockstream.info`
-- Timeout 5s + `AbortController`
-- Logs structurés via `logger("mempool")`
+- Automatic fallback `mempool.space` → `blockstream.info`
+- 5s timeout + `AbortController`
+- Structured logs via `logger("mempool")`
 
-### Vérification CHANNEL (P2.4) — deux niveaux
+### CHANNEL verification (P2.4) — two levels
 - `src/lib/bitlab/channel.ts`
-- `ONCHAIN` (default) : lookup via LND REST (testnet/signet/regtest) ou
-  mempool.space (mainnet). Vérification forte.
-- `DECLARATIVE` : regex scid uniquement, pas d'appel réseau. Réservé aux
-  quêtes pédagogiques sans récompense sats réelle.
-- Déclaration par quête via `missionConfig.channelVerifyLevel`.
-- Payload enrichi : `verifyLevel: "ONCHAIN" | "DECLARATIVE"` + `source` associée.
+- `ONCHAIN` (default): lookup via LND REST (testnet/signet/regtest) or
+  mempool.space (mainnet). Strong verification.
+- `DECLARATIVE`: scid regex only, no network call. Reserved for
+  pedagogical quests without a real sats reward.
+- Declared per quest via `missionConfig.channelVerifyLevel`.
+- Enriched payload: `verifyLevel: "ONCHAIN" | "DECLARATIVE"` + associated `source`.
 
-### Vérification des adresses (P0.4) — deux niveaux
+### Address verification (P0.4) — two levels
 - `src/lib/bitlab/address.ts`
-- `validateAddressFormat(network, address)` : préfixe + charset + longueur
-  par réseau (tb1 bech32 / m/n/2 base58 pour testnet4+signet ; bcrt1 pour
-  regtest ; mainnet refusé). Pas de checksum full (déporté sur niveau USED).
-- `parseAddressVerifyLevel(missionConfig)` : lit `addressVerifyLevel` depuis
-  la config de mission (default `FORMAT`).
-- Deux niveaux déclarés par la quête :
-  - `FORMAT` (default) : validation locale uniquement, pas de requête réseau.
-  - `USED` : `FORMAT` + check mempool (adresse doit avoir `fundedTxoCount ≥ 1`).
-- Route `/api/bitlab/proof` branche `kind: ADDRESS` :
-  - 400 si `payload.address` manquant ou format invalide.
-  - 404 si niveau `USED` et l'explorateur ne connaît pas l'adresse.
-  - 409 si niveau `USED` et l'adresse n'a jamais été créditée.
-  - Succès : enrichit `payload.format`, `payload.verifyLevel`, et pour
-    `USED` ajoute `fundedTxoCount`, `fundedTxoSumSats`, `txCount`.
+- `validateAddressFormat(network, address)`: prefix + charset + length
+  per network (tb1 bech32 / m/n/2 base58 for testnet4+signet; bcrt1 for
+  regtest; mainnet refused). No full checksum (deferred to USED level).
+- `parseAddressVerifyLevel(missionConfig)`: reads `addressVerifyLevel` from
+  the mission config (default `FORMAT`).
+- Two levels declared by the quest:
+  - `FORMAT` (default): local validation only, no network request.
+  - `USED`: `FORMAT` + mempool check (address must have `fundedTxoCount ≥ 1`).
+- `/api/bitlab/proof` route, `kind: ADDRESS` branch:
+  - 400 if `payload.address` missing or format invalid.
+  - 404 if `USED` level and the explorer doesn't know the address.
+  - 409 if `USED` level and the address has never been credited.
+  - Success: enriches `payload.format`, `payload.verifyLevel`, and for
+    `USED` adds `fundedTxoCount`, `fundedTxoSumSats`, `txCount`.
 
-### Décodage BOLT11
-- `src/lib/bitlab/bolt11.ts` (lib `bolt11` npm)
-- Extraction de `amountSats`, `network`, `paymentHash`, `expiry`
-- Appelé depuis `/api/bitlab/proof` pour `kind=INVOICE` (400 si invalide)
+### BOLT11 decoding
+- `src/lib/bitlab/bolt11.ts` (npm `bolt11` lib)
+- Extraction of `amountSats`, `network`, `paymentHash`, `expiry`
+- Called from `/api/bitlab/proof` for `kind=INVOICE` (400 if invalid)
 
-### Rate-limiting à deux dimensions (userId + IP)
-Chaque route BitLab applique **deux** rate-limits en Redis (fallback in-memory) :
+### Two-dimensional rate-limiting (userId + IP)
+Each BitLab route applies **two** rate-limits in Redis (in-memory fallback):
 
-| Route | Limite userId (×/60s) | Limite IP (×/60s) |
+| Route | userId limit (×/60s) | IP limit (×/60s) |
 |---|---|---|
 | `/api/bitlab/challenge` | 30 | 120 |
 | `/api/bitlab/proof` | 20 | 80 |
 | `/api/bitlab/deep-link` | 30 | 120 |
 | `/api/bitlab/deep-link/verify-return` | 60 | 240 |
 
-- **IP d'abord** (avant `authenticate`) : protège contre DoS non-authentifié.
-- Extraction via `clientIp(req)` (`src/lib/bitquest/session.ts`) : priorité
-  `x-forwarded-for` (1re IP), fallback `x-real-ip`, fallback `"unknown"`
-  (bucket partagée fail-closed).
-- Ratio ×4 userId→IP pour tolérer NAT (familles, écoles, VPN d'entreprise).
-- **Prod requise** : un reverse proxy fiable (nginx/caddy) qui réécrit
-  `x-forwarded-for`. Sans proxy, un client peut spoofer le header.
+- **IP first** (before `authenticate`): protects against unauthenticated DoS.
+- Extraction via `clientIp(req)` (`src/lib/bitquest/session.ts`): priority
+  `x-forwarded-for` (first IP), fallback `x-real-ip`, fallback `"unknown"`
+  (shared fail-closed bucket).
+- ×4 userId→IP ratio to tolerate NAT (families, schools, corporate VPN).
+- **Required in prod**: a trusted reverse proxy (nginx/caddy) that rewrites
+  `x-forwarded-for`. Without a proxy, a client could spoof the header.
 
-### Versionnement du protocole BitQuest ↔ BitLab (`PROTOCOL_VERSION = 1`)
-- Source unique dans `src/lib/bitlab/protocol.ts` ; partagée par le JWT challenge
-  et le deep-link HMAC signé.
-- Émission : les deux canaux embarquent toujours `v: PROTOCOL_VERSION`.
-- Réception : `v > PROTOCOL_VERSION` rejeté (anti-downgrade), `v < 1` ou non-entier
-  rejeté, `v` absent toléré avec fallback legacy (grâce ≤ TTL : 1h JWT / 1h HMAC).
-- Les deux routes `/api/bitlab/challenge` et `/api/bitlab/deep-link` renvoient
-  `protocolVersion` dans leur JSON pour permettre au client BitLab de négocier.
+### BitQuest ↔ BitLab protocol versioning (`PROTOCOL_VERSION = 1`)
+- Single source in `src/lib/bitlab/protocol.ts`; shared by the JWT challenge
+  and the HMAC-signed deep-link.
+- Emission: both channels always carry `v: PROTOCOL_VERSION`.
+- Reception: `v > PROTOCOL_VERSION` rejected (anti-downgrade), `v < 1` or non-integer
+  rejected, absent `v` tolerated with legacy fallback (grace ≤ TTL: 1h JWT / 1h HMAC).
+- Both `/api/bitlab/challenge` and `/api/bitlab/deep-link` routes return
+  `protocolVersion` in their JSON to allow the BitLab client to negotiate.
 
-### JWT challenge (anti-replay) — protocole versionné `v: 1`
+### JWT challenge (anti-replay) — versioned protocol `v: 1`
 - `src/lib/bitlab/jwt.ts` — `jose` HS256
-- `POST /api/bitlab/challenge` émet un JWT contenant
-  `{ v, userId, questCode, kind, nonce, exp (1h) }` et renvoie aussi
-  `protocolVersion` dans le corps JSON pour que le client puisse négocier.
-- `POST /api/bitlab/proof` **exige** ce JWT (`min 16 chars`). Vérifications :
-  signature, expiry, nonce consommé via Redis `SET NX EX`, correspondance
-  `(userId, questCode, kind)`, **version de protocole** (`v > PROTOCOL_VERSION` rejeté,
-  `v` absent toléré pour les tokens pré-versionnement pendant la fenêtre d'expiration).
-- Export `PROTOCOL_VERSION` depuis `jwt.ts` — bump uniquement si une évolution
-  casse les tokens existants (pas pour un simple ajout facultatif).
-- Secret : `BITLAB_JWT_SECRET` (fallback `CSRF_SECRET` en dev)
-- Rate-limit : `rateLimit("bitlab-challenge:<user>", 30, 60s)` sur l'émission,
-  `rateLimit("bitlab-proof:<user>", 20, 60s)` sur la soumission (backend Redis
-  si `REDIS_URL`, sinon in-memory).
-- Tests : `src/lib/bitlab/jwt.test.ts` (16 tests — émission, versionnement,
-  anti-replay via mock Redis, claims, signature, expiry).
+- `POST /api/bitlab/challenge` issues a JWT containing
+  `{ v, userId, questCode, kind, nonce, exp (1h) }` and also returns
+  `protocolVersion` in the JSON body so the client can negotiate.
+- `POST /api/bitlab/proof` **requires** this JWT (`min 16 chars`). Checks:
+  signature, expiry, nonce consumed via Redis `SET NX EX`, correspondence
+  `(userId, questCode, kind)`, **protocol version** (`v > PROTOCOL_VERSION` rejected,
+  absent `v` tolerated for pre-versioning tokens during the expiry window).
+- Export `PROTOCOL_VERSION` from `jwt.ts` — bump only if an evolution
+  breaks existing tokens (not for a mere optional addition).
+- Secret: `BITLAB_JWT_SECRET` (fallback `CSRF_SECRET` in dev)
+- Rate-limit: `rateLimit("bitlab-challenge:<user>", 30, 60s)` on issuance,
+  `rateLimit("bitlab-proof:<user>", 20, 60s)` on submission (Redis backend
+  if `REDIS_URL`, otherwise in-memory).
+- Tests: `src/lib/bitlab/jwt.test.ts` (16 tests — issuance, versioning,
+  anti-replay via Redis mock, claims, signature, expiry).
 
-### Service `LightningClient` (mempool)
+### `LightningClient` service (mempool)
 - `src/lib/bitlab/lightning.ts`
 - `getChannel(scid)` via `mempool.space/api/v1/lightning/channels/{id}`
-- Normalisation vers `ChannelInfo` (capacity, status, pubkeys, chan_point)
-- Dispatcher `resolveChannel(network, scid)` — voir ci-dessous
+- Normalization to `ChannelInfo` (capacity, status, pubkeys, chan_point)
+- Dispatcher `resolveChannel(network, scid)` — see below
 
-### Service `LndClient` (testnet/signet/regtest)
+### `LndClient` service (testnet/signet/regtest)
 - `src/lib/bitlab/lnd.ts`
-- Interroge `GET /v1/graph/edge/{chan_id}` d'un node LND externe
-- `scidToChanId(scid)` encode `<block>x<tx>x<vout>` en chan_id uint64
+- Queries `GET /v1/graph/edge/{chan_id}` of an external LND node
+- `scidToChanId(scid)` encodes `<block>x<tx>x<vout>` into chan_id uint64
   (BOLT 07)
-- `getChannelViaLnd(id, cfg)` via `node:https` avec macaroon header
-  (`Grpc-Metadata-macaroon`) et support TLS self-signed
-- Configuration par env (voir § *Config LND*)
-- Infra Docker testnet dédiée : voir
-  [`docs/DOCKER_LND.md`](DOCKER_LND.md) pour lancer un node lnd via
-  `docker compose --profile lnd` et extraire les credentials
+- `getChannelViaLnd(id, cfg)` via `node:https` with macaroon header
+  (`Grpc-Metadata-macaroon`) and self-signed TLS support
+- Configuration via env (see § *LND config*)
+- Dedicated Docker testnet infra: see
+  [`docs/DOCKER_LND.md`](DOCKER_LND.md) to launch an lnd node via
+  `docker compose --profile lnd` and extract credentials
 
-### Dispatcher Lightning
-- `resolveChannel(network, scid)` dans `lightning.ts`
-  - `testnet4 | signet | regtest` → LND si configuré, sinon
-    `source="unavailable"` (le handler répond 501)
-  - autres → mempool.space
-  - retourne `{ channel, source: "lnd" | "mempool" | "unavailable" }` —
-    la source est persistée dans `payload.source` pour l'audit
+### Lightning dispatcher
+- `resolveChannel(network, scid)` in `lightning.ts`
+  - `testnet4 | signet | regtest` → LND if configured, otherwise
+    `source="unavailable"` (handler responds 501)
+  - others → mempool.space
+  - returns `{ channel, source: "lnd" | "mempool" | "unavailable" }` —
+    the source is persisted in `payload.source` for audit
 
-### Endpoint `/api/bitlab/proof`
-- Auth requise + CSRF conditionnel + rate limit 20/min
-- JWT challenge **obligatoire**
-- Vérification métier par kind :
-  - **TX** : lookup explorateur, exige `confirmed === true` (409 sinon)
-  - **BLOCK** : lookup explorateur, enrichit `height` + `tx_count`
-  - **INVOICE** : BOLT11 décodé et validé (400 si invalide)
-  - **CHANNEL** : `resolveChannel` (LND ou mempool), 501 si réseau
-    testnet sans LND, 404 si channel inconnu
-  - **ADDRESS** : accepté en l'état (dérivation locale non vérifiable
-    côté serveur sans xpub)
-- Upsert idempotent sur `(user, quest, kind)`
+### `/api/bitlab/proof` endpoint
+- Auth required + conditional CSRF + rate limit 20/min
+- JWT challenge **mandatory**
+- Business verification per kind:
+  - **TX**: explorer lookup, requires `confirmed === true` (409 otherwise)
+  - **BLOCK**: explorer lookup, enriches `height` + `tx_count`
+  - **INVOICE**: BOLT11 decoded and validated (400 if invalid)
+  - **CHANNEL**: `resolveChannel` (LND or mempool), 501 if testnet
+    network without LND, 404 if channel unknown
+  - **ADDRESS**: accepted as-is (local derivation not verifiable
+    server-side without xpub)
+- Idempotent upsert on `(user, quest, kind)`
 
 ### Validation
-- `bitlabProofSchema` et `bitlabChallengeSchema` dans
+- `bitlabProofSchema` and `bitlabChallengeSchema` in
   `src/lib/validation/schemas.ts`
-- `questCode` kebab-case, enums stricts sur `kind` et `network`
-- `payload` libre (chaque kind a ses champs attendus côté handler)
-- `challenge` requis (min 16 chars)
+- `questCode` kebab-case, strict enums on `kind` and `network`
+- Free `payload` (each kind has its expected fields on the handler side)
+- `challenge` required (min 16 chars)
 
-### Wiring quête — 5 quêtes BITLAB_PROOF
-- Champ `Quest.missionKind = "SIMULATED" | "BITLAB_PROOF"` dans Prisma
-- Seed (`prisma/seed.ts`) marque en `BITLAB_PROOF` :
-  - `tx-basics` (kind=TX, pilote historique)
-  - `utxo` (kind=TX, intermediaire — construction UTXO réelle testnet)
-  - `fees-mempool` (kind=TX, intermediaire — tx avec frais calibrés)
-  - `lightning-invoice` (kind=INVOICE, avancée — BOLT11 décodé serveur)
-  - `lightning` (kind=CHANNEL, avancée — SCID vérifié via LND testnet).
-    **Requiert** LND configuré (cf. `docs/DOCKER_LND.md`). Sans LND,
-    `/api/bitlab/proof` répond 501 UNAVAILABLE à chaque tentative.
-- Les autres restent `SIMULATED` : `key_forge` (crypto locale),
-  `mine_nonce` (impossible de miner), `multisig_sign`/`taproot_tweak`
-  (exercices cryptos sans broadcast), `block_explorer`/`genesis`
-  (introduction gentle pour les débutants)
-- `/api/quests/[code]/progress` action `mission_submit` branche :
-  - `missionKind === "BITLAB_PROOF"` → cherche une `BitLabProof`
-    `consumed=false` pour `(user, quest)`, la marque consommée et
-    enchaîne les récompenses (XP, sats, badges, bonus streak)
-  - `missionKind === "SIMULATED"` → flux historique inchangé
+### Quest wiring — 5 BITLAB_PROOF quests
+- Field `Quest.missionKind = "SIMULATED" | "BITLAB_PROOF"` in Prisma
+- Seed (`prisma/seed.ts`) marks as `BITLAB_PROOF`:
+  - `tx-basics` (kind=TX, historical pilot)
+  - `utxo` (kind=TX, intermediate — real UTXO construction on testnet)
+  - `fees-mempool` (kind=TX, intermediate — tx with calibrated fees)
+  - `lightning-invoice` (kind=INVOICE, advanced — BOLT11 decoded server-side)
+  - `lightning` (kind=CHANNEL, advanced — SCID verified via LND testnet).
+    **Requires** LND configured (cf. `docs/DOCKER_LND.md`). Without LND,
+    `/api/bitlab/proof` responds 501 UNAVAILABLE on each attempt.
+- The others stay `SIMULATED`: `key_forge` (local crypto),
+  `mine_nonce` (impossible to mine), `multisig_sign`/`taproot_tweak`
+  (crypto exercises without broadcast), `block_explorer`/`genesis`
+  (gentle introduction for beginners)
+- `/api/quests/[code]/progress` action `mission_submit` branches:
+  - `missionKind === "BITLAB_PROOF"` → looks for a `BitLabProof`
+    with `consumed=false` for `(user, quest)`, marks it consumed and
+    chains the rewards (XP, sats, badges, streak bonus)
+  - `missionKind === "SIMULATED"` → unchanged historical flow
 
 ### Audit log — BitLabProofAttempt
-- Prisma model `BitLabProofAttempt` : `userId`, `questCode`, `kind`,
+- Prisma model `BitLabProofAttempt`: `userId`, `questCode`, `kind`,
   `network`, `outcome`, `reasonMessage?`, `latencyMs`, `createdAt`
-- Outcomes : `ACCEPTED | REJECTED | NOT_FOUND | UNAVAILABLE |
+- Outcomes: `ACCEPTED | REJECTED | NOT_FOUND | UNAVAILABLE |
   INVALID_JWT | MEMPOOL | BAD_REQUEST | RATE_LIMITED`
 - Helper `recordProofAttempt` + `fireProofAttempt` (fire-and-forget)
-  dans `src/lib/bitlab/audit.ts`
-- Appelé depuis chaque path de sortie de `/api/bitlab/proof` (succès
-  et refus). Latence mesurée côté serveur, utile pour détecter
-  dégradation mempool/LND
+  in `src/lib/bitlab/audit.ts`
+- Called from every exit path of `/api/bitlab/proof` (success
+  and refusal). Latency measured server-side, useful to detect
+  mempool/LND degradation
 - Indexes `(userId, createdAt)`, `(questCode, createdAt)`,
-  `(outcome, createdAt)` pour requêtes admin ultérieures
+  `(outcome, createdAt)` for later admin queries
 
-### UI quest-player
-- `BitLabProofStep` dans `src/components/bitquest/quest-player.tsx`
-- Affiché quand `quest.missionKind === "BITLAB_PROOF"` à l'étape mission
-- Champs : txid/hash + sélecteur réseau + lien deep-link vers BitLab
+### Quest-player UI
+- `BitLabProofStep` in `src/components/bitquest/quest-player.tsx`
+- Displayed when `quest.missionKind === "BITLAB_PROOF"` at the mission step
+- Fields: txid/hash + network selector + deep-link to BitLab
   (`NEXT_PUBLIC_BITLAB_URL`)
-- Bouton « Vérifier ma preuve » enchaîne :
+- "Verify my proof" button chains:
   1. `/api/bitlab/challenge` → JWT
-  2. `/api/bitlab/proof` → persiste la preuve
-  3. `mission_submit` du parent → consomme la preuve, octroie les
-     récompenses
-- Deep-link bidirectionnel : « Ouvrir dans BitLab » construit l'URL via
-  `buildBitlabDeepLink` (voir § *Protocole deep-link*) et navigue en
-  même onglet. Au retour avec `?bitlab_result=1`, `parseBitlabReturn`
-  pré-remplit le formulaire et nettoie l'URL via `router.replace`.
-- `missionKind` exposé dans `QuestState` (listing) et `QuestDetail.quest`
-  (détail) + types `src/lib/bitquest/client.ts`
-- Helper `toBitlabKind(missionType)` dans `src/lib/bitlab/mission-kinds.ts`
-  pour dériver le kind BitLab attendu depuis le missionType de la quête
+  2. `/api/bitlab/proof` → persists the proof
+  3. parent `mission_submit` → consumes the proof, grants
+     rewards
+- Bidirectional deep-link: "Open in BitLab" builds the URL via
+  `buildBitlabDeepLink` (see § *Deep-link protocol*) and navigates in
+  the same tab. On return with `?bitlab_result=1`, `parseBitlabReturn`
+  pre-fills the form and cleans the URL via `router.replace`.
+- `missionKind` exposed in `QuestState` (listing) and `QuestDetail.quest`
+  (detail) + types `src/lib/bitquest/client.ts`
+- Helper `toBitlabKind(missionType)` in `src/lib/bitlab/mission-kinds.ts`
+  to derive the expected BitLab kind from the quest missionType
 
-### Protocole deep-link BitQuest ↔ BitLab
-- `src/lib/bitlab/deep-link.ts` — helpers purs (24 tests)
-- Endpoints serveur : `POST /api/bitlab/deep-link` (sender signé) et
-  `POST /api/bitlab/deep-link/verify-return` (vérif au retour)
+### BitQuest ↔ BitLab deep-link protocol
+- `src/lib/bitlab/deep-link.ts` — pure helpers (24 tests)
+- Server endpoints: `POST /api/bitlab/deep-link` (signed sender) and
+  `POST /api/bitlab/deep-link/verify-return` (verify on return)
 
-**Sender** (BitQuest → BitLab) : `GET ${NEXT_PUBLIC_BITLAB_URL}?` avec
-params :
-- `questCode` : code kebab-case de la quête BitQuest
-- `kind` : `TX | BLOCK | INVOICE | CHANNEL | ADDRESS`
-- `network` : `testnet4 | signet | regtest`
-- `returnTo` : URL absolue BitQuest où renvoyer l'apprenant
-- *extras* optionnels (ex. `target`, `feeSats`) tirés de `missionConfig`
-- `ts` et `sig` (**si** `BITLAB_SIGN_SECRET` configuré) : horodatage
-  unix + HMAC-SHA256 base64url. BitLab doit les échoer intacts à la
-  redirection de retour.
+**Sender** (BitQuest → BitLab): `GET ${NEXT_PUBLIC_BITLAB_URL}?` with
+params:
+- `questCode`: kebab-case code of the BitQuest quest
+- `kind`: `TX | BLOCK | INVOICE | CHANNEL | ADDRESS`
+- `network`: `testnet4 | signet | regtest`
+- `returnTo`: absolute BitQuest URL to send the learner back to
+- optional *extras* (e.g. `target`, `feeSats`) pulled from `missionConfig`
+- `ts` and `sig` (**if** `BITLAB_SIGN_SECRET` configured): unix
+  timestamp + HMAC-SHA256 base64url. BitLab must echo them intact on
+  return redirect.
 
-**Receiver** (BitLab → BitQuest) : redirige vers `${returnTo}?` avec :
-- `bitlab_result=1` (flag d'origine, obligatoire)
-- `kind`, `network` (échos sender)
-- Un des champs suivants selon kind :
-  - `txid=<hex64>` pour TX
-  - `hash=<hex64>` pour BLOCK
-  - `bolt11=<lnXXX>` pour INVOICE
-  - `scid=<block>x<tx>x<vout>` ou chan_id pour CHANNEL
-    → côté BitLab, `LnChannelView.scidFormatted` fournit le format
-    attendu (voir `bitlab/docs/channel-scid.md` — CTA auto à venir)
-  - `address=<base58/bech32>` pour ADDRESS
-- `ts` et `sig` échoés (si sender les a envoyés)
+**Receiver** (BitLab → BitQuest): redirects to `${returnTo}?` with:
+- `bitlab_result=1` (origin flag, mandatory)
+- `kind`, `network` (sender echoes)
+- One of the following fields depending on kind:
+  - `txid=<hex64>` for TX
+  - `hash=<hex64>` for BLOCK
+  - `bolt11=<lnXXX>` for INVOICE
+  - `scid=<block>x<tx>x<vout>` or chan_id for CHANNEL
+    → on the BitLab side, `LnChannelView.scidFormatted` provides the expected
+    format (see `bitlab/docs/channel-scid.md` — auto CTA coming)
+  - `address=<base58/bech32>` for ADDRESS
+- `ts` and `sig` echoed (if sender sent them)
 
-BitQuest à la réception :
-1. Valide `bitlab_result=1`, `kind` connu, `network` non vide, valeur
-   bien formée (regex par kind — hex64 pour TX/BLOCK, `ln…` pour
-   INVOICE, scid ou chan_id pour CHANNEL, bech32/base58 pour ADDRESS)
-2. Vérifie que `kind` correspond à la quête courante (évite collision
-   inter-quêtes)
-3. Si `ts+sig` présents, appelle `/api/bitlab/deep-link/verify-return`
-   → serveur recompute HMAC et compare (timing-safe). Si enforced et
-   invalide : toast d'erreur et nettoyage URL sans pré-remplir
-4. Sinon : pré-remplit le formulaire + nettoie l'URL. L'apprenant reste
-   maître du clic « Vérifier » (pas d'auto-submit, décision délibérée
-   pour maintenir le consentement explicite avant d'engager le JWT
-   challenge)
+BitQuest on reception:
+1. Validates `bitlab_result=1`, known `kind`, non-empty `network`, well-formed
+   value (regex per kind — hex64 for TX/BLOCK, `ln…` for
+   INVOICE, scid or chan_id for CHANNEL, bech32/base58 for ADDRESS)
+2. Checks that `kind` matches the current quest (avoids
+   inter-quest collision)
+3. If `ts+sig` present, calls `/api/bitlab/deep-link/verify-return`
+   → server recomputes HMAC and compares (timing-safe). If enforced and
+   invalid: error toast and URL cleanup without pre-filling
+4. Otherwise: pre-fills the form + cleans the URL. The learner remains
+   master of the "Verify" click (no auto-submit, deliberate decision
+   to maintain explicit consent before engaging the JWT challenge)
 
-### Signature HMAC du deep-link (optionnelle)
-- Variable d'env `BITLAB_SIGN_SECRET` : HMAC key secrète (au moins
-  16 bytes). Si absente, les deep-links ne sont pas signés et
-  `/api/bitlab/deep-link/verify-return` répond `{ ok: true, enforced:
+### HMAC deep-link signature (optional)
+- Env var `BITLAB_SIGN_SECRET`: secret HMAC key (at least
+  16 bytes). If absent, deep-links are not signed and
+  `/api/bitlab/deep-link/verify-return` responds `{ ok: true, enforced:
   false }`
-- Payload canonique signé : `${userId}|${questCode}|${kind}|${network}|${ts}`
-- Algorithme : HMAC-SHA256, encodage base64url, max âge 1h
-- `signDeepLinkPayload` + `verifyDeepLinkPayload` dans
+- Canonical signed payload: `${userId}|${questCode}|${kind}|${network}|${ts}`
+- Algorithm: HMAC-SHA256, base64url encoding, max age 1h
+- `signDeepLinkPayload` + `verifyDeepLinkPayload` in
   `src/lib/bitlab/deep-link.ts` (timing-safe via `crypto.timingSafeEqual`)
-- Threat model couvert : un tiers qui a intercepté un lien de retour
-  ne peut pas forger un retour BitLab pour la quête (binding au
-  `userId`), ni rejouer après 1h, ni l'utiliser pour une autre quête
-  (binding au `questCode`)
+- Threat model covered: a third party who intercepted a return link
+  cannot forge a BitLab return for the quest (bound to
+  `userId`), cannot replay after 1h, cannot use it for another quest
+  (bound to `questCode`)
 
-## Ce qui N'est PAS livré (par choix)
+## What Is NOT Delivered (by choice)
 
-1. **Pas d'audit `AdminAuditLog`** sur `/api/bitlab/proof` : c'est une
-   action apprenante, pas une mutation admin.
-2. **Pas de UI deep-link callback** dans `mission-panel.tsx` : le bouton
-   « Ouvrir dans BitLab » ouvre `NEXT_PUBLIC_BITLAB_URL` en nouvel onglet,
-   sans round-trip JWT + callback encore (optionnel, roadmap).
-3. **ADDRESS non vérifié** : la dérivation d'une adresse depuis un xpub
-   est purement cliente ; aucune lookup serveur actuellement.
+1. **No `AdminAuditLog` audit** on `/api/bitlab/proof`: it is a
+   learner action, not an admin mutation.
+2. **No deep-link callback UI** in `mission-panel.tsx`: the
+   "Open in BitLab" button opens `NEXT_PUBLIC_BITLAB_URL` in a new tab,
+   without yet a JWT + callback round-trip (optional, roadmap).
+3. **ADDRESS not verified**: deriving an address from an xpub
+   is purely client-side; no server lookup currently.
 
-## Config LND
+## LND Config
 
-Variables d'environnement requises pour activer la vérification CHANNEL
-sur testnet/signet/regtest :
+Environment variables required to enable CHANNEL verification
+on testnet/signet/regtest:
 
 ```bash
 LND_REST_URL=https://my-lnd-node.local:8080
-LND_MACAROON_HEX=0201036c6e64...   # readonly.macaroon encodé en hex
-# Précédence TLS (une seule à utiliser) :
-LND_TLS_CERT_B64=LS0tLS1CRUdJTi...  # tls.cert PEM encodé en base64 (prod)
-LND_TLS_INSECURE=1                  # dev uniquement : accepte un cert self-signed
+LND_MACAROON_HEX=0201036c6e64...   # readonly.macaroon hex-encoded
+# TLS precedence (only one to use):
+LND_TLS_CERT_B64=LS0tLS1CRUdJTi...  # tls.cert PEM encoded in base64 (prod)
+LND_TLS_INSECURE=1                  # dev only: accepts a self-signed cert
 ```
 
-Génération des valeurs depuis un node LND :
+Generation of values from an LND node:
 
 ```bash
 # Macaroon → hex
 xxd -p -c 1000 ~/.lnd/data/chain/bitcoin/testnet/readonly.macaroon
 
-# Cert TLS → base64 (une seule ligne, portable Docker/CI)
+# TLS cert → base64 (single line, Docker/CI portable)
 base64 -i ~/.lnd/tls.cert | tr -d '\n'
 ```
 
-**Précédence TLS** (dans le client) :
-1. Si `LND_TLS_CERT_B64` est fourni : le cert est utilisé comme CA pinnée
-   (`rejectUnauthorized=true`). Toute autre CA est refusée, même valide
-   système.
-2. Sinon si `LND_TLS_INSECURE=1` : `rejectUnauthorized=false`. Dev seulement.
-3. Sinon : vérification stricte contre la CA system (suffit pour un cert
-   signé Let's Encrypt).
+**TLS precedence** (in the client):
+1. If `LND_TLS_CERT_B64` is provided: the cert is used as a pinned CA
+   (`rejectUnauthorized=true`). Any other CA is refused, even a valid
+   system one.
+2. Otherwise if `LND_TLS_INSECURE=1`: `rejectUnauthorized=false`. Dev only.
+3. Otherwise: strict verification against the system CA (sufficient for a
+   Let's Encrypt signed cert).
 
-Sans `LND_REST_URL` + `LND_MACAROON_HEX`, les preuves `kind=CHANNEL` sur
-testnet reçoivent un `501 Not Implemented` avec un message explicatif.
+Without `LND_REST_URL` + `LND_MACAROON_HEX`, `kind=CHANNEL` proofs on
+testnet receive a `501 Not Implemented` with an explanatory message.
 
-## API — exemples
+## API — examples
 
-### Émettre un JWT challenge
+### Issue a JWT challenge
 
 ```bash
 curl -X POST http://localhost:3000/api/bitlab/challenge \
@@ -315,7 +314,7 @@ curl -X POST http://localhost:3000/api/bitlab/challenge \
 # → { ok, token, nonce, expiresAt }
 ```
 
-### Soumettre une preuve de transaction
+### Submit a transaction proof
 
 ```bash
 curl -X POST http://localhost:3000/api/bitlab/proof \
@@ -331,13 +330,13 @@ curl -X POST http://localhost:3000/api/bitlab/proof \
   }'
 ```
 
-Réponses attendues :
-- `200 { ok, proof }` — tx confirmée, preuve persistée
-- `409 { error, mempool:true }` — tx en mempool, non encore confirmée
-- `404 { error }` — tx introuvable sur les deux explorateurs
-- `400 { error }` — txid mal formé, JWT invalide, ou quête inconnue
+Expected responses:
+- `200 { ok, proof }` — tx confirmed, proof persisted
+- `409 { error, mempool:true }` — tx in mempool, not yet confirmed
+- `404 { error }` — tx not found on both explorers
+- `400 { error }` — malformed txid, invalid JWT, or unknown quest
 
-### Soumettre une preuve de channel Lightning
+### Submit a Lightning channel proof
 
 ```bash
 curl -X POST http://localhost:3000/api/bitlab/proof \
@@ -353,48 +352,48 @@ curl -X POST http://localhost:3000/api/bitlab/proof \
   }'
 ```
 
-Réponses attendues :
-- `200 { ok, proof }` — channel trouvé, `payload.source` indique `lnd`
-  ou `mempool`
-- `404 { error }` — channel inconnu du node LND / mempool
-- `501 { error }` — testnet/signet/regtest sans config LND
-- `400 { error }` — scid mal formé ou JWT invalide
+Expected responses:
+- `200 { ok, proof }` — channel found, `payload.source` indicates `lnd`
+  or `mempool`
+- `404 { error }` — channel unknown to the LND node / mempool
+- `501 { error }` — testnet/signet/regtest without LND config
+- `400 { error }` — malformed scid or invalid JWT
 
-### UI admin du journal d'audit
-- `/admin/bitlab/attempts` — page SSR gated par rôle ADMIN (via layout)
-- Stats 24h en header : tentatives totales, % acceptation, latence
-  moyenne pondérée
-- Ventilation par outcome avec latence moyenne/outcome
-- Filtres combinables : outcome (8 chips) + questCode (chips dynamiques
-  depuis les codes présents)
-- Table paginée (100 max) avec pseudo, questCode, kind, network,
-  outcome badge coloré, latence, timestamp, reasonMessage
-- Tuile « BitLab preuves (24h) » ajoutée sur `/admin` (vue d'ensemble)
-- NAV admin : nouvelle entrée « BitLab preuves »
-- Export CSV : bouton « Exporter CSV » qui respecte les filtres courants.
-  `GET /admin/bitlab/attempts/export?outcome=…&quest=…` retourne jusqu'à
-  10 000 lignes (hard cap) UTF-8 avec BOM (compatibilité Excel). Colonnes :
+### Audit log admin UI
+- `/admin/bitlab/attempts` — SSR page gated by ADMIN role (via layout)
+- 24h stats in header: total attempts, acceptance %, weighted
+  average latency
+- Breakdown by outcome with average latency/outcome
+- Combinable filters: outcome (8 chips) + questCode (dynamic chips
+  from present codes)
+- Paginated table (max 100) with pseudo, questCode, kind, network,
+  colored outcome badge, latency, timestamp, reasonMessage
+- "BitLab proofs (24h)" tile added on `/admin` (overview)
+- Admin NAV: new entry "BitLab proofs"
+- CSV export: "Export CSV" button that respects current filters.
+  `GET /admin/bitlab/attempts/export?outcome=…&quest=…` returns up to
+  10,000 lines (hard cap) UTF-8 with BOM (Excel compatibility). Columns:
   id, createdAt, userId, pseudo, questCode, kind, network, outcome,
-  latencyMs, reasonMessage. Nom de fichier horodaté avec les filtres.
+  latencyMs, reasonMessage. Timestamped filename with filters.
 
-## Prochaines étapes (roadmap)
+## Next Steps (roadmap)
 
-La roadmap Phase 3 est couverte. Suites possibles (hors scope immédiat) :
+The PHASE_3 roadmap is covered. Possible follow-ups (out of immediate scope):
 
-1. **Test end-to-end LND** — ouvrir un channel testnet réel et exécuter
-   la quête `lightning` bout en bout pour valider le flux sur un node
-   LND fraîchement initialisé (cf. `docs/DOCKER_LND.md`).
-2. **Phase 4** — à définir : pédagogie Lightning avancée (routing,
-   backups, AMP), ou passage à régtest multi-nodes pour exercices de
-   channel management en réseau fermé.
+1. **End-to-end LND test** — open a real testnet channel and run
+   the `lightning` quest end-to-end to validate the flow on a
+   freshly initialized LND node (cf. `docs/DOCKER_LND.md`).
+2. **Phase 4** — TBD: advanced Lightning pedagogy (routing,
+   backups, AMP), or shift to multi-node regtest for channel
+   management exercises on a closed network.
 
 ## Audit & logs
 
-Chaque preuve acceptée émet un log `[INFO] bitlab-proof · bitlab proof
-accepted` avec `{ userId, questCode, kind, network }`. En cas d'échec de
-lookup explorateur, le log est `[WARN] mempool · tx lookup failed` (ou
-`lightning · channel lookup failed`, ou `lnd · lnd channel lookup failed`)
-avec le détail de l'erreur sous-jacente.
+Each accepted proof emits a `[INFO] bitlab-proof · bitlab proof
+accepted` log with `{ userId, questCode, kind, network }`. On explorer
+lookup failure, the log is `[WARN] mempool · tx lookup failed` (or
+`lightning · channel lookup failed`, or `lnd · lnd channel lookup failed`)
+with the underlying error detail.
 
-Pas d'audit `AdminAuditLog` sur ces endpoints : ce ne sont pas des
-mutations admin.
+No `AdminAuditLog` audit on these endpoints: these are not
+admin mutations.

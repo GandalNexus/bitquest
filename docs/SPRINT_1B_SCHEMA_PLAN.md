@@ -1,54 +1,54 @@
-# Sprint 1B — Schéma Académie + plan de migration additive
+# SPRINT_1B — Academy schema + additive migration plan
 
-**Date** : 2026-11-09
-**Branche** : `phase-1-lot-1` (continue le Sprint 1A, commit `00cce1e`)
-**Pré-requis** : Phase 0 + Sprint 1A validés, Docker up, `db/custom.db` intacte.
+**Date**: 2026-11-09
+**Branch**: `phase-1-lot-1` (continues Sprint 1A, commit `00cce1e`)
+**Prerequisites**: Phase 0 + Sprint 1A validated, Docker up, `db/custom.db` intact.
 
-> ⚠️ **Aucune modification de code ni de base ne sera effectuée tant que ce plan n'est pas validé.**
-
----
-
-## 1. Objectifs de Sprint 1B
-
-Poser les fondations de l'Académie en lecture seule :
-- Modèles Prisma pour un parcours hiérarchique Cours → Chapitres → Leçons.
-- Suivi de progression par utilisateur × leçon.
-- (Optionnel) lien faible Chapitre ↔ Quête pour marier théorie académique et pratique gamifiée.
-- Routes API publiques + routes SSR `/academy/**`.
-- Lecteur Markdown.
-- Seed d'un premier cours réel (« Fondamentaux Bitcoin »).
-
-Ce document ne traite **que** la partie schéma + migration. Les routes et pages seront produites dans un sous-sprint suivant après validation du modèle.
+> **No modification of code or database will be performed until this plan is validated.**
 
 ---
 
-## 2. Principes directeurs du schéma
+## 1. Objectives of SPRINT_1B
 
-1. **Additif strictement.** Aucune modification des 8 modèles existants (`User`, `Quest`, `QuizQuestion`, `UserQuestProgress`, `Badge`, `UserBadge`, `WalletTransaction`, `UserEvent`).
-2. **Compatibilité SQLite.** Pas d'enums natifs (utilisation de `String` avec commentaire d'énumération, comme pour `Quest.track`, `Badge.rarity`, etc.). JSON stocké en `String` (cohérent avec l'existant).
-3. **Back-refs optionnelles.** Les nouvelles relations ajoutent des champs *relation* sur `User` et `Quest`. Ce sont des champs purement logiques côté Prisma, qui **ne génèrent aucune colonne** dans la base : donc techniquement toujours additifs.
-4. **Slugs stables** côté URL : chaque leçon est adressable par `/academy/[courseSlug]/[chapterSlug]/[lessonSlug]`. Unicité composite pour éviter les collisions.
-5. **Pas de suppression en cascade silencieuse.** Les relations critiques utilisent `onDelete: Restrict` par défaut (empêche de supprimer un cours qui contient encore des leçons progressées).
-6. **Pas de MDX dans le modèle.** Le champ `content` d'une leçon stocke du Markdown pur (string). MDX viendra dans le sprint admin (phase 2).
+Lay down the Academy foundations in read-only:
+- Prisma models for a hierarchical path Courses → Chapters → Lessons.
+- Progress tracking per user × lesson.
+- (Optional) weak link Chapter ↔ Quest to marry academic theory and gamified practice.
+- Public API routes + SSR routes `/academy/**`.
+- Markdown reader.
+- Seed of a first real course ("Bitcoin Fundamentals").
+
+This document covers **only** the schema + migration part. Routes and pages will be produced in a following sub-sprint after model validation.
 
 ---
 
-## 3. Modèles proposés
+## 2. Guiding Schema Principles
+
+1. **Strictly additive.** No modification of the 8 existing models (`User`, `Quest`, `QuizQuestion`, `UserQuestProgress`, `Badge`, `UserBadge`, `WalletTransaction`, `UserEvent`).
+2. **SQLite compatibility.** No native enums (use `String` with enumeration comment, as for `Quest.track`, `Badge.rarity`, etc.). JSON stored as `String` (consistent with existing).
+3. **Optional back-refs.** New relations add *relation* fields on `User` and `Quest`. These are purely logical fields on Prisma side, which **generate no column** in the database: so technically still additive.
+4. **Stable slugs** on URL side: each lesson is addressable by `/academy/[courseSlug]/[chapterSlug]/[lessonSlug]`. Composite uniqueness to avoid collisions.
+5. **No silent cascade deletion.** Critical relations use `onDelete: Restrict` by default (prevents deleting a course that still contains lessons with progress).
+6. **No MDX in the model.** The `content` field of a lesson stores pure Markdown (string). MDX will come in the admin sprint (phase 2).
+
+---
+
+## 3. Proposed Models
 
 ### 3.1 `Course`
 
-Un parcours thématique. Ex. « Fondamentaux Bitcoin », « Lightning Network », « Sécurité des clés ».
+A thematic path. E.g. "Bitcoin Fundamentals", "Lightning Network", "Key Security".
 
 ```prisma
 model Course {
   id          String   @id @default(cuid())
-  slug        String   @unique                 // ex. "fondamentaux-bitcoin"
-  title       String                            // "Fondamentaux Bitcoin"
-  subtitle    String                            // Phrase courte (hero du cours)
-  description String                            // Paragraphe long (page catalogue)
-  coverIcon   String   @default("BookOpen")    // nom d'icône Lucide (comme Badge.icon)
-  order       Int                               // ordre d'affichage dans le catalogue
-  publishedAt DateTime?                         // null = brouillon (non listé publiquement)
+  slug        String   @unique                 // e.g. "fondamentaux-bitcoin"
+  title       String                            // "Bitcoin Fundamentals"
+  subtitle    String                            // Short phrase (course hero)
+  description String                            // Long paragraph (catalog page)
+  coverIcon   String   @default("BookOpen")    // Lucide icon name (like Badge.icon)
+  order       Int                               // display order in the catalog
+  publishedAt DateTime?                         // null = draft (not publicly listed)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -56,53 +56,53 @@ model Course {
 }
 ```
 
-**Raisons des choix :**
-- `slug` séparé du `id` → URLs lisibles et SEO-friendly.
-- `publishedAt` nullable → support simple « brouillon vs publié » sans table Status.
-- `coverIcon` réutilise la convention `Badge.icon` (nom Lucide) : pas de nouvelle convention à introduire.
+**Reasons for choices:**
+- `slug` separate from `id` → readable, SEO-friendly URLs.
+- Nullable `publishedAt` → simple "draft vs published" support without a Status table.
+- `coverIcon` reuses the `Badge.icon` convention (Lucide name): no new convention to introduce.
 
 ### 3.2 `Chapter`
 
-Une section d'un cours.
+A section of a course.
 
 ```prisma
 model Chapter {
   id        String   @id @default(cuid())
   courseId  String
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  slug      String                               // ex. "propriete-numerique"
-  title     String                               // "La propriété numérique"
-  summary   String                               // 1-2 phrases visibles dans le sommaire
-  order     Int                                  // position dans le cours
+  slug      String                               // e.g. "propriete-numerique"
+  title     String                               // "Digital ownership"
+  summary   String                               // 1-2 sentences visible in the summary
+  order     Int                                  // position within the course
 
   lessons       Lesson[]
   linkedQuests  ChapterQuest[]
 
-  @@unique([courseId, slug])                    // slug unique dans son cours
+  @@unique([courseId, slug])                    // slug unique within its course
   @@index([courseId, order])
 }
 ```
 
-**Raisons :**
-- Unicité composite `(courseId, slug)` : deux cours peuvent avoir un chapitre `introduction` sans collision.
-- Index `(courseId, order)` : lecture rapide du sommaire.
+**Reasons:**
+- Composite uniqueness `(courseId, slug)`: two courses can have an `introduction` chapter without collision.
+- Index `(courseId, order)`: fast summary read.
 
 ### 3.3 `Lesson`
 
-Une leçon atomique.
+An atomic lesson.
 
 ```prisma
 model Lesson {
   id          String   @id @default(cuid())
   chapterId   String
   chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Restrict)
-  slug        String                              // ex. "pourquoi-bitcoin"
-  title       String                              // "Pourquoi Bitcoin ?"
-  summary     String                              // phrase visible dans le sommaire
-  content     String                              // Markdown pur
-  estimatedMinutes Int   @default(5)              // temps de lecture estimé
-  order       Int                                 // position dans le chapitre
-  publishedAt DateTime?                           // null = brouillon
+  slug        String                              // e.g. "pourquoi-bitcoin"
+  title       String                              // "Why Bitcoin?"
+  summary     String                              // phrase visible in the summary
+  content     String                              // pure Markdown
+  estimatedMinutes Int   @default(5)              // estimated reading time
+  order       Int                                 // position within the chapter
+  publishedAt DateTime?                           // null = draft
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -113,14 +113,14 @@ model Lesson {
 }
 ```
 
-**Raisons :**
-- `content: String` → Markdown pur. Rendu via `react-markdown` (déjà en deps).
-- `estimatedMinutes` → affichage « 5 min » dans le sommaire, aide l'apprenant à planifier.
-- Pas de `theorySections` JSON comme Quest, parce qu'on vise un contenu libre et structuré en Markdown (avec titres, listes, blocs code, etc.).
+**Reasons:**
+- `content: String` → pure Markdown. Rendered via `react-markdown` (already in deps).
+- `estimatedMinutes` → "5 min" display in the summary, helps the learner plan.
+- No `theorySections` JSON like Quest, because we aim for free content structured in Markdown (with headings, lists, code blocks, etc.).
 
 ### 3.4 `LessonProgress`
 
-État par utilisateur × leçon.
+State per user × lesson.
 
 ```prisma
 model LessonProgress {
@@ -130,20 +130,20 @@ model LessonProgress {
   lesson       Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   completedAt  DateTime @default(now())
 
-  @@id([userId, lessonId])                        // couple unique = clé primaire composite
+  @@id([userId, lessonId])                        // unique pair = composite primary key
   @@index([userId])
 }
 ```
 
-**Raisons :**
-- Modèle **binaire** (lue / pas lue), pas de « % lu ». Plus simple, suffisant pour la V1.
-- `@@id` composite : pas d'id synthétique, lecture O(1) via clé.
-- `onDelete: Cascade` : si un apprenant est supprimé (RGPD), sa progression l'est aussi.
-- `onDelete: Cascade` côté leçon : si une leçon disparaît du catalogue, les progress orphelins sont nettoyés automatiquement (évite le besoin de reconciliation manuelle).
+**Reasons:**
+- **Binary** model (read / not read), no "% read". Simpler, sufficient for V1.
+- `@@id` composite: no synthetic id, O(1) read via key.
+- `onDelete: Cascade`: if a learner is deleted (GDPR), their progress is too.
+- `onDelete: Cascade` on the lesson side: if a lesson disappears from the catalog, orphan progress is automatically cleaned up (avoids the need for manual reconciliation).
 
-### 3.5 `ChapterQuest` (table pivot, optionnelle)
+### 3.5 `ChapterQuest` (pivot table, optional)
 
-Lie un chapitre à une quête gamifiée existante. Purement additive : ne touche pas à `Quest`.
+Links a chapter to an existing gamified quest. Purely additive: doesn't touch `Quest`.
 
 ```prisma
 model ChapterQuest {
@@ -151,48 +151,48 @@ model ChapterQuest {
   questId   String
   chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   quest     Quest   @relation(fields: [questId], references: [id], onDelete: Restrict)
-  order     Int                                  // position d'affichage dans le chapitre
-  note      String?                              // ex. "À faire après la leçon 2"
+  order     Int                                  // display position in the chapter
+  note      String?                              // e.g. "To do after lesson 2"
 
   @@id([chapterId, questId])
   @@index([chapterId])
 }
 ```
 
-**Raisons du pivot vs `Quest.chapterId` optionnel :**
-- `Quest.chapterId` ajouterait une colonne à la table `Quest` existante → modification de schéma non-additive (ajout de colonne acceptable mais moins pur).
-- Une quête peut être référencée par plusieurs chapitres si l'organisation évolue.
-- Si on n'utilise pas la fonctionnalité au Sprint 1B, la table `ChapterQuest` reste simplement vide — aucun impact.
+**Reasons for pivot vs optional `Quest.chapterId`:**
+- `Quest.chapterId` would add a column to the existing `Quest` table → non-additive schema modification (adding a column is acceptable but less clean).
+- A quest can be referenced by multiple chapters if the organization evolves.
+- If we don't use the feature at SPRINT_1B, the `ChapterQuest` table simply stays empty — no impact.
 
-### 3.6 Back-refs à ajouter sur modèles existants
+### 3.6 Back-refs to add on existing models
 
-**Important** : ces champs sont **purement Prisma** (côté ORM). Ils ne génèrent aucune colonne additionnelle dans SQLite — la FK vit dans les nouvelles tables uniquement.
+**Important**: these fields are **purely Prisma** (ORM side). They generate no additional column in SQLite — the FK lives only in the new tables.
 
 ```prisma
 model User {
-  // … champs existants intacts …
-  lessonProgress LessonProgress[]   // NOUVEAU — back-ref uniquement
+  // … existing fields intact …
+  lessonProgress LessonProgress[]   // NEW — back-ref only
 }
 
 model Quest {
-  // … champs existants intacts …
-  chapters ChapterQuest[]           // NOUVEAU — back-ref uniquement
+  // … existing fields intact …
+  chapters ChapterQuest[]           // NEW — back-ref only
 }
 ```
 
-Vérification : Prisma Studio + `prisma db pull` confirmeront qu'aucune colonne n'est ajoutée à `User` ou `Quest`.
+Verification: Prisma Studio + `prisma db pull` will confirm that no column is added to `User` or `Quest`.
 
 ---
 
-## 4. Schéma complet à ajouter (prêt à copier)
+## 4. Complete Schema to Add (ready to copy)
 
-Insertion à la fin de `prisma/schema.prisma`, après `UserEvent` (ligne 123).
+Insert at the end of `prisma/schema.prisma`, after `UserEvent` (line 123).
 
 ```prisma
 /* =============================================================
- * ACADEMY  — Sprint 1B
- * Parcours pédagogique structuré (Course → Chapter → Lesson),
- * complémentaire du système de quêtes gamifiées.
+ * ACADEMY  — SPRINT_1B
+ * Structured pedagogical path (Course → Chapter → Lesson),
+ * complementary to the gamified quest system.
  * ============================================================= */
 
 model Course {
@@ -270,74 +270,76 @@ model ChapterQuest {
 }
 ```
 
-Modifications **ajoutées** dans les modèles existants (uniquement les back-refs, pas de colonnes) :
+Modifications **added** to existing models (only back-refs, no columns):
 
 ```prisma
 model User {
-  // … (inchangé) …
-  lessonProgress LessonProgress[]   // AJOUT
+  // … (unchanged) …
+  lessonProgress LessonProgress[]   // ADDITION
 }
 
 model Quest {
-  // … (inchangé) …
-  chapters ChapterQuest[]           // AJOUT
+  // … (unchanged) …
+  chapters ChapterQuest[]           // ADDITION
 }
 ```
 
 ---
 
-## 5. Plan de migration — 3 options
+## 5. Migration Plan — 3 Options
 
-**Rappel** : la base `db/custom.db` existe mais n'a **aucune migration Prisma versionnée** (`prisma/migrations/` est absent). Les tables actuelles ont été créées via `prisma db push` au fil du temps.
+**Reminder**: the `db/custom.db` database exists but has **no versioned
+Prisma migration** (`prisma/migrations/` is absent). Current tables were
+created via `prisma db push` over time.
 
-### Option A — Baseline + migrate dev (la plus propre)
+### Option A — Baseline + migrate dev (the cleanest)
 
-Établit la discipline Prisma Migrate à partir de maintenant, sans toucher aux données existantes.
+Establishes Prisma Migrate discipline from now on, without touching existing data.
 
 ```bash
-# 1. Baseline : marquer le schéma actuel comme "init" déjà appliqué
+# 1. Baseline: mark the current schema as "init" already applied
 docker compose -f docker-compose.dev.yml exec -T bitquest-dev npx prisma migrate dev \
   --name init --create-only
 docker compose -f docker-compose.dev.yml exec -T bitquest-dev npx prisma migrate resolve \
   --applied $(ls prisma/migrations | head -1)
 
-# 2. Éditer prisma/schema.prisma pour ajouter les 5 nouveaux modèles + 2 back-refs
-# 3. Générer et appliquer la migration add_academy
+# 2. Edit prisma/schema.prisma to add the 5 new models + 2 back-refs
+# 3. Generate and apply the add_academy migration
 docker compose -f docker-compose.dev.yml exec -T bitquest-dev npx prisma migrate dev \
   --name add_academy
 ```
 
-**Avantages** :
-- Ajoute `prisma/migrations/` versionné (traçable en git).
-- `migrate dev` ne drop pas de données tant qu'il n'y a pas de drift.
-- Migration ré-exécutable identiquement en CI ou en prod plus tard.
+**Pros**:
+- Adds versioned `prisma/migrations/` (traceable in git).
+- `migrate dev` doesn't drop data as long as there's no drift.
+- Migration identically re-runnable in CI or in prod later.
 
-**Inconvénients** :
-- Le `migrate dev` a un comportement interactif : si drift détecté, il propose un reset (il faut répondre `No`).
-- Le `--create-only` + `migrate resolve` est un pattern ponctuel à documenter.
+**Cons**:
+- `migrate dev` has interactive behavior: if drift is detected, it proposes a reset (must answer `No`).
+- The `--create-only` + `migrate resolve` is a one-off pattern to document.
 
-**Risque** : si une réponse interactive est mal gérée et accepte le reset, perte de données. **Mitigation** : snapshot `db/custom.db` avant toute commande + exécution manuelle (toi au clavier).
+**Risk**: if an interactive answer is mishandled and accepts the reset, data loss. **Mitigation**: snapshot of `db/custom.db` before any command + manual execution (you at the keyboard).
 
-### Option B — `prisma db push` SANS `--accept-data-loss`
+### Option B — `prisma db push` WITHOUT `--accept-data-loss`
 
-Plus simple, moins propre.
+Simpler, less clean.
 
 ```bash
-# Éditer prisma/schema.prisma (ajouts seuls, aucune suppression)
+# Edit prisma/schema.prisma (additions only, no deletion)
 docker compose -f docker-compose.dev.yml exec -T bitquest-dev npx prisma db push
 ```
 
-**Avantages** :
-- Une seule commande.
-- `db push` sans `--accept-data-loss` **refuse** si la migration perdrait des données (colonne/table supprimée, type restreint). Notre changement étant purement additif, il doit passer sans intervention.
+**Pros**:
+- Single command.
+- `db push` without `--accept-data-loss` **refuses** if the migration would lose data (column/table deletion, restricted type). Our change being purely additive, it should pass without intervention.
 
-**Inconvénients** :
-- Pas de fichier de migration versionné.
-- Deviendra une dette technique au moment de la migration Postgres.
+**Cons**:
+- No versioned migration file.
+- Will become technical debt when migrating to Postgres.
 
-**Risque** : faible pour ce changement additif. Si le push propose quand même une suppression, on refuse.
+**Risk**: low for this additive change. If the push still proposes a deletion, we refuse.
 
-### Option C — SQL à la main via sqlite3 CLI
+### Option C — SQL by hand via sqlite3 CLI
 
 ```sql
 CREATE TABLE Course ( ... );
@@ -345,70 +347,70 @@ CREATE UNIQUE INDEX ... ;
 -- ... etc
 ```
 
-**Avantages** :
-- Contrôle total.
+**Pros**:
+- Full control.
 
-**Inconvénients** :
-- Divergence entre `schema.prisma` et base réelle (il faudrait aussi éditer le schema et faire un `prisma db pull` pour recadrer).
-- Perte de temps par rapport à A ou B.
+**Cons**:
+- Divergence between `schema.prisma` and actual database (would also need to edit the schema and do a `prisma db pull` to realign).
+- Waste of time compared to A or B.
 
-**À écarter** sauf besoin pointu.
-
----
-
-## 6. Recommandation
-
-**Option A (baseline + migrate dev)** si tu veux installer la discipline migrations dès maintenant. Je recommande cette option car on va vers Postgres bientôt et autant poser les migrations propres.
-
-**Option B (db push sans --accept-data-loss)** si tu préfères la vitesse et la simplicité à court terme. Zéro risque de perte sur ce changement purement additif.
-
-Je penche légèrement pour **Option A** mais les deux sont acceptables.
+**To discard** unless specific need.
 
 ---
 
-## 7. Points sécurité à flaguer **avant l'exécution**
+## 6. Recommendation
 
-1. **Snapshot DB obligatoire** avant toute commande qui touche la base :
+**Option A (baseline + migrate dev)** if you want to install migration discipline right now. I recommend this option because we're moving toward Postgres soon and might as well lay down clean migrations.
+
+**Option B (db push without --accept-data-loss)** if you prefer speed and simplicity in the short term. Zero loss risk on this purely additive change.
+
+I lean slightly toward **Option A** but both are acceptable.
+
+---
+
+## 7. Security Points to Flag **Before Execution**
+
+1. **Mandatory DB snapshot** before any command that touches the database:
    ```bash
    cp db/custom.db "db/custom.db.bak-$(date +%Y%m%d-%H%M%S)"
    ```
-2. **Exécution manuelle** des commandes Prisma qui demandent confirmation (migrate dev interactif) — je ne les lancerai pas via `exec -T` qui bypass TTY.
-3. **Vérification post-migration** :
-   - `shasum -a 256 db/custom.db` (notera le changement légitime).
-   - Compter les lignes de chaque table existante → doit être identique.
-   - Vérifier l'absence de colonne ajoutée dans `User` et `Quest` (via `.schema User` et `.schema Quest` en sqlite3).
-4. **Rollback** : restaurer le snapshot `.bak` si quoi que ce soit dérape.
+2. **Manual execution** of Prisma commands that require confirmation (interactive migrate dev) — I won't launch them via `exec -T` which bypasses TTY.
+3. **Post-migration verification**:
+   - `shasum -a 256 db/custom.db` (will note the legitimate change).
+   - Count rows of each existing table → must be identical.
+   - Check absence of added column in `User` and `Quest` (via `.schema User` and `.schema Quest` in sqlite3).
+4. **Rollback**: restore the `.bak` snapshot if anything goes wrong.
 
 ---
 
-## 8. Tâches qui suivront la validation du schéma
+## 8. Tasks Following Schema Validation
 
-Dans l'ordre, une fois ce plan validé :
+In order, once this plan is validated:
 
-1. **Snapshot DB** (ligne 1 ci-dessus).
-2. **Appliquer le schéma** (option A ou B selon ton choix).
-3. **Vérifier** l'intégrité des tables existantes.
-4. **Régénérer le client Prisma** et relancer `typecheck + lint + test` (doit rester vert).
-5. **Écrire `prisma/seed.ts`** pour ajouter 1 cours « Fondamentaux Bitcoin » + 2 chapitres × 3 leçons chacun en français. Le lancer **manuellement** (`npx prisma db seed` ou script dédié) — jamais destructif pour les tables existantes.
-6. **Créer `src/lib/bitquest/academy.ts`** — fonctions typées de lecture (getCoursesSummary, getCourseTree, getLessonWithProgress, selectNextLessonInCourse) + tests Vitest sur la logique pure.
-7. **Routes API** `/api/academy/courses`, `/api/academy/courses/[slug]`, `/api/academy/lessons/[id]/complete`.
-8. **Pages SSR** `/academy`, `/academy/[courseSlug]`, `/academy/[courseSlug]/[chapterSlug]/[lessonSlug]`.
-9. **Lecteur Markdown** via `react-markdown` (lib déjà présente).
-10. **Activer la tuile Académie** du Dashboard (retirer `disabled`, pointer vers `/academy`).
-11. **Commit(s)** cohérent(s) par sous-étape.
-
----
-
-## 9. Décisions à confirmer avant exécution
-
-1. ✅ Schéma proposé (§4) OK ou ajustements ?
-2. ✅ Option de migration — **A** ou **B** ? (Je recommande A, mais B est aussi acceptable.)
-3. ✅ Garder `ChapterQuest` (pivot Chapitre↔Quête) dans le même sprint, ou le différer à un sprint ultérieur ?
-4. ✅ `onDelete` policies confirmées (Cascade pour LessonProgress/ChapterQuest, Restrict pour Course→Chapter et Chapter→Lesson) ?
-5. ✅ Autorisation pour le snapshot `.bak` versionné localement (ignoré par git) ?
-6. ✅ Je peux exécuter moi-même les commandes dans Docker, ou tu préfères que je te les donne et tu les lances toi-même (TTY interactif au clavier pour migrate dev) ?
+1. **DB snapshot** (line 1 above).
+2. **Apply the schema** (option A or B depending on your choice).
+3. **Verify** integrity of existing tables.
+4. **Regenerate the Prisma client** and re-run `typecheck + lint + test` (must stay green).
+5. **Write `prisma/seed.ts`** to add 1 "Bitcoin Fundamentals" course + 2 chapters × 3 lessons each in French. Run it **manually** (`npx prisma db seed` or dedicated script) — never destructive for existing tables.
+6. **Create `src/lib/bitquest/academy.ts`** — typed read functions (getCoursesSummary, getCourseTree, getLessonWithProgress, selectNextLessonInCourse) + Vitest tests on the pure logic.
+7. **API routes** `/api/academy/courses`, `/api/academy/courses/[slug]`, `/api/academy/lessons/[id]/complete`.
+8. **SSR pages** `/academy`, `/academy/[courseSlug]`, `/academy/[courseSlug]/[chapterSlug]/[lessonSlug]`.
+9. **Markdown reader** via `react-markdown` (lib already present).
+10. **Activate the Dashboard Academy tile** (remove `disabled`, point to `/academy`).
+11. **Consistent commit(s)** per sub-step.
 
 ---
 
-**Rédigé le** : 2026-11-09
-**Statut** : en attente de validation. **Aucune modification de base, de schéma ou de code source tant que tu n'as pas validé ces 6 points.**
+## 9. Decisions to Confirm Before Execution
+
+1. Proposed schema (§4) OK or adjustments?
+2. Migration option — **A** or **B**? (I recommend A, but B is also acceptable.)
+3. Keep `ChapterQuest` (Chapter↔Quest pivot) in the same sprint, or defer to a later sprint?
+4. Confirmed `onDelete` policies (Cascade for LessonProgress/ChapterQuest, Restrict for Course→Chapter and Chapter→Lesson)?
+5. Authorization for the `.bak` snapshot versioned locally (ignored by git)?
+6. Can I run the Docker commands myself, or do you prefer I give them to you and you run them yourself (interactive TTY at the keyboard for migrate dev)?
+
+---
+
+**Written on**: 2026-11-09
+**Status**: pending validation. **No modification of database, schema or source code until you have validated these 6 points.**

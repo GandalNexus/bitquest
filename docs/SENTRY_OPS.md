@@ -1,121 +1,120 @@
-# Sentry — guide ops (Phase 5)
+# Sentry — ops guide (Phase 5)
 
-## Vue d'ensemble
+## Overview
 
-BitQuest est instrumenté avec `@sentry/nextjs`. L'intégration est
-**opt-in** : sans DSN configuré, tout le code Sentry est no-op et
-n'ajoute aucun overhead (ni en performance ni en appels réseau).
+BitQuest is instrumented with `@sentry/nextjs`. The integration is
+**opt-in**: with no DSN configured, all Sentry code is no-op and
+adds zero overhead (neither in performance nor network calls).
 
-Trois surfaces instrumentées :
+Three instrumented surfaces:
 
-- **Client** (`sentry.client.config.ts`) — erreurs JS navigateur.
-- **Server** (`sentry.server.config.ts`) — erreurs Node runtime.
-- **Edge** (`sentry.edge.config.ts`) — erreurs middleware/edge functions.
+- **Client** (`sentry.client.config.ts`) — browser JS errors.
+- **Server** (`sentry.server.config.ts`) — Node runtime errors.
+- **Edge** (`sentry.edge.config.ts`) — middleware/edge function errors.
 
-Un wrapper applicatif (`src/lib/obs/sentry.ts`) expose
-`captureException()` et `captureMessage()`. Le logger pino
-(`src/lib/log.ts`) appelle automatiquement `captureException` sur tout
-`log.error({ err }, …)`. Le code métier n'a donc **jamais** à importer
-Sentry directement.
+An application wrapper (`src/lib/obs/sentry.ts`) exposes
+`captureException()` and `captureMessage()`. The pino logger
+(`src/lib/log.ts`) automatically calls `captureException` on any
+`log.error({ err }, …)`. Business code therefore **never** needs to import
+Sentry directly.
 
-## Activation en production
+## Production Activation
 
-### 1. Créer un projet Sentry
+### 1. Create a Sentry project
 
-Sur sentry.io → New Project → platform "Next.js". Nommer le projet
-`bitquest-prod` (et `bitquest-staging` séparé si deux environnements).
+On sentry.io → New Project → "Next.js" platform. Name the project
+`bitquest-prod` (and separate `bitquest-staging` if two environments).
 
-### 2. Récupérer le DSN
+### 2. Retrieve the DSN
 
-Dans Settings → Projects → bitquest-prod → Client Keys. Le DSN a la
-forme :
+In Settings → Projects → bitquest-prod → Client Keys. The DSN has the
+form:
 
 ```
 https://<public_key>@<orgid>.ingest.sentry.io/<project_id>
 ```
 
-### 3. Configurer les variables d'environnement
+### 3. Configure environment variables
 
-**Production (serveur)** :
+**Production (server)**:
 
 ```bash
 SENTRY_DSN=https://xxx@yyy.ingest.sentry.io/zzz
-# Release pris via npm_package_version (package.json → version).
-SENTRY_TRACES_SAMPLE_RATE=0.1   # 10% des transactions échantillonnées
+# Release taken from npm_package_version (package.json → version).
+SENTRY_TRACES_SAMPLE_RATE=0.1   # 10% of transactions sampled
 ```
 
-**Production (client)** — ces vars commencent par `NEXT_PUBLIC_` donc
-sont injectées dans le bundle navigateur :
+**Production (client)** — these vars start with `NEXT_PUBLIC_` so
+they're injected into the browser bundle:
 
 ```bash
 NEXT_PUBLIC_SENTRY_DSN=$SENTRY_DSN
-NEXT_PUBLIC_APP_VERSION=v0.4.0   # grouping release côté client
+NEXT_PUBLIC_APP_VERSION=v0.4.0   # release grouping on client side
 NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=0.1
 ```
 
-`NODE_ENV` pilote automatiquement le champ `environment` (production /
-development / test). Pas besoin de variable `SENTRY_ENV` séparée.
+`NODE_ENV` automatically drives the `environment` field (production /
+development / test). No need for a separate `SENTRY_ENV` variable.
 
-> ⚠️ Le DSN public **peut** être exposé dans le bundle — c'est prévu
-> par design Sentry (le DSN n'est pas un secret, juste un identifiant
-> de projet). Mais ne JAMAIS exposer de clé Auth Token d'intégration
-> CI côté client.
+> The public DSN **can** be exposed in the bundle — it's by Sentry
+> design (the DSN is not a secret, just a project identifier).
+> But NEVER expose a CI integration Auth Token on the client side.
 
-### 4. Vérifier que Sentry remonte
+### 4. Verify Sentry reports
 
-Après déploiement, déclencher une erreur contrôlée :
+After deployment, trigger a controlled error:
 
 ```ts
-// Depuis une route test accessible uniquement aux ADMIN :
+// From a test route accessible only to ADMIN:
 captureException(new Error("Sentry smoke test"));
 ```
 
-Le projet Sentry doit afficher l'erreur dans les 30 secondes. Si
-rien n'apparaît, vérifier :
+The Sentry project should display the error within 30 seconds. If
+nothing appears, check:
 
-- `SENTRY_DSN` bien défini dans l'env du process serveur.
-- Le domaine n'est pas bloqué par un ad blocker / CSP.
-- Les logs du serveur ne mentionnent pas d'erreur Sentry au démarrage.
+- `SENTRY_DSN` properly defined in the server process env.
+- The domain is not blocked by an ad blocker / CSP.
+- Server logs don't mention a Sentry error at startup.
 
-## Anonymisation (RGPD)
+## Anonymization (GDPR)
 
-Les trois configs ont un `beforeSend` qui scrub :
+The three configs have a `beforeSend` that scrubs:
 
-- `event.request.cookies` entier → supprimé.
-- Headers `Authorization`, `Cookie`, `x-gn-token` → supprimés.
+- Entire `event.request.cookies` → removed.
+- `Authorization`, `Cookie`, `x-gn-token` headers → removed.
 
-Le logger pino (`src/lib/log.ts`) scrub aussi ses propres champs
-sensibles via sa redact list. Si tu ajoutes un nouveau champ sensible
-(token, hash, seed), étends le `redact` de pino **avant** de déployer.
+The pino logger (`src/lib/log.ts`) also scrubs its own sensitive
+fields via its redact list. If you add a new sensitive field
+(token, hash, seed), extend pino's `redact` **before** deploying.
 
-## Dashboards recommandés
+## Recommended Dashboards
 
-Créer sur Sentry :
+Create on Sentry:
 
-- **Alert : erreurs > 10/min** — Slack webhook sur canal `#bitquest-alerts`.
-- **Issue filter : environment:production tag:scope** — chaque `logger("scope")`
-  attache automatiquement ce tag (via l'enrichissement interne du wrapper).
-- **Performance → BitLab proof flow** — transactions nommées
-  `POST /api/bitlab/proof` et `POST /api/bitlab/challenge`. Objectif
+- **Alert: errors > 10/min** — Slack webhook on `#bitquest-alerts` channel.
+- **Issue filter: environment:production tag:scope** — each `logger("scope")`
+  automatically attaches this tag (via internal enrichment of the wrapper).
+- **Performance → BitLab proof flow** — transactions named
+  `POST /api/bitlab/proof` and `POST /api/bitlab/challenge`. Target
   p95 < 400ms, p99 < 1.5s.
 
-## Désactiver Sentry
+## Disabling Sentry
 
-Pour désactiver proprement (ex : passer en mode "canari sans alerting") :
+To cleanly disable (e.g. switch to "canary without alerting" mode):
 
 ```bash
 unset SENTRY_DSN
 unset NEXT_PUBLIC_SENTRY_DSN
 ```
 
-Les 3 configs voient `dsn` vide → ne font pas d'init → les wrappers
-`captureException` restent no-op. Aucun rebuild nécessaire.
+The 3 configs see an empty `dsn` → don't init → the `captureException`
+wrappers remain no-op. No rebuild required.
 
-## Limites connues
+## Known Limitations
 
-- Pas de source maps auto-uploadées (nécessite `withSentryConfig` dans
-  `next.config.ts` + `SENTRY_AUTH_TOKEN` CI). Reporté : à faire quand
-  on a un CI stable qui build en prod.
-- Pas d'intégration Replay (anti-RGPD trop sensible pour l'instant).
-- `tracesSampleRate` à 0.1 en défaut → ajuster selon la volumétrie
-  réelle une fois en prod.
+- No auto-uploaded source maps (requires `withSentryConfig` in
+  `next.config.ts` + CI `SENTRY_AUTH_TOKEN`). Deferred: to do when
+  we have a stable CI that builds in prod.
+- No Replay integration (anti-GDPR too sensitive for now).
+- `tracesSampleRate` at 0.1 by default → adjust according to real
+  volume once in prod.

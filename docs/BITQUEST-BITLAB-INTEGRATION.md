@@ -1,31 +1,31 @@
-# BITQUEST ↔ BITLAB — Intégration GandalNexus
+# BITQUEST ↔ BITLAB — GandalNexus Integration
 
-> Snapshot opérationnel du protocole 2026-11-14 · LOT 14.
-> Pour la vision stratégique, voir `BITQUEST_INTEGRATION_BITLAB.md` (historique).
+> Operational snapshot of the protocol 2026-11-14 · LOT 14.
+> For the strategic vision, see `BITQUEST_INTEGRATION_BITLAB.md` (history).
 
-## 1. Vue d'ensemble du flow
+## 1. Flow overview
 
 ```
 BitQuest                                            BitLab
    │                                                   │
-   │  1. Clic « Ouvrir dans BitLab » (quête)           │
+   │  1. Click "Open in BitLab" (quest)                │
    │─────────────────────────────────────────────────▶ │
    │  GET /api/bitlab/deep-link?questCode=&kind=…      │
    │                                                   │
-   │  2. Deep-link signé (HMAC + v:1) + launch_token   │
+   │  2. Signed deep-link (HMAC + v:1) + launch_token  │
    │     JWT HS256 TTL 60s + attemptId CREATED         │
    │                                                   │
-   │  3. Redirect top-level vers BitLab                │
+   │  3. Top-level redirect to BitLab                  │
    │─────────────────────────────────────────────────▶ │
    │                                                   │
    │                                                   │ 4. parseBitquestMission
    │                                                   │    + exchange launch_token
    │                                                   │    (POST verify-launch-token)
    │  ◀─────────────────────────────────────────────── │
-   │  5. BitLab consomme → store user + session        │
+   │  5. BitLab consumes → store user + session        │
    │                                                   │
-   │                                                   │ 6. Mission UI, apprenant
-   │                                                   │    construit la preuve
+   │                                                   │ 6. Mission UI, learner
+   │                                                   │    builds the proof
    │                                                   │
    │  7. GET /api/bitlab/challenge?attemptId=…         │
    │  ◀─────────────────────────────────────────────── │
@@ -36,19 +36,19 @@ BitQuest                                            BitLab
    │  ◀─────────────────────────────────────────────── │
    │  { jwt, kind, txid|hash|bolt11|scid|address }     │
    │                                                   │
-   │  9. Server :                                      │
+   │  9. Server:                                       │
    │     - verifyChallengeOrRespond()                  │
    │     - consume nonce (Redis SET NX)                │
-   │     - verif on-chain (mempool / LND / format)     │
+   │     - on-chain verif (mempool / LND / format)     │
    │     - attempt PROOF_PENDING → VERIFYING           │
-   │       → COMPLETED (ou FAILED)                     │
+   │       → COMPLETED (or FAILED)                     │
    │     - upsert BitLabProof                          │
    │     - snapshotAttemptResult (XP+sats+badges)      │
    │                                                   │
-   │ 10. Redirect retour signé (verify-return v:1)     │
+   │ 10. Signed return redirect (verify-return v:1)    │
    │─────────────────────────────────────────────────▶ │
    │                                                   │
-   │                                                   │ 11. Banner « Preuve envoyée »
+   │                                                   │ 11. Banner "Proof sent"
    │                                                   │     window.location → BitQuest
    │  ◀─────────────────────────────────────────────── │
    │                                                   │
@@ -57,116 +57,116 @@ BitQuest                                            BitLab
    │                                                   │
 ```
 
-## 2. Artefacts cryptographiques
+## 2. Cryptographic artifacts
 
-| Artefact | Secret | Format | TTL | Anti-replay |
+| Artifact | Secret | Format | TTL | Anti-replay |
 |---|---|---|---|---|
-| Deep-link HMAC | `BITLAB_SIGN_SECRET` (opt) | base64url sig sur `v\|userId\|questCode\|kind\|network\|ts` | Pas de TTL direct, `ts` lu à l'arrivée | Signature + `attemptId` single-use |
+| Deep-link HMAC | `BITLAB_SIGN_SECRET` (opt) | base64url sig on `v\|userId\|questCode\|kind\|network\|ts` | No direct TTL, `ts` read on arrival | Signature + single-use `attemptId` |
 | Launch token JWT | `BITLAB_LAUNCH_SECRET` > `BITLAB_JWT_SECRET` > `CSRF_SECRET` | HS256 { userId, pseudo, role, email, emailVerifiedAt, nonce, v, aud=bitlab-user, iss=bitquest } | 60 s | nonce Redis SET NX EX 600 |
-| Session token BitLab | idem | HS256 { userId, pseudo, role, v, aud=bitlab-session } | 2 h | Pas de revocation jusqu'à LOT 14 ; désormais clear via `/api/auth/bitlab-logout` (rotation `User.token`) |
-| Challenge mission JWT | `BITLAB_JWT_SECRET` | HS256 { userId, questCode, kind, network, attemptId?, nonce, exp, aud=bitlab, v } | 10 min | nonce Redis SET NX |
-| Verify-return URL | `BITLAB_SIGN_SECRET` | HMAC sur `v\|userId\|questCode\|kind\|network\|ts` | — | `ts` echoé par BitLab, ré-vérifié |
+| BitLab session token | same | HS256 { userId, pseudo, role, v, aud=bitlab-session } | 2 h | No revocation until LOT 14; now cleared via `/api/auth/bitlab-logout` (rotation of `User.token`) |
+| Mission challenge JWT | `BITLAB_JWT_SECRET` | HS256 { userId, questCode, kind, network, attemptId?, nonce, exp, aud=bitlab, v } | 10 min | nonce Redis SET NX |
+| Verify-return URL | `BITLAB_SIGN_SECRET` | HMAC on `v\|userId\|questCode\|kind\|network\|ts` | — | `ts` echoed by BitLab, re-verified |
 
-## 3. Routes BitQuest exposées à BitLab
+## 3. BitQuest routes exposed to BitLab
 
-| Route | Méthode | Auth | CORS | Rate-limit | Rôle |
+| Route | Method | Auth | CORS | Rate-limit | Role |
 |---|---|---|---|---|---|
-| `/api/bitlab/deep-link` | POST | cookie session | — | 30/60s user, 120/60s IP | Génère URL signée + attempt |
-| `/api/bitlab/deep-link/verify-return` | POST | cookie session | — | 60/60s user, 240/60s IP | Marque mission comme retournée de BitLab |
-| `/api/bitlab/challenge` | GET | JWT ou cookie | — | 30/60s user, 120/60s IP | Émet JWT mission |
-| `/api/bitlab/proof` | POST | JWT challenge | — | 20/60s user, 80/60s IP | Vérifie preuve, update attempt |
-| `/api/auth/launch-token` | POST | cookie session | — | 15/60s user | Émet launch_token (SSO sur demande) |
+| `/api/bitlab/deep-link` | POST | session cookie | — | 30/60s user, 120/60s IP | Generates signed URL + attempt |
+| `/api/bitlab/deep-link/verify-return` | POST | session cookie | — | 60/60s user, 240/60s IP | Marks mission as returned from BitLab |
+| `/api/bitlab/challenge` | GET | JWT or cookie | — | 30/60s user, 120/60s IP | Issues mission JWT |
+| `/api/bitlab/proof` | POST | challenge JWT | — | 20/60s user, 80/60s IP | Verifies proof, updates attempt |
+| `/api/auth/launch-token` | POST | session cookie | — | 15/60s user | Issues launch_token (SSO on demand) |
 | `/api/auth/verify-launch-token` | POST | public | allowlist `BITLAB_ALLOWED_ORIGINS` | 60/60s IP | Exchange launch_token → session token |
-| `/api/auth/bitlab-sso` | GET | cookie session (silent) | allowlist | 30/60s IP | SSO top-level nav |
-| `/api/auth/bitlab-logout` | GET | cookie session | allowlist | 30/60s IP | **Déconnexion globale** (LOT 14) |
+| `/api/auth/bitlab-sso` | GET | session cookie (silent) | allowlist | 30/60s IP | Top-level nav SSO |
+| `/api/auth/bitlab-logout` | GET | session cookie | allowlist | 30/60s IP | **Global logout** (LOT 14) |
 
-## 4. États MissionAttempt
+## 4. MissionAttempt states
 
 ```
 CREATED ──▶ IN_PROGRESS ──▶ PROOF_PENDING ──▶ VERIFYING ──▶ COMPLETED
    │              │                │               │             │
    └─── ABANDONED ┴── ABANDONED ────┴── FAILED ─────┴── FAILED ───┘
-        (user action)                 (proof invalide)
-   └─── EXPIRED ◀──── (toutes les étapes non terminales, TTL 2h)
+        (user action)                 (invalid proof)
+   └─── EXPIRED ◀──── (all non-terminal stages, TTL 2h)
 ```
 
-Transition atomique via `updateMany({ where: { id, state: { in: FROM } } })`.
-Count == 0 → race perdue, caller voit `ILLEGAL_TRANSITION`.
+Atomic transition via `updateMany({ where: { id, state: { in: FROM } } })`.
+Count == 0 → lost race, caller sees `ILLEGAL_TRANSITION`.
 
-## 5. Scénarios d'erreur gérés
+## 5. Handled error scenarios
 
-| Scénario | Réponse | Fichier |
+| Scenario | Response | File |
 |---|---|---|
-| launch_token expiré (>60s) | 400 avec code `JWT_EXPIRED` | `launch-token.ts:verifyLaunchToken` |
-| launch_token rejeu (nonce consommé) | 400 "déjà consommé" | `launch-token.ts:148` |
+| launch_token expired (>60s) | 400 with code `JWT_EXPIRED` | `launch-token.ts:verifyLaunchToken` |
+| launch_token replay (consumed nonce) | 400 "already consumed" | `launch-token.ts:148` |
 | JWT challenge `v > current` | 400 + audit `INVALID_JWT` | `proof/route.ts:88` |
-| mempool.space timeout 5s | `null` renvoyé → 404 côté caller | `mempool.ts:fetchWithTimeout` |
-| mempool.space down → fallback blockstream | tryGet retry transparent | `mempool.ts:tryGet` |
-| attempt expiré (>2h) | 410 "Tentative expirée" | `proof/route.ts:154` |
+| mempool.space 5s timeout | `null` returned → 404 on caller side | `mempool.ts:fetchWithTimeout` |
+| mempool.space down → blockstream fallback | tryGet transparent retry | `mempool.ts:tryGet` |
+| attempt expired (>2h) | 410 "Attempt expired" | `proof/route.ts:154` |
 | attempt race (count=0) | ILLEGAL_TRANSITION | `attempt.ts:transitionAttempt` |
-| CHANNEL sans LND | 501 "indisponible" (ou DECLARATIVE OK) | `proof/route.ts:280` |
-| ADDRESS funded_txo_count=0 (USED) | 409 REJECTED | `proof/route.ts` branche ADDRESS |
-| rate-limit dépassé | 429 "Trop de requêtes" | tous les routes `/api/bitlab/*` |
+| CHANNEL without LND | 501 "unavailable" (or DECLARATIVE OK) | `proof/route.ts:280` |
+| ADDRESS funded_txo_count=0 (USED) | 409 REJECTED | `proof/route.ts` ADDRESS branch |
+| rate-limit exceeded | 429 "Too many requests" | all `/api/bitlab/*` routes |
 
-## 6. Déconnexion globale (LOT 14)
+## 6. Global logout (LOT 14)
 
-Nouveau flow pour « quitter proprement GandalNexus » depuis BitLab.
+New flow to "cleanly leave GandalNexus" from BitLab.
 
 ```
 BitLab header dropdown                        BitQuest
     │                                              │
-    │  « Déconnexion globale »                     │
+    │  "Global logout"                             │
     │  window.location.assign(                     │
     │    /api/auth/bitlab-logout?returnTo=<url>)   │
     │ ───────────────────────────────────────────▶ │
-    │                                              │ Rote User.token
+    │                                              │ Rotate User.token
     │                                              │ Set-Cookie bq_session=; MA=0
     │                                              │ Set-Cookie bq_csrf=; MA=0
-    │                                              │ 302 vers <returnTo>?logged_out=1
+    │                                              │ 302 to <returnTo>?logged_out=1
     │ ◀─────────────────────────────────────────── │
     │                                              │
-    │  useBitquestMission détecte ?logged_out=1    │
-    │  → clearUser() (store vidé)                  │
+    │  useBitquestMission detects ?logged_out=1    │
+    │  → clearUser() (store emptied)               │
     │  → router.replace(pathname)                  │
 ```
 
-Sécurité :
-- `returnTo` validé contre `BITLAB_ALLOWED_ORIGINS` (même allowlist que
+Security:
+- `returnTo` validated against `BITLAB_ALLOWED_ORIGINS` (same allowlist as
   `/api/auth/bitlab-sso`).
-- Rate-limit IP 30/60s.
-- Pas de CSRF (déconnecter n'exfiltre rien).
-- Idempotent si pas de session.
+- IP rate-limit 30/60s.
+- No CSRF (logging out doesn't exfiltrate anything).
+- Idempotent if no session.
 
-## 7. Tests d'intégration
+## 7. Integration tests
 
-| Fichier | Nb | Couvre |
+| File | Count | Covers |
 |---|---:|---|
-| `src/app/api/bitlab/flow.e2e.test.ts` | 6+ | Deep-link + challenge + proof + versioning + rate-limit IP |
+| `src/app/api/bitlab/flow.e2e.test.ts` | 6+ | Deep-link + challenge + proof + versioning + IP rate-limit |
 | `src/app/api/auth/sso-e2e.test.ts` | 4 | bitlab-sso + verify-launch-token chain |
 | `src/app/api/auth/bitlab-sso/route.test.ts` | 13 | returnTo allowlist, rate-limit, silent mode |
-| `src/app/api/auth/bitlab-logout/route.test.ts` | 8 | Déconnexion globale (LOT 14) |
-| `src/lib/auth/launch-token.test.ts` | 10 | émission, verify, anti-replay, downgrade v |
+| `src/app/api/auth/bitlab-logout/route.test.ts` | 8 | Global logout (LOT 14) |
+| `src/lib/auth/launch-token.test.ts` | 10 | issuance, verify, anti-replay, downgrade v |
 
-Total **≈ 41 scénarios d'intégration** sur le protocole.
+Total **≈ 41 integration scenarios** on the protocol.
 
-## 8. Dépendances runtime
+## 8. Runtime dependencies
 
-- **Redis** : anti-replay nonce + rate-limit. Fallback in-memory si
-  `REDIS_URL` absent (dev). En prod : indispensable (sinon anti-replay
-  silencieusement désactivé avec `log.warn`).
-- **mempool.space + blockstream.info** : vérification TX/BLOCK/ADDRESS.
-  Fallback explicite. Timeout 5s.
-- **LND REST** (opt) : vérification CHANNEL en mode LND. Si absent,
-  seul le mode DECLARATIVE est utilisable.
+- **Redis**: nonce anti-replay + rate-limit. In-memory fallback if
+  `REDIS_URL` is absent (dev). In prod: essential (otherwise anti-replay
+  silently disabled with `log.warn`).
+- **mempool.space + blockstream.info**: TX/BLOCK/ADDRESS verification.
+  Explicit fallback. 5s timeout.
+- **LND REST** (opt): CHANNEL verification in LND mode. If absent,
+  only the DECLARATIVE mode is usable.
 
-## 9. Limites connues
+## 9. Known limitations
 
-- **Session token BitLab (2h)** : pas de revocation granulaire côté BitQuest.
-  La déconnexion globale fait rotation `User.token` (bloque les requêtes
-  ensuite) + clear cookies. Les JWT émis restent cryptographiquement
-  valides jusqu'à expiry mais ne matchent plus aucun user côté BitQuest.
-- **CHANNEL sur testnet** : pas d'index LN public, nécessite LND opt-in
-  ou mode DECLARATIVE.
-- **Silent SSO** : cookie `bq_session` est SameSite=Lax → envoyé sur
-  navigation top-level, pas sur fetch cross-origin. D'où le passage par
-  `?silent=1` qui navigue top-level.
+- **BitLab session token (2h)**: no granular revocation on the BitQuest side.
+  Global logout rotates `User.token` (blocks subsequent requests)
+  + clears cookies. Issued JWTs remain cryptographically
+  valid until expiry but no longer match any user on the BitQuest side.
+- **CHANNEL on testnet**: no public LN index, requires opt-in LND
+  or DECLARATIVE mode.
+- **Silent SSO**: `bq_session` cookie is SameSite=Lax → sent on
+  top-level navigation, not on cross-origin fetch. Hence the use of
+  `?silent=1` which navigates top-level.

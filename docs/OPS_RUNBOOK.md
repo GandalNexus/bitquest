@@ -1,53 +1,53 @@
 # OPS RUNBOOK — BitQuest prod
 
-> Exécutables ops : cron, rotation secrets, dashboards, alertes.
-> LOT 78. Complète `POSTGRES_PROD.md`, `SENTRY_OPS.md`,
+> Ops executables: cron, secrets rotation, dashboards, alerts.
+> BATCH 78. Complements `POSTGRES_PROD.md`, `SENTRY_OPS.md`,
 > `RELEASE-READINESS.md`.
 
 ## 1. Secrets rotation
 
-### 1a. Inventaire des secrets
+### 1a. Secrets inventory
 
-| Variable | Rôle | Longueur | Rotation recommandée |
+| Variable | Role | Length | Recommended rotation |
 |---|---|---|---|
-| `CSRF_SECRET` | HMAC CSRF double-submit | ≥ 32B | 90j |
-| `BITLAB_JWT_SECRET` | JWT challenge mission | ≥ 32B | 90j |
-| `BITLAB_LAUNCH_SECRET` | Launch token SSO | ≥ 32B | 90j |
-| `BITLAB_SIGN_SECRET` | HMAC deep-link | ≥ 32B | 90j |
-| `CERT_SIGN_SECRET` | HMAC Certificate v1 | ≥ 32B | 180j |
-| `CERT_SIGN_PRIVKEY_HEX` | Schnorr v2 (LOT 71) | 32B hex | **jamais** (signature permanente) |
-| `CRON_SECRET` | Header /api/cron/* | ≥ 16B | 365j |
-| `SENTRY_DSN` | Observabilité | — | jamais (fourni par Sentry) |
-| `DATABASE_URL` | Postgres | — | lors de reset DB |
-| `REDIS_URL` | Redis | — | lors de reset Redis |
-| `LND_MACAROON_HEX` | Macaroon LND | — | selon LND policy |
+| `CSRF_SECRET` | HMAC CSRF double-submit | ≥ 32B | 90d |
+| `BITLAB_JWT_SECRET` | JWT mission challenge | ≥ 32B | 90d |
+| `BITLAB_LAUNCH_SECRET` | SSO launch token | ≥ 32B | 90d |
+| `BITLAB_SIGN_SECRET` | HMAC deep-link | ≥ 32B | 90d |
+| `CERT_SIGN_SECRET` | HMAC Certificate v1 | ≥ 32B | 180d |
+| `CERT_SIGN_PRIVKEY_HEX` | Schnorr v2 (BATCH 71) | 32B hex | **never** (permanent signature) |
+| `CRON_SECRET` | Header /api/cron/* | ≥ 16B | 365d |
+| `SENTRY_DSN` | Observability | — | never (provided by Sentry) |
+| `DATABASE_URL` | Postgres | — | on DB reset |
+| `REDIS_URL` | Redis | — | on Redis reset |
+| `LND_MACAROON_HEX` | LND macaroon | — | per LND policy |
 
-### 1b. Procédure rotation JWT/HMAC (zero-downtime)
+### 1b. JWT/HMAC rotation procedure (zero-downtime)
 
-Les tokens émis signés avec l'ancien secret vont expirer avec leur
-TTL naturel. Les flows à TTL court (JWT challenge 10 min) sont
-transparents. Pour launch-token (60s) + CSRF (30j) :
+Tokens issued signed with the old secret will expire with their
+natural TTL. Short-TTL flows (JWT challenge 10 min) are transparent.
+For launch-token (60s) + CSRF (30d):
 
-1. **Préparation** (j-7) :
-   - Générer `NEW_SECRET=$(openssl rand -hex 32)`.
-   - Logger dans un gestionnaire ops (1Password / Vault).
-2. **Déploiement rolling** :
-   - Pour chaque serveur app : set env `OLD_<SECRET>=<ancien>` +
-     `<SECRET>=<nouveau>`. Le code accepte les 2 (TODO LOT futur :
-     dual-secret support ; aujourd'hui rotation = downtime 1 cycle TTL).
-3. **Purge** (j+1 cycle TTL) : retirer `OLD_<SECRET>`.
-4. **Audit** : vérifier dans Sentry qu'aucun warning
-   `Signature invalide` ne subsiste.
+1. **Preparation** (d-7):
+   - Generate `NEW_SECRET=$(openssl rand -hex 32)`.
+   - Log in an ops manager (1Password / Vault).
+2. **Rolling deployment**:
+   - For each app server: set env `OLD_<SECRET>=<old>` +
+     `<SECRET>=<new>`. The code accepts both (TODO future BATCH:
+     dual-secret support; today rotation = 1 TTL cycle downtime).
+3. **Purge** (d+1 TTL cycle): remove `OLD_<SECRET>`.
+4. **Audit**: verify in Sentry that no `Invalid signature` warning
+   remains.
 
-**Note sur Schnorr v2 (LOT 71)** : `CERT_SIGN_PRIVKEY_HEX` ne doit
-**JAMAIS** être roté — les certificats déjà émis restent vérifiables
-avec la pubkey publiée NIP-11. Un reset = tous les certifs v2 passés
-deviennent invalides. Si compromis : révoquer la pubkey côté NIP
-et émettre une nouvelle instance BitQuest.
+**Note on Schnorr v2 (BATCH 71)**: `CERT_SIGN_PRIVKEY_HEX` must
+**NEVER** be rotated — certificates already issued remain verifiable
+with the NIP-11 published pubkey. A reset = all past v2 certificates
+become invalid. If compromised: revoke the pubkey on the NIP side
+and issue a new BitQuest instance.
 
 ## 2. Cron ops
 
-### 2a. Cron purge MissionAttempt expirés (LOT 22)
+### 2a. Cron purge expired MissionAttempt (BATCH 22)
 
 ```cron
 # /etc/cron.d/bitquest-purge-attempts
@@ -58,11 +58,11 @@ et émettre une nouvelle instance BitQuest.
   >> /var/log/bitquest-purge.log 2>&1
 ```
 
-- Toutes les 10 min.
-- Fichier secret : `/etc/bitquest/cron-secret`, chmod 600, owned by www-data.
-- Logs rotés par logrotate (voir `/etc/logrotate.d/bitquest`).
+- Every 10 min.
+- Secret file: `/etc/bitquest/cron-secret`, chmod 600, owned by www-data.
+- Logs rotated by logrotate (see `/etc/logrotate.d/bitquest`).
 
-### 2b. Cron backup Postgres (scripts LOT P1.1)
+### 2b. Cron Postgres backup (BATCH P1.1 scripts)
 
 ```cron
 # /etc/cron.d/bitquest-backup
@@ -70,91 +70,91 @@ et émettre une nouvelle instance BitQuest.
   cd /srv/bitquest && RETENTION=30 ./scripts/backup-postgres.sh \
   >> /var/log/bitquest-backup.log 2>&1
 
-# Backup hebdomadaire off-site le dimanche à 4h
+# Weekly off-site backup on Sunday at 4am
 0 4 * * 0 www-data \
   cd /srv/bitquest && \
   rsync -az backups/ offsite-host:/backups/bitquest/ \
   >> /var/log/bitquest-backup.log 2>&1
 ```
 
-- Quotidien 3h UTC avec rétention 30 jours.
-- Hebdomadaire 4h UTC → off-site.
-- **Tester la restauration mensuellement** sur un env staging.
+- Daily 3am UTC with 30-day retention.
+- Weekly 4am UTC → off-site.
+- **Test restore monthly** on a staging env.
 
-### 2c. Cron vacuum Postgres
+### 2c. Cron Postgres vacuum
 
 ```cron
-# /etc/cron.d/bitquest-vacuum (dimanche 5h)
+# /etc/cron.d/bitquest-vacuum (Sunday 5am)
 0 5 * * 0 postgres psql -U bitquest -d bitquest -c "VACUUM ANALYZE;" \
   >> /var/log/bitquest-vacuum.log 2>&1
 ```
 
-## 3. Dashboards Sentry
+## 3. Sentry dashboards
 
-### 3a. Dashboard « Santé opérationnelle » (ADMIN)
+### 3a. "Operational health" dashboard (ADMIN)
 
-Metrics suggérés :
-- **Erreur rate** (min 5m) : alerte si > 10/min.
-- **BitLab proof success rate 24h** : alerte si < 70%.
-- **Lightning reward FAILED/PAID ratio** : alerte si > 1.
-- **Attestation CREATE_FAILED** : alerte sur 1 occurrence (anomalie).
-- **Cron purge-attempts volume** : alerte si > 100 attempts expirés
-  en un batch (anomalie, cf. LOT 31 PURGE_ANOMALY_THRESHOLD).
+Suggested metrics:
+- **Error rate** (min 5m): alert if > 10/min.
+- **BitLab proof success rate 24h**: alert if < 70%.
+- **Lightning reward FAILED/PAID ratio**: alert if > 1.
+- **Attestation CREATE_FAILED**: alert on 1 occurrence (anomaly).
+- **Cron purge-attempts volume**: alert if > 100 expired attempts
+  in one batch (anomaly, cf. BATCH 31 PURGE_ANOMALY_THRESHOLD).
 
-### 3b. Dashboard « Perf »
+### 3b. "Perf" dashboard
 
-- p50/p95 `/api/bitlab/proof` (verif TX mempool).
+- p50/p95 `/api/bitlab/proof` (mempool TX verify).
 - p50/p95 `/api/me/attestations/[id]/certificate` (crypto signing).
-- p50/p95 `/api/certificates/verify` (route publique).
+- p50/p95 `/api/certificates/verify` (public route).
 
-### 3c. Dashboard « Protocole »
+### 3c. "Protocol" dashboard
 
-- Volume de requêtes `/api/version` (pulse écosystème).
-- Taux v1 vs v2 dans `/api/certificates/verify` (adoption Schnorr).
-- Volume NIP-11 `/.well-known/nostr.json` (intégrations tierces).
+- Request volume on `/api/version` (ecosystem pulse).
+- v1 vs v2 ratio on `/api/certificates/verify` (Schnorr adoption).
+- NIP-11 `/.well-known/nostr.json` volume (third-party integrations).
 
-## 4. Runbook incidents
+## 4. Incident runbook
 
 ### 4a. Postgres down
 
-1. Alerte Sentry « DB ping failed » reçue.
-2. `docker compose ps bitquest-db` → statut.
-3. Si unhealthy : `docker compose restart bitquest-db`.
-4. Si données corrompues : restore du dernier backup (voir
+1. Sentry alert "DB ping failed" received.
+2. `docker compose ps bitquest-db` → status.
+3. If unhealthy: `docker compose restart bitquest-db`.
+4. If data corrupted: restore from last backup (see
    `POSTGRES_PROD.md §Restore`).
-5. Post-mortem : rotation macaroons/secrets si contexte compromis.
+5. Post-mortem: rotate macaroons/secrets if context compromised.
 
 ### 4b. LND Lightning down
 
-1. Alerte Sentry `lightning reward LND failure` (LOT 31).
-2. Vérifier `LND_REST_URL` accessible.
-3. Désactiver temporairement : `LND_SEND_REWARDS_LIVE=0` + toggle
-   flag `lightning.rewards` OFF via `/admin/feature-flags`.
-4. Investiguer les failed rewards en base (`/admin/lightning-rewards`).
+1. Sentry alert `lightning reward LND failure` (BATCH 31).
+2. Check `LND_REST_URL` reachable.
+3. Temporarily disable: `LND_SEND_REWARDS_LIVE=0` + toggle
+   `lightning.rewards` flag OFF via `/admin/feature-flags`.
+4. Investigate failed rewards in DB (`/admin/lightning-rewards`).
 
-### 4c. Attack / abus
+### 4c. Attack / abuse
 
-1. Rate-limit déjà en place côté app (userId + IP).
-2. Si abus nonce replay : vérifier Redis up.
-3. Si abus `/api/certificates/verify` : rate-limit IP 60/60s LOT 29.
-4. Pour tout blocage IP : cf. reverse proxy (nginx/caddy), pas au
-   niveau app.
+1. Rate-limit already in place on the app side (userId + IP).
+2. If nonce replay abuse: check Redis up.
+3. If `/api/certificates/verify` abuse: rate-limit IP 60/60s BATCH 29.
+4. For any IP blocking: see reverse proxy (nginx/caddy), not at the
+   app level.
 
-## 5. Health checks externes
+## 5. External health checks
 
-Pingdom/UptimeRobot recommandé sur :
-- `GET /api/health` (DB + Redis) : fréquence 1 min.
-- `GET /api/version` (meta static) : fréquence 5 min.
-- `GET /.well-known/nostr.json` (NIP-11) : fréquence 1h.
+Pingdom/UptimeRobot recommended on:
+- `GET /api/health` (DB + Redis): 1 min frequency.
+- `GET /api/version` (static meta): 5 min frequency.
+- `GET /.well-known/nostr.json` (NIP-11): 1h frequency.
 
-Seuils SLA v1 :
+v1 SLA thresholds:
 - 99.5% uptime api/health.
-- 1s p95 latence /api/health.
-- 24h max avant détection d'un signaling incident.
+- 1s p95 latency /api/health.
+- 24h max before detecting a signaling incident.
 
-## 6. Références
+## 6. References
 
-- `POSTGRES_PROD.md` : procédure backup/restore détaillée.
-- `SENTRY_OPS.md` : activation Sentry + RGPD.
-- `RELEASE-READINESS.md` : checklist jour-J prod.
-- `TECHNICAL-DEBT.md` : dette classée par priorité.
+- `POSTGRES_PROD.md`: detailed backup/restore procedure.
+- `SENTRY_OPS.md`: Sentry activation + GDPR.
+- `RELEASE-READINESS.md`: production go-day checklist.
+- `TECHNICAL-DEBT.md`: debt ranked by priority.

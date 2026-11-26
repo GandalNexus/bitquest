@@ -1,298 +1,298 @@
-# Audit BitQuest — 2026-11-09
+# BitQuest Audit — 2026-11-09
 
-> Rapport d'audit officiel, basé sur l'état réel du code au commit `95c1fdf` et sur la lecture intégrale du cahier des charges (`../cdc-bitquest.pdf`) et du manifeste (`../gandalnexus-manifesto.pdf`). Toutes les affirmations sont adossées à un chemin fichier:ligne.
-
----
-
-## 1. Résumé exécutif
-
-BitQuest est un projet Next.js 16 / React 19 / Prisma / SQLite **réellement fonctionnel** sur son chemin principal (inscription → parcours de quête → quiz → mission simulée → XP/sats/badges), mais **nettement en deçà du cahier des charges** sur plusieurs axes structurants :
-
-- **ORM & base annoncés dans la documentation ≠ ORM & base effectifs.** Le `README.md` et le `CHANGELOG.md` promettent Drizzle + PostgreSQL ; le code utilise Prisma 6.11 + **SQLite** (`prisma/schema.prisma:5-8`, `src/lib/db.ts:1-13`), et le fichier de base est stocké en clair sous `db/custom.db`.
-- **Aucune intégration réelle avec BitLab.** Les 8 missions "BitLab" sont **entièrement simulées côté serveur** (`src/lib/bitquest/missions.ts`, 568 lignes). Aucun appel HTTP, deep-link, postMessage, WebLN ou LDK. Le terme "BitLab" n'est présent qu'en texte d'interface.
-- **Aucun satoshi réel n'est en jeu.** Les sats sont un entier `User.sats` incrémenté en base (`prisma/schema.prisma:19`) ; pas de wallet, pas de BOLT11, pas de rate-limiting côté chaîne. Cohérent avec la nature pédagogique mais à clarifier dans le discours produit.
-- **Authentification "dev-only".** Sessions via `x-gn-user-id` + `x-gn-token` lus dans `localStorage` (pas de cookie `httpOnly`, pas de JWT, pas de CSRF). Hachage via `crypto.scryptSync` (acceptable) mais sans paramétrage adaptatif.
-- **Zéro test exécutable.** `vitest.config.ts` pointe sur `app/actions/**`, `db/**`, `middleware.ts` — chemins qui n'existent pas dans ce projet, lequel est entièrement sous `src/`. Aucun `*.test.ts` dans le dépôt.
-- **Zéro interface d'administration.** Pas de route `/admin`, pas de rôle, pas de CRUD pour les cours/quêtes/badges/quiz.
-- **i18n non activée.** `next-intl@4.3.4` est présent dans `package.json:66` mais n'est importé nulle part — tout le contenu est en français en dur.
-- **Dette "template".** Package nommé `nextjs_tailwind_shadcn_ts` (`package.json:2`), dépendance `z-ai-web-dev-sdk` jamais importée, 36 composants `shadcn/ui` orphelins, `next.config.ts:7` force `ignoreBuildErrors: true`.
-
-Malgré cela, le cœur métier (progression, moteur de missions, moteur de badges, calcul XP/niveau/streak) est **soigné, isolé dans `src/lib/bitquest/`, testable, et de bonne qualité**. La refonte doit **préserver cette base** et non repartir de zéro.
+> Official audit report, based on the actual state of the code at commit `95c1fdf` and on the full reading of the specifications (`../cdc-bitquest.pdf`) and the manifesto (`../gandalnexus-manifesto.pdf`). All statements are backed by a file:line path.
 
 ---
 
-## 2. Périmètre et méthode
+## 1. Executive summary
 
-- Lecture exhaustive : `README.md`, `CHANGELOG.md`, `AUTHORS.md`, `SECURITY.md`, `package.json`, `tsconfig.json`, `next.config.ts`, `middleware.ts`, `drizzle.config.ts`, `docker-compose.yml`, `.env.example`, `prisma/schema.prisma`, `vitest.config.ts`.
-- Exploration systématique de `src/app/`, `src/components/`, `src/lib/`, `prisma/`, `db/`, `public/`.
-- Vérification croisée via `grep -r "drizzle|next-auth|next-intl|webln|@scure|lightning"` (7 fichiers touchés, tous en référence textuelle, aucune intégration).
-- Lecture intégrale de la route critique `src/app/api/quests/[code]/progress/route.ts` (303 lignes).
-- Lecture intégrale des dépôts `../cdc-bitquest.pdf` (4 pages) et `../gandalnexus-manifesto.pdf` (2 pages).
-- **Hors périmètre** : BitLab (`../bitlab/`), analysé séparément dans `BITQUEST_INTEGRATION_BITLAB.md`.
+BitQuest is a Next.js 16 / React 19 / Prisma / SQLite project **actually functional** on its main path (signup → quest path → quiz → simulated mission → XP/sats/badges), but **clearly below the specifications** on several structural axes:
+
+- **ORM & DB announced in the documentation ≠ actual ORM & DB.** The `README.md` and `CHANGELOG.md` promise Drizzle + PostgreSQL; the code uses Prisma 6.11 + **SQLite** (`prisma/schema.prisma:5-8`, `src/lib/db.ts:1-13`), and the database file is stored in plaintext under `db/custom.db`.
+- **No real integration with BitLab.** The 8 "BitLab" missions are **entirely simulated on the server side** (`src/lib/bitquest/missions.ts`, 568 lines). No HTTP call, deep-link, postMessage, WebLN or LDK. The term "BitLab" is only present in interface text.
+- **No real satoshi is at stake.** Sats are an integer `User.sats` incremented in database (`prisma/schema.prisma:19`); no wallet, no BOLT11, no chain-side rate-limiting. Consistent with the educational nature but to be clarified in the product messaging.
+- **"dev-only" authentication.** Sessions via `x-gn-user-id` + `x-gn-token` read in `localStorage` (no `httpOnly` cookie, no JWT, no CSRF). Hashing via `crypto.scryptSync` (acceptable) but without adaptive parameterization.
+- **Zero executable tests.** `vitest.config.ts` points to `app/actions/**`, `db/**`, `middleware.ts` — paths that don't exist in this project, which is entirely under `src/`. No `*.test.ts` in the repository.
+- **Zero admin interface.** No `/admin` route, no role, no CRUD for courses/quests/badges/quiz.
+- **i18n not activated.** `next-intl@4.3.4` is present in `package.json:66` but is imported nowhere — all content is hardcoded in French.
+- **"Template" debt.** Package named `nextjs_tailwind_shadcn_ts` (`package.json:2`), `z-ai-web-dev-sdk` dependency never imported, 36 orphan `shadcn/ui` components, `next.config.ts:7` forces `ignoreBuildErrors: true`.
+
+Despite this, the business core (progression, mission engine, badge engine, XP/level/streak calculation) is **polished, isolated in `src/lib/bitquest/`, testable, and of good quality**. The refactor must **preserve this base** and not start from scratch.
 
 ---
 
-## 3. Stack réellement en place
+## 2. Scope and method
 
-| Couche | Annoncé (README/CdC) | Effectif |
+- Exhaustive reading: `README.md`, `CHANGELOG.md`, `AUTHORS.md`, `SECURITY.md`, `package.json`, `tsconfig.json`, `next.config.ts`, `middleware.ts`, `drizzle.config.ts`, `docker-compose.yml`, `.env.example`, `prisma/schema.prisma`, `vitest.config.ts`.
+- Systematic exploration of `src/app/`, `src/components/`, `src/lib/`, `prisma/`, `db/`, `public/`.
+- Cross-verification via `grep -r "drizzle|next-auth|next-intl|webln|@scure|lightning"` (7 files touched, all as textual references, no integration).
+- Full reading of the critical route `src/app/api/quests/[code]/progress/route.ts` (303 lines).
+- Full reading of the files `../cdc-bitquest.pdf` (4 pages) and `../gandalnexus-manifesto.pdf` (2 pages).
+- **Out of scope**: BitLab (`../bitlab/`), analyzed separately in `BITQUEST_INTEGRATION_BITLAB.md`.
+
+---
+
+## 3. Stack actually in place
+
+| Layer | Announced (README/specs) | Actual |
 |---|---|---|
 | Framework | Next.js 14+ (App Router) | **Next.js 16.1.1** (`package.json:64`) |
-| Langage | TypeScript strict | TS 5 strict (`tsconfig.json:7`), mais `noImplicitAny: false` (ligne 9) et `next.config.ts:7` : `ignoreBuildErrors: true` — **le typage n'est pas vraiment appliqué au build** |
-| UI | Tailwind + shadcn/ui | ✅ Tailwind 4, 48 primitives shadcn (dont **36 non utilisées**) |
-| State client | Zustand | ✅ Zustand 5 (`src/lib/bitquest/store.ts`) + TanStack Query 5 (`src/lib/bitquest/hooks.ts`) |
+| Language | Strict TypeScript | TS 5 strict (`tsconfig.json:7`), but `noImplicitAny: false` (line 9) and `next.config.ts:7`: `ignoreBuildErrors: true` — **typing is not really enforced at build** |
+| UI | Tailwind + shadcn/ui | ✅ Tailwind 4, 48 shadcn primitives (of which **36 unused**) |
+| Client state | Zustand | ✅ Zustand 5 (`src/lib/bitquest/store.ts`) + TanStack Query 5 (`src/lib/bitquest/hooks.ts`) |
 | ORM | Drizzle | ❌ **Prisma 6.11** (`src/lib/db.ts`, `prisma/schema.prisma`) |
-| Base | PostgreSQL serverless | ❌ **SQLite** (`prisma/schema.prisma:6`). Fichier local : `db/custom.db` |
-| Auth | NextAuth cité dans deps | ❌ Non utilisé. Auth maison `scrypt` + token localStorage |
-| i18n | next-intl | ❌ Dépendance installée, zéro import |
-| Tests | Vitest configuré | ⚠️ Config présente, **pointée sur des chemins inexistants**, zéro test |
-| Déploiement | `output: "standalone"` + Caddyfile | ✅ Configuré (`next.config.ts:4`) |
+| DB | Serverless PostgreSQL | ❌ **SQLite** (`prisma/schema.prisma:6`). Local file: `db/custom.db` |
+| Auth | NextAuth cited in deps | ❌ Not used. In-house auth `scrypt` + localStorage token |
+| i18n | next-intl | ❌ Dependency installed, zero imports |
+| Tests | Vitest configured | ⚠️ Config present, **pointed to nonexistent paths**, zero tests |
+| Deployment | `output: "standalone"` + Caddyfile | ✅ Configured (`next.config.ts:4`) |
 
-**Dépendances "lourdes" présentes dans `package.json` mais sans usage avéré :**
-- `next-auth@4.24.11` (ligne 65) — zéro import
-- `next-intl@4.3.4` (ligne 66) — zéro import
-- `@mdxeditor/editor@3.39.1` (ligne 24) — zéro import (éditeur jamais câblé)
-- `@dnd-kit/*` (lignes 20-22) — zéro import
-- `z-ai-web-dev-sdk@0.0.18` (ligne 83) — signature d'un template IA, **à retirer**
-- `react-markdown`, `react-syntax-highlighter`, `embla-carousel-react`, `recharts`, `input-otp`, `react-resizable-panels`, `vaul` — à vérifier au cas par cas lors du nettoyage.
+**"Heavy" dependencies present in `package.json` but without known usage:**
+- `next-auth@4.24.11` (line 65) — zero imports
+- `next-intl@4.3.4` (line 66) — zero imports
+- `@mdxeditor/editor@3.39.1` (line 24) — zero imports (editor never wired)
+- `@dnd-kit/*` (lines 20-22) — zero imports
+- `z-ai-web-dev-sdk@0.0.18` (line 83) — signature of an AI template, **to be removed**
+- `react-markdown`, `react-syntax-highlighter`, `embla-carousel-react`, `recharts`, `input-otp`, `react-resizable-panels`, `vaul` — to be checked case by case during cleanup.
 
 ---
 
-## 4. Modèle de données (Prisma / SQLite)
+## 4. Data model (Prisma / SQLite)
 
-8 modèles, tous persistés en SQLite. Chaque champ JSON est stocké en `String` (contrainte SQLite, pas de type `Json` natif).
+8 models, all persisted in SQLite. Each JSON field is stored as `String` (SQLite constraint, no native `Json` type).
 
-| Modèle | Rôle | Clé fonctionnelle | Remarques |
+| Model | Role | Functional key | Remarks |
 |---|---|---|---|
-| `User` | Compte apprenant | `pseudo` unique, `token` unique | `isGuest` / `isBot` co-habitent ; aucun `role` admin |
-| `Quest` | Définition d'une quête | `code` unique, `track`, `order` | `theorySections` et `missionConfig` sont du JSON stringifié |
-| `QuizQuestion` | Question d'un quiz | `questId`, `order` | **Champ `quest2: String?` orphelin** (`prisma/schema.prisma:62`) — reliquat de migration mort |
-| `UserQuestProgress` | État par utilisateur×quête | `@@unique([userId, questId])` | Stocke `missionSession` (challenge + attendu) et `missionProof` en JSON |
-| `Badge` | Catalogue de badges | `code`, `rarity`, `conditionType`, `conditionValue` | 7 types de conditions, évaluation serveur |
-| `UserBadge` | Attribution | `@@id([userId, badgeId])` | OK |
-| `WalletTransaction` | Historique sats | `type` (QUEST_REWARD / STREAK_BONUS / DAILY_CAP) | Mono-directionnel : aucune dépense |
-| `UserEvent` | Timeline utilisateur | `type` (5 valeurs), `payload` JSON | Alimente le dashboard |
+| `User` | Learner account | `pseudo` unique, `token` unique | `isGuest` / `isBot` coexist; no admin `role` |
+| `Quest` | Quest definition | `code` unique, `track`, `order` | `theorySections` and `missionConfig` are stringified JSON |
+| `QuizQuestion` | Quiz question | `questId`, `order` | **Orphan `quest2: String?` field** (`prisma/schema.prisma:62`) — dead migration remnant |
+| `UserQuestProgress` | State per user×quest | `@@unique([userId, questId])` | Stores `missionSession` (challenge + expected) and `missionProof` as JSON |
+| `Badge` | Badge catalog | `code`, `rarity`, `conditionType`, `conditionValue` | 7 condition types, server-side evaluation |
+| `UserBadge` | Assignment | `@@id([userId, badgeId])` | OK |
+| `WalletTransaction` | Sats history | `type` (QUEST_REWARD / STREAK_BONUS / DAILY_CAP) | One-directional: no spending |
+| `UserEvent` | User timeline | `type` (5 values), `payload` JSON | Feeds the dashboard |
 
-**Problèmes identifiés :**
-- **Pas de migrations versionnées.** Aucun dossier `prisma/migrations/`. Le script `db:push --accept-data-loss` est exécuté en dev ; en production ce flag est inacceptable.
-- **`db/custom.db` est committable.** Le `.gitignore` ignore bien `*.db`, mais le fichier existe localement et peut fuir si quelqu'un force un commit.
-- **Pas d'index de performance** au-delà des unicités. `UserQuestProgress.userId`, `WalletTransaction.userId`, `UserEvent.userId` seront lus très souvent — un index explicite accélérerait et préparerait la migration Postgres.
-- **Types JSON stringifiés.** Acceptable pour SQLite ; à convertir en `Json` natif lors de la migration Postgres.
-
----
-
-## 5. Authentification et sessions
-
-**Fichier central** : `src/app/api/auth/route.ts` (113 lignes).
-
-- Inscription (`action: "register"`) : validation `pseudo` 3–20 chars, email regex simple `^\S+@\S+\.\S+$`, mot de passe 6+ chars (**trop faible**). Hachage via `crypto.scryptSync` + salt 16 octets. Token = 32 octets aléatoires.
-- Connexion (`action: "login"`) : vérification `crypto.timingSafeEqual` (bien).
-- Invité (`action: "guest"`) : rate-limité en mémoire à 10/min/IP via `src/lib/bitquest/session.ts`.
-- **Transport session** : client stocke `{ userId, token }` dans `localStorage` (clé `bitquest_session`), le `fetch` ajoute ensuite deux headers custom `x-gn-user-id` et `x-gn-token` (`src/lib/bitquest/client.ts`).
-- **Middleware** (`middleware.ts:15`) : lit un cookie `user_session` qui **n'est jamais défini par le code** côté serveur. **La protection de route est donc inopérante** — n'importe qui peut taper `/dashboard` sans cookie et le middleware laissera passer... sauf qu'il redirige quand le cookie manque. **Contradiction** : la session est en `localStorage`, pas en cookie, donc l'utilisateur authentifié est quand même redirigé vers `/login`. À vérifier : il n'y a en pratique **qu'une seule page SPA** (`src/app/page.tsx`), donc l'incohérence est masquée mais **le middleware est à réécrire**.
-- **Rôles** : aucun (`User` n'a pas de champ `role`).
-- **CSRF** : non présent — acceptable tant que la session est hors cookie (donc non ciblable par CSRF classique), mais à revoir si l'on bascule vers un cookie `httpOnly`.
-- **Rate limiting** : implémenté en mémoire (`src/lib/bitquest/session.ts:19`) — **réinitialisé à chaque redémarrage, inefficace en multi-instance**.
+**Identified problems:**
+- **No versioned migrations.** No `prisma/migrations/` folder. The `db:push --accept-data-loss` script is run in dev; in production this flag is unacceptable.
+- **`db/custom.db` is committable.** The `.gitignore` does ignore `*.db`, but the file exists locally and may leak if someone force-commits.
+- **No performance indexes** beyond uniqueness. `UserQuestProgress.userId`, `WalletTransaction.userId`, `UserEvent.userId` will be read very often — an explicit index would speed things up and prepare for the Postgres migration.
+- **Stringified JSON types.** Acceptable for SQLite; to be converted to native `Json` during the Postgres migration.
 
 ---
 
-## 6. Module pédagogique (quêtes)
+## 5. Authentication and sessions
 
-- **11 quêtes de seed** complètement rédigées en français (`src/lib/seed-data.ts`, 800+ lignes) : 3 INITIATION, 2 INTERMEDIATE, le reste réparti sur ADVANCED et SPECIAL.
-- Structure d'une quête : `intro` + `theorySections` (JSON array de 3 sections `{title, body, keypoints}`) + 4 `QuizQuestion` + `missionType` + `missionConfig`.
-- **Pas de contenu multimédia stocké** (images, vidéos, schémas). Le CdC exige des illustrations ; actuellement seul du texte.
-- **Déverrouillage** : `src/lib/bitquest/quests.ts` applique une double règle (niveau requis + quête précédente complétée sur la même piste). Fonctionnel.
-- **Progression persistée** : oui, via `UserQuestProgress` (statuts AVAILABLE / IN_PROGRESS / THEORY_DONE / QUIZ_PASSED / COMPLETED).
-- **Prérequis pédagogiques transversaux** (ex. "complète la piste INITIATION avant toute quête SPECIAL") : non modélisés.
-- **Éditeur de contenu** : absent. `@mdxeditor/editor` est installé mais non câblé. Le contenu se modifie uniquement en éditant le seed TypeScript.
+**Central file**: `src/app/api/auth/route.ts` (113 lines).
 
----
-
-## 7. Quiz et évaluations
-
-- Types supportés : `MCQ` (choix unique parmi N) et `TRUE_FALSE`. **Pas de question à réponses multiples**, **pas de question ouverte**, **pas de validation conditionnelle "logique Bitcoin"** comme le mentionne le CdC §2.4.
-- Correction : **100 % côté serveur** (`src/app/api/quests/[code]/progress/route.ts:109-125`). Le client reçoit le score et les explications par question.
-- Seuil de passage : 70 % (`src/lib/bitquest/progression.ts` via `QUIZ_PASS_THRESHOLD`).
-- Historique : `quizAttempts`, `quizBestScore`, `perfectQuiz` stockés dans `UserQuestProgress`.
-- **Pas de banque de questions / randomisation** — les 4 questions sont fixes par quête.
+- Signup (`action: "register"`): `pseudo` 3–20 chars validation, simple email regex `^\S+@\S+\.\S+$`, 6+ chars password (**too weak**). Hashing via `crypto.scryptSync` + 16-byte salt. Token = 32 random bytes.
+- Login (`action: "login"`): `crypto.timingSafeEqual` verification (good).
+- Guest (`action: "guest"`): rate-limited in memory to 10/min/IP via `src/lib/bitquest/session.ts`.
+- **Session transport**: client stores `{ userId, token }` in `localStorage` (key `bitquest_session`), then `fetch` adds two custom headers `x-gn-user-id` and `x-gn-token` (`src/lib/bitquest/client.ts`).
+- **Middleware** (`middleware.ts:15`): reads a `user_session` cookie that is **never defined by the code** server-side. **Route protection is therefore inoperative** — anyone can type `/dashboard` without a cookie and the middleware will let them through... except it redirects when the cookie is missing. **Contradiction**: the session is in `localStorage`, not in a cookie, so the authenticated user is redirected to `/login` anyway. To check: there is in practice **only one SPA page** (`src/app/page.tsx`), so the inconsistency is hidden but **the middleware is to be rewritten**.
+- **Roles**: none (`User` has no `role` field).
+- **CSRF**: not present — acceptable as long as the session is outside a cookie (so not targetable by classic CSRF), but to be revisited if we switch to an `httpOnly` cookie.
+- **Rate limiting**: implemented in memory (`src/lib/bitquest/session.ts:19`) — **reset on each restart, ineffective in multi-instance**.
 
 ---
 
-## 8. Missions "BitLab" (en fait simulation serveur)
+## 6. Pedagogical module (quests)
 
-- **Fichier** : `src/lib/bitquest/missions.ts` (568 lignes), 2 fonctions principales : `generateMission(type, config)` et `validateMission(type, session, answer)`.
-- **8 types** : `block_explorer`, `key_forge`, `tx_builder`, `mine_nonce`, `ln_channel`, `ln_invoice`, `multisig_sign`, `taproot_tweak`. Chaque type a son UI dédiée dans `src/components/bitquest/mission-panel.tsx`.
-- **Modèle "challenge + expected"** : le serveur génère un challenge, stocke l'attendu dans `UserQuestProgress.missionSession` et compare la réponse du client. **La preuve est forgée côté serveur** et stockée dans `missionProof`.
-- **Rien de tout cela ne touche une vraie blockchain, un vrai nœud Lightning, un vrai LDK.** Les BOLT11 affichés sont des strings synthétiques. C'est un simulateur pédagogique bien conçu, mais **à ne surtout pas présenter comme une intégration BitLab**.
-- **Rate limiting mission** : 100 req/min par user via `rateLimit("progress:...")` + `MISSION_MAX_ATTEMPTS` par quête.
+- **11 seed quests** entirely written in French (`src/lib/seed-data.ts`, 800+ lines): 3 INITIATION, 2 INTERMEDIATE, the rest spread over ADVANCED and SPECIAL.
+- Quest structure: `intro` + `theorySections` (JSON array of 3 sections `{title, body, keypoints}`) + 4 `QuizQuestion` + `missionType` + `missionConfig`.
+- **No multimedia content stored** (images, videos, diagrams). The specs require illustrations; currently only text.
+- **Unlocking**: `src/lib/bitquest/quests.ts` applies a double rule (required level + previous quest completed on the same track). Functional.
+- **Persisted progression**: yes, via `UserQuestProgress` (statuses AVAILABLE / IN_PROGRESS / THEORY_DONE / QUIZ_PASSED / COMPLETED).
+- **Transversal pedagogical prerequisites** (e.g. "complete the INITIATION track before any SPECIAL quest"): not modeled.
+- **Content editor**: absent. `@mdxeditor/editor` is installed but not wired. Content is modified solely by editing the TypeScript seed.
+
+---
+
+## 7. Quiz and evaluations
+
+- Supported types: `MCQ` (single choice among N) and `TRUE_FALSE`. **No multiple-answer question**, **no open-ended question**, **no conditional "Bitcoin logic" validation** as mentioned in specs §2.4.
+- Grading: **100% server-side** (`src/app/api/quests/[code]/progress/route.ts:109-125`). The client receives the score and the explanations per question.
+- Passing threshold: 70% (`src/lib/bitquest/progression.ts` via `QUIZ_PASS_THRESHOLD`).
+- History: `quizAttempts`, `quizBestScore`, `perfectQuiz` stored in `UserQuestProgress`.
+- **No question bank / randomization** — the 4 questions are fixed per quest.
+
+---
+
+## 8. "BitLab" missions (actually server simulation)
+
+- **File**: `src/lib/bitquest/missions.ts` (568 lines), 2 main functions: `generateMission(type, config)` and `validateMission(type, session, answer)`.
+- **8 types**: `block_explorer`, `key_forge`, `tx_builder`, `mine_nonce`, `ln_channel`, `ln_invoice`, `multisig_sign`, `taproot_tweak`. Each type has its dedicated UI in `src/components/bitquest/mission-panel.tsx`.
+- **"Challenge + expected" model**: the server generates a challenge, stores the expected in `UserQuestProgress.missionSession` and compares the client's response. **The proof is forged server-side** and stored in `missionProof`.
+- **None of this touches a real blockchain, a real Lightning node, a real LDK.** The BOLT11s displayed are synthetic strings. It's a well-designed pedagogical simulator, but **absolutely not to be presented as a BitLab integration**.
+- **Mission rate limiting**: 100 req/min per user via `rateLimit("progress:...")` + `MISSION_MAX_ATTEMPTS` per quest.
 
 ---
 
 ## 9. Gamification
 
-**Moteur central** : `src/lib/bitquest/progression.ts` (239 lignes).
+**Central engine**: `src/lib/bitquest/progression.ts` (239 lines).
 
-- **XP** : 4 sources (THEORY_SECTION = 5, QUIZ_PASS = 30, MISSION_SUCCESS = 50, QUEST_BONUS = 20).
-- **Niveaux** : 10 paliers `[0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200]`. Titres fixes "Novice de la Genèse" → "Maître Satoshi".
-- **Streak** : `User.streak` + `User.lastActiveDate`. Logique : +1 si activité hier, reset à 1 sinon.
-- **Sats** : plafond journalier `SATS_DAILY_CAP = 10000`, bonus streak de 0 à 50 % (10 % par jour). `awardSats()` insère 1 ou 2 `WalletTransaction`.
-- **Badges** : 15 en seed, évaluation automatique par `evaluateBadges(userId)` après chaque action impactante. 7 conditions : `QUEST_COMPLETE`, `QUEST_COUNT`, `TRACK_COMPLETE`, `STREAK`, `LEVEL`, `SATS_TOTAL`, `PERFECT_QUIZ`.
-- **Classements** : route `GET /api/leaderboard` — top 20 par XP (`src/app/api/leaderboard/route.ts`).
-- **Défis quotidiens/hebdomadaires** : **non implémentés** — le CdC les mentionne, le code ne les modélise pas.
-- **Historique des récompenses** : oui (`WalletTransaction` + `UserEvent`).
+- **XP**: 4 sources (THEORY_SECTION = 5, QUIZ_PASS = 30, MISSION_SUCCESS = 50, QUEST_BONUS = 20).
+- **Levels**: 10 tiers `[0, 100, 250, 450, 700, 1000, 1400, 1900, 2500, 3200]`. Fixed titles "Novice de la Genèse" → "Maître Satoshi".
+- **Streak**: `User.streak` + `User.lastActiveDate`. Logic: +1 if activity yesterday, reset to 1 otherwise.
+- **Sats**: daily cap `SATS_DAILY_CAP = 10000`, streak bonus from 0 to 50% (10% per day). `awardSats()` inserts 1 or 2 `WalletTransaction`.
+- **Badges**: 15 in seed, automatic evaluation by `evaluateBadges(userId)` after each impactful action. 7 conditions: `QUEST_COMPLETE`, `QUEST_COUNT`, `TRACK_COMPLETE`, `STREAK`, `LEVEL`, `SATS_TOTAL`, `PERFECT_QUIZ`.
+- **Leaderboards**: route `GET /api/leaderboard` — top 20 by XP (`src/app/api/leaderboard/route.ts`).
+- **Daily/weekly challenges**: **not implemented** — the specs mention them, the code does not model them.
+- **Reward history**: yes (`WalletTransaction` + `UserEvent`).
 
 ---
 
-## 10. Récompenses Bitcoin / Lightning
+## 10. Bitcoin / Lightning rewards
 
-- **Lightning réel : zéro.** Aucune lib installée (pas de `@scure/*`, pas de `lightning`, pas de `webln`, pas de `ldk`).
-- **WebLN : zéro.** Aucun `window.webln`.
-- **Rate limiting côté chaîne : non applicable** (il n'y a pas de chaîne).
-- **Protection contre les doubles récompenses** : oui au niveau applicatif — `progress.ts:236` vérifie `if (!p.missionProof)` avant d'attribuer l'XP mission, et `wasCompleted` empêche la double attribution du bonus de complétion et des sats.
-- **Architecture sécurisée pour sats réels** : **à concevoir intégralement.** Aucune brique n'existe.
+- **Real Lightning: zero.** No lib installed (no `@scure/*`, no `lightning`, no `webln`, no `ldk`).
+- **WebLN: zero.** No `window.webln`.
+- **Chain-side rate limiting: not applicable** (there is no chain).
+- **Protection against double rewards**: yes at the application level — `progress.ts:236` checks `if (!p.missionProof)` before assigning the mission XP, and `wasCompleted` prevents double assignment of the completion bonus and sats.
+- **Secure architecture for real sats**: **to be designed entirely.** No brick exists.
 
 ---
 
 ## 11. Administration
 
-- **Aucune route `/admin`.**
-- **Aucun rôle utilisateur.**
-- **Aucun CRUD UI** pour quêtes, badges, cours, users, événements.
-- **Aucune journalisation d'opérations admin.**
-- La gestion du contenu se fait exclusivement en éditant `src/lib/seed-data.ts` puis en rejouant `prisma/seed.ts`. **Impossible pour un éditeur non-dev de contribuer.**
+- **No `/admin` route.**
+- **No user role.**
+- **No CRUD UI** for quests, badges, courses, users, events.
+- **No logging of admin operations.**
+- Content management is done exclusively by editing `src/lib/seed-data.ts` then replaying `prisma/seed.ts`. **Impossible for a non-dev editor to contribute.**
 
 ---
 
-## 12. Interface utilisateur
+## 12. User interface
 
-**Architecture UI** : SPA monopage dans `src/app/page.tsx` (81 lignes) qui dispatche vers 5 vues via le store Zustand.
+**UI architecture**: single-page SPA in `src/app/page.tsx` (81 lines) which dispatches to 5 views via the Zustand store.
 
-Composants métier dans `src/components/bitquest/` :
+Business components in `src/components/bitquest/`:
 - `app-shell.tsx` (navbar + sidebar)
-- `dashboard.tsx` (anneau niveau SVG, stats, 3 quêtes suggérées, timeline)
-- `quest-map.tsx` (grille par piste)
-- `quest-player.tsx` (lecteur 4 étapes théorie → quiz → mission → récap)
-- `mission-panel.tsx` (8 UIs selon `missionType`)
+- `dashboard.tsx` (SVG level ring, stats, 3 suggested quests, timeline)
+- `quest-map.tsx` (grid by track)
+- `quest-player.tsx` (4-step reader theory → quiz → mission → recap)
+- `mission-panel.tsx` (8 UIs according to `missionType`)
 - `leaderboard.tsx`, `wallet-view.tsx`, `profile-view.tsx`, `auth-screen.tsx`, `ui-bits.tsx`.
 
-**Points forts** : dark mode via `next-themes`, polices soignées (Orbitron / Exo 2 / Geist Mono), Framer Motion utilisé pour transitions et célébrations.
+**Strengths**: dark mode via `next-themes`, polished fonts (Orbitron / Exo 2 / Geist Mono), Framer Motion used for transitions and celebrations.
 
-**Points faibles** :
-- Tout le routage se fait en client (`store.view`) → pas d'URL partageable, pas de SEO, pas de deep-link vers une quête.
-- Pas de mode "mobile-first" documenté — `hooks/use-mobile.ts` est utilisé mais plusieurs écrans restent denses.
-- Pas d'accessibilité vérifiée (pas de tests a11y, pas d'attributs ARIA systématiques).
-- Pas d'écrans d'erreur / 404 / offline.
+**Weaknesses**:
+- All routing is done client-side (`store.view`) → no shareable URL, no SEO, no deep-link to a quest.
+- No "mobile-first" mode documented — `hooks/use-mobile.ts` is used but several screens remain dense.
+- No verified accessibility (no a11y tests, no systematic ARIA attributes).
+- No error / 404 / offline screens.
 
 ---
 
-## 13. Internationalisation
+## 13. Internationalization
 
-- `next-intl@4.3.4` installé, **jamais importé**.
-- Pas de dossier `messages/`, pas de configuration `next.config` dédiée.
-- Tout le texte utilisateur est en français en dur.
-- Le CdC prévoit FR + EN + Wolof. **À bâtir intégralement.**
+- `next-intl@4.3.4` installed, **never imported**.
+- No `messages/` folder, no dedicated `next.config` configuration.
+- All user text is hardcoded in French.
+- The specs plan FR + EN + Wolof. **To be built entirely.**
 
 ---
 
 ## 14. Tests
 
-- `vitest.config.ts` : coverage pointée sur `app/actions/**`, `db/**`, `middleware.ts` — **le projet n'a aucun dossier `app/actions`** (tout est sous `src/app/`), le dossier `db/` ne contient que `custom.db`, et le `middleware.ts` est à la racine. **Configuration obsolète, probablement copiée d'un template.**
-- `__tests__/setup.ts` référencé comme `setupFiles` : **le dossier `__tests__` n'existe pas**.
-- Aucun fichier `*.test.ts`, `*.spec.ts`, `*.test.tsx`, `*.spec.tsx` dans le dépôt.
-- Les commits récents (`3aadd0a test: add comprehensive stress test suite for auth and quests`) suggèrent qu'une suite de tests a existé puis a été **supprimée par le commit `a2d7ad9 refactor: add new codebase`**. À confirmer par `git log --diff-filter=D`.
+- `vitest.config.ts`: coverage pointed to `app/actions/**`, `db/**`, `middleware.ts` — **the project has no `app/actions` folder** (everything is under `src/app/`), the `db/` folder contains only `custom.db`, and `middleware.ts` is at the root. **Obsolete configuration, probably copied from a template.**
+- `__tests__/setup.ts` referenced as `setupFiles`: **the `__tests__` folder does not exist**.
+- No `*.test.ts`, `*.spec.ts`, `*.test.tsx`, `*.spec.tsx` file in the repository.
+- Recent commits (`3aadd0a test: add comprehensive stress test suite for auth and quests`) suggest a test suite existed then was **deleted by the commit `a2d7ad9 refactor: add new codebase`**. To be confirmed by `git log --diff-filter=D`.
 
 ---
 
-## 15. Sécurité
+## 15. Security
 
-| Thème | État | Verdict |
+| Theme | State | Verdict |
 |---|---|---|
-| Hachage mdp | `scryptSync` + salt 16o | ✅ Correct |
-| Comparaison | `timingSafeEqual` | ✅ Correct |
-| Transport session | `localStorage` + headers custom | ⚠️ Pas de `httpOnly`, vulnérable au XSS |
-| CSRF | Absent | ⚠️ Non requis tant que pas de cookie, à prévoir sinon |
-| Validation d'entrée | Manuelle, pas de Zod | ⚠️ Zod installé mais non utilisé |
-| Rate limiting | En RAM | ⚠️ Non viable en production |
-| Secrets | `.env.example` sans secret | ✅ Pas de leak |
-| Permissions API | Authentification seule, pas d'autorisation granulaire | ⚠️ Pas de rôle |
-| Injection SQL | Prisma paramétré | ✅ Sûr |
-| Protection XSS | React (échappement auto) | ✅ Par défaut |
-| `JSON.parse` sur champs stockés | Non sanitizé | ⚠️ Risque faible (données contrôlées par seed) |
-| Secrets Bitcoin côté serveur | Aucune clé | ✅ Conforme au CdC §4 |
+| Password hash | `scryptSync` + 16b salt | ✅ Correct |
+| Comparison | `timingSafeEqual` | ✅ Correct |
+| Session transport | `localStorage` + custom headers | ⚠️ No `httpOnly`, vulnerable to XSS |
+| CSRF | Absent | ⚠️ Not required as long as no cookie, to plan otherwise |
+| Input validation | Manual, no Zod | ⚠️ Zod installed but not used |
+| Rate limiting | In RAM | ⚠️ Not viable in production |
+| Secrets | `.env.example` without secret | ✅ No leak |
+| API permissions | Authentication only, no granular authorization | ⚠️ No role |
+| SQL injection | Parameterized Prisma | ✅ Safe |
+| XSS protection | React (auto-escaping) | ✅ By default |
+| `JSON.parse` on stored fields | Not sanitized | ⚠️ Low risk (data controlled by seed) |
+| Bitcoin secrets on server side | No key | ✅ Compliant with specs §4 |
 
 ---
 
-## 16. Déploiement et DevOps
+## 16. Deployment and DevOps
 
-- `next.config.ts` : `output: "standalone"` ✅ + `ignoreBuildErrors: true` ❌.
-- `Caddyfile` présent (reverse proxy) — à auditer séparément.
-- `docker-compose.yml` déclare Postgres 16 — **incohérent** avec le `prisma/schema.prisma` qui utilise SQLite.
-- `.github/` existe — workflows à inventorier.
-- `oxlint` + `eslint` + `prettier` + `prettier-plugin` configurés. Qualité statique OK.
-- Pas de CI visible qui lint/type-check/test.
-
----
-
-## 17. Ce qui est **réellement** fonctionnel, à préserver
-
-1. **Moteur de progression** (`src/lib/bitquest/progression.ts`) — XP, niveau, streak, sats, badges.
-2. **Moteur de missions simulées** (`src/lib/bitquest/missions.ts`) — 8 types, génération & validation côté serveur.
-3. **Route progression** (`src/app/api/quests/[code]/progress/route.ts`) — gestion complète des 5 actions, idempotence sur les récompenses.
-4. **Seed pédagogique** (`src/lib/seed-data.ts`) — 11 quêtes bien écrites en français.
-5. **Dashboard + anneau niveau** — UX travaillée.
-6. **Zustand + TanStack Query** — stack client saine.
-7. **Dark mode + polices** — identité visuelle cohérente.
-
-## 18. Ce qui est **absent** ou **défectueux**, par ordre d'urgence
-
-### Critique (bloque la cible "plateforme de référence")
-- Admin complet (CRUD quêtes, cours, chapitres, quiz, badges, users, événements).
-- Rôles utilisateurs (admin / éditeur / apprenant).
-- Modèle Course / Chapter / Lesson (le CdC implique une structure hiérarchique au-dessus de la Quête, actuellement absente).
-- Intégration BitLab réelle (voir `BITQUEST_INTEGRATION_BITLAB.md`).
-- Tests (unitaires au moins sur `progression.ts` et `missions.ts`, E2E sur le parcours de quête).
-- i18n FR/EN (puis WO).
-
-### Fort
-- Migration vers PostgreSQL et migrations Prisma versionnées.
-- Session cookie `httpOnly` + CSRF.
-- Rate limiting persistant (Redis / DB).
-- Éditeur de contenu (MDX déjà installé).
-- Illustrations / contenu multimédia dans les quêtes.
-- Défis quotidiens / hebdomadaires.
-- Pages dédiées par vue (URL partageables, SEO, deep-link).
-
-### Moyen
-- Nettoyage des dépendances inutilisées (`next-auth`, `@mdxeditor` si abandonné, `@dnd-kit`, `z-ai-web-dev-sdk`, composants shadcn orphelins).
-- Correction de `middleware.ts` (ou suppression si on reste SPA).
-- `next.config.ts` : désactiver `ignoreBuildErrors`.
-- Index Prisma manquants.
-- Renommage `package.json` (actuellement `nextjs_tailwind_shadcn_ts`) → `bitquest`.
-- Nettoyage du champ orphelin `QuizQuestion.quest2`.
-
-### Faible
-- Suppression de `db/custom.db` du tracking (ou vérification `.gitignore`).
-- Documenter le `Caddyfile`.
-- Ajout d'une page `/about`, `/privacy`, `/terms`.
+- `next.config.ts`: `output: "standalone"` ✅ + `ignoreBuildErrors: true` ❌.
+- `Caddyfile` present (reverse proxy) — to be audited separately.
+- `docker-compose.yml` declares Postgres 16 — **inconsistent** with `prisma/schema.prisma` which uses SQLite.
+- `.github/` exists — workflows to be inventoried.
+- `oxlint` + `eslint` + `prettier` + `prettier-plugin` configured. Static quality OK.
+- No visible CI that lints/type-checks/tests.
 
 ---
 
-## 19. Risques majeurs identifiés
+## 17. What is **actually** functional, to preserve
 
-1. **Discours produit vs réalité technique.** Le README promet une pile (Drizzle / Postgres) qui n'est pas celle du code ; le CdC promet une intégration BitLab qui n'existe pas. Risque de perte de confiance si un contributeur externe audite le projet.
-2. **Suppression silencieuse des tests.** Le commit `a2d7ad9 refactor: add new codebase` paraît avoir remplacé la codebase d'un coup — potentiellement destructif. À auditer (`git show --stat a2d7ad9`).
-3. **Dépendance `z-ai-web-dev-sdk`.** Signature d'un code généré par un service tiers ; vérifier les fichiers associés et retirer.
-4. **`ignoreBuildErrors: true`.** Masque toutes les erreurs TS au build. Un refactor en production peut casser silencieusement.
-5. **Gestion contenu par seed.** Impossible de collaborer avec un rédacteur non-dev tant qu'il n'y a pas d'admin.
+1. **Progression engine** (`src/lib/bitquest/progression.ts`) — XP, level, streak, sats, badges.
+2. **Simulated mission engine** (`src/lib/bitquest/missions.ts`) — 8 types, server-side generation & validation.
+3. **Progression route** (`src/app/api/quests/[code]/progress/route.ts`) — full management of the 5 actions, idempotence on rewards.
+4. **Pedagogical seed** (`src/lib/seed-data.ts`) — 11 well-written quests in French.
+5. **Dashboard + level ring** — polished UX.
+6. **Zustand + TanStack Query** — healthy client stack.
+7. **Dark mode + fonts** — consistent visual identity.
+
+## 18. What is **missing** or **defective**, in order of urgency
+
+### Critical (blocks the "reference platform" target)
+- Full admin (CRUD quests, courses, chapters, quiz, badges, users, events).
+- User roles (admin / editor / learner).
+- Course / Chapter / Lesson model (the specs imply a hierarchical structure above the Quest, currently absent).
+- Real BitLab integration (see `BITQUEST_INTEGRATION_BITLAB.md`).
+- Tests (at least unit on `progression.ts` and `missions.ts`, E2E on the quest path).
+- i18n FR/EN (then WO).
+
+### Strong
+- Migration to PostgreSQL and versioned Prisma migrations.
+- `httpOnly` cookie session + CSRF.
+- Persistent rate limiting (Redis / DB).
+- Content editor (MDX already installed).
+- Illustrations / multimedia content in the quests.
+- Daily / weekly challenges.
+- Dedicated pages per view (shareable URLs, SEO, deep-link).
+
+### Medium
+- Cleanup of unused dependencies (`next-auth`, `@mdxeditor` if abandoned, `@dnd-kit`, `z-ai-web-dev-sdk`, orphan shadcn components).
+- Fix `middleware.ts` (or remove it if we stay SPA).
+- `next.config.ts`: disable `ignoreBuildErrors`.
+- Missing Prisma indexes.
+- Rename `package.json` (currently `nextjs_tailwind_shadcn_ts`) → `bitquest`.
+- Cleanup of the orphan `QuizQuestion.quest2` field.
+
+### Low
+- Remove `db/custom.db` from tracking (or check `.gitignore`).
+- Document the `Caddyfile`.
+- Add `/about`, `/privacy`, `/terms` pages.
 
 ---
 
-## 20. Conclusion de l'audit
+## 19. Major identified risks
 
-BitQuest n'est **ni un simple quiz**, **ni la plateforme décrite dans le cahier des charges** — c'est un **MVP pédagogique sérieux avec un moteur métier solide**, mais dont la couche "produit" (admin, contenu dynamique, i18n, tests, BitLab) et la couche "ops" (Postgres, migrations, sécurité session) ne sont pas encore construites.
-
-La bonne nouvelle : le **cœur métier (`src/lib/bitquest/`) et le seed sont de qualité suffisante pour être conservés** et servir de fondation à la refonte. La mauvaise : il reste **au moins 60 à 80 jours-homme** de travail pour atteindre les objectifs du CdC (voir `BITQUEST_ROADMAP.md`).
+1. **Product messaging vs. technical reality.** The README promises a stack (Drizzle / Postgres) that is not that of the code; the specs promise a BitLab integration that does not exist. Risk of loss of trust if an external contributor audits the project.
+2. **Silent deletion of tests.** The commit `a2d7ad9 refactor: add new codebase` appears to have replaced the codebase all at once — potentially destructive. To audit (`git show --stat a2d7ad9`).
+3. **`z-ai-web-dev-sdk` dependency.** Signature of code generated by a third-party service; check the associated files and remove.
+4. **`ignoreBuildErrors: true`.** Masks all TS errors at build. A refactor in production may break silently.
+5. **Content management via seed.** Impossible to collaborate with a non-dev editor until there is an admin.
 
 ---
 
-**Rédigé le** : 2026-11-09
-**Prochain livrable** : `BITQUEST_ARCHITECTURE.md`
+## 20. Audit conclusion
+
+BitQuest is **neither a simple quiz**, **nor the platform described in the specifications** — it's a **serious pedagogical MVP with a solid business engine**, but whose "product" layer (admin, dynamic content, i18n, tests, BitLab) and "ops" layer (Postgres, migrations, session security) are not yet built.
+
+The good news: the **business core (`src/lib/bitquest/`) and the seed are of sufficient quality to be preserved** and serve as a foundation for the refactor. The bad: there remain **at least 60 to 80 person-days** of work to achieve the objectives of the specs (see `BITQUEST_ROADMAP.md`).
+
+---
+
+**Written on**: 2026-11-09
+**Next deliverable**: `BITQUEST_ARCHITECTURE.md`

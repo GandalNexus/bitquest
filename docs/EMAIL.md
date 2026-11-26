@@ -1,109 +1,107 @@
-# Envoi d'emails (mailer BitQuest)
+# Email sending (BitQuest mailer)
 
-Phase 1 (auth) a posé le modèle `verificationToken` + l'endpoint
-`POST /api/auth/verification/send` ; cette couche complète la boucle en
-câblant un vrai envoi d'email via un provider externe.
+Phase 1 (auth) laid down the `verificationToken` model + the
+`POST /api/auth/verification/send` endpoint; this layer closes the
+loop by wiring up real email sending through an external provider.
 
-## Providers supportés
+## Supported providers
 
-| `MAIL_PROVIDER` | Comportement | Recommandation |
+| `MAIL_PROVIDER` | Behavior | Recommendation |
 |---|---|---|
-| `none` (défaut) | Log l'email en console, retourne `ok=true`. Pas d'envoi réseau. | Dev local |
-| `resend` | Envoi via l'API REST [Resend](https://resend.com/) (`https://api.resend.com/emails`). | Prod |
+| `none` (default) | Logs the email to the console, returns `ok=true`. No network sending. | Local dev |
+| `resend` | Sending via the [Resend](https://resend.com/) REST API (`https://api.resend.com/emails`). | Prod |
 
-L'ajout de SMTP générique (nodemailer) ou SendGrid se fait en ajoutant
-un cas au dispatch dans `src/lib/mail/mailer.ts:sendMail`.
+Adding a generic SMTP (nodemailer) or SendGrid is done by adding a
+case to the dispatch in `src/lib/mail/mailer.ts:sendMail`.
 
 ## Config
 
 ```bash
-# Prod avec Resend
+# Prod with Resend
 MAIL_PROVIDER=resend
-MAIL_FROM="BitQuest <noreply@ton-domaine-vérifié.com>"
+MAIL_FROM="BitQuest <noreply@your-verified-domain.com>"
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
 
 # Dev
-# (ne rien configurer ; MAIL_PROVIDER=none par défaut)
+# (nothing to configure; MAIL_PROVIDER=none by default)
 ```
 
-**Attention à `MAIL_FROM`** : Resend exige que le domaine d'envoi soit
-*vérifié* dans le dashboard (SPF + DKIM + DMARC). Sinon l'envoi
-retourne 422 et le mailer loggera `domain not verified`.
+**Watch out for `MAIL_FROM`**: Resend requires the sending domain to
+be *verified* in the dashboard (SPF + DKIM + DMARC). Otherwise sending
+returns 422 and the mailer will log `domain not verified`.
 
-## Génération d'une clé Resend
+## Generating a Resend key
 
-1. Créer un compte sur [resend.com](https://resend.com/).
-2. Ajouter et vérifier un domaine (ou utiliser `onboarding@resend.dev`
-   pour tester).
-3. **API Keys → Create API Key** : choisir scope `Sending access` +
-   permissions sur le domaine. Copier la valeur `re_xxx…` (visible une
-   seule fois).
+1. Create an account on [resend.com](https://resend.com/).
+2. Add and verify a domain (or use `onboarding@resend.dev` to test).
+3. **API Keys → Create API Key**: choose scope `Sending access` +
+   permissions on the domain. Copy the `re_xxx…` value (shown only
+   once).
 
-## Flux d'envoi
+## Sending flow
 
-1. L'utilisateur s'enregistre via `POST /api/auth` action=register.
-   → `sendVerificationEmail(email, pseudo, token)` est appelé en
-   fire-and-forget (ne bloque pas la réponse).
-2. L'utilisateur peut re-déclencher l'envoi via
+1. The user registers via `POST /api/auth` action=register.
+   → `sendVerificationEmail(email, pseudo, token)` is called
+   fire-and-forget (does not block the response).
+2. The user can re-trigger sending via
    `POST /api/auth/verification/send` (rate-limit 3/min).
-3. Le serveur appelle `sendMail(verificationEmailTemplate(...))` qui
-   dispatche vers le provider.
-4. En retour :
+3. The server calls `sendMail(verificationEmailTemplate(...))` which
+   dispatches to the provider.
+4. In return:
    - `provider === "resend"` + `res.ok === true` → `dispatched = true`
-     côté handler, réponse `{ ok: true, dispatched: true }` (pas de
-     `devUrl` exposé).
-   - Provider none ou échec → `dispatched = false`. En dev,
-     `devUrl` est renvoyé pour que l'apprenant clique le lien sans
-     boîte mail.
+     on the handler side, response `{ ok: true, dispatched: true }`
+     (no `devUrl` exposed).
+   - Provider none or failure → `dispatched = false`. In dev,
+     `devUrl` is returned so the learner can click the link without
+     an inbox.
 
 ## Template
 
-`src/lib/mail/templates.ts:verificationEmailTemplate` retourne
-`{ to, subject, html, text }` :
+`src/lib/mail/templates.ts:verificationEmailTemplate` returns
+`{ to, subject, html, text }`:
 
-- **Subject** : « Vérifie ton adresse — BitQuest »
-- **HTML** : cartes dark-mode avec CTA button (inline styles,
-  compatibilité Gmail/Outlook)
-- **Text** : version plain avec URL seule, pour les clients email
-  sans HTML
+- **Subject**: "Verify your address — BitQuest"
+- **HTML**: dark-mode cards with CTA button (inline styles,
+  Gmail/Outlook compatible)
+- **Text**: plain version with URL only, for email clients without
+  HTML
 
-Le pseudo et l'URL sont échappés via `escapeHtml` pour prévenir une
-injection HTML dans le nom d'utilisateur.
+The pseudo and URL are escaped via `escapeHtml` to prevent HTML
+injection in the user name.
 
 ## Tests
 
-- `src/lib/mail/mailer.test.ts` — 11 tests : dispatch provider, Bearer,
-  fallback none si API key manquante, erreur Resend 422, fetch rejected
-- `src/lib/mail/templates.test.ts` — 4 tests : pseudo/url inclus,
-  échappement HTML (XSS prévention sur pseudo + URL)
+- `src/lib/mail/mailer.test.ts` — 11 tests: provider dispatch, Bearer,
+  fallback to none if API key missing, Resend 422 error, fetch rejected
+- `src/lib/mail/templates.test.ts` — 4 tests: pseudo/url included,
+  HTML escaping (XSS prevention on pseudo + URL)
 
 ## Logs
 
-Chaque envoi loggue via `logger("mailer")` :
+Every send logs via `logger("mailer")`:
 
-- `provider=none` : `mail: provider=none, printing to logs` puis
-  `mail body (text version)` avec le texte complet.
-- `provider=resend, ok` : `mail sent via resend` + `resendId`.
-- `provider=resend, ko` : `resend send failed` avec status et detail.
+- `provider=none`: `mail: provider=none, printing to logs` then
+  `mail body (text version)` with the full text.
+- `provider=resend, ok`: `mail sent via resend` + `resendId`.
+- `provider=resend, ko`: `resend send failed` with status and detail.
 
-`logger("email-verification")` complète côté caller avec
-`verification email dispatched` ou `verification email not dispatched`.
+`logger("email-verification")` complements on the caller side with
+`verification email dispatched` or `verification email not dispatched`.
 
-## Quand upgrade (SMTP / SendGrid)
+## When to upgrade (SMTP / SendGrid)
 
-Ajouter un cas dans `sendMail` :
+Add a case in `sendMail`:
 
 ```ts
 if (provider === "smtp") return await sendViaSmtp(message);
 ```
 
-Implémenter `sendViaSmtp` avec `nodemailer` (à ajouter aux deps). La
-config SMTP peut passer par une URL unique :
+Implement `sendViaSmtp` with `nodemailer` (to be added to deps). SMTP
+config can be passed via a single URL:
 
 ```
 SMTP_URL=smtps://user:pass@smtp.example.com:465
 ```
 
-Les tests existants vérifient que l'enum `MAIL_PROVIDER` tolère les
-providers inconnus en retombant sur `none` — aucun risque de
-régression.
+The existing tests verify that the `MAIL_PROVIDER` enum tolerates
+unknown providers by falling back to `none` — no regression risk.

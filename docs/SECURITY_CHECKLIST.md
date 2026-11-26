@@ -1,178 +1,178 @@
-# Checklist sécurité BitQuest — Phase 5.5
+# BitQuest Security Checklist — Phase 5.5
 
-**Date** : 2026-11-10
-**Statut** : prêt pour un pentest externe (contraintes documentées ci-dessous)
+**Date**: 2026-11-10
+**Status**: ready for an external pentest (constraints documented below)
 
-Ce document liste les protections actives, les éléments vérifiables par un
-audit externe, et les limitations connues. Il complète `SECURITY.md` (policy
-publique de divulgation).
+This document lists active protections, items verifiable by an
+external audit, and known limitations. It complements `SECURITY.md` (public
+disclosure policy).
 
 ---
 
-## 1. Authentification & session
+## 1. Authentication & Session
 
-| Protection                          | Statut | Référence                                       |
+| Protection                          | Status | Reference                                       |
 |-------------------------------------|--------|-------------------------------------------------|
-| Cookie `bq_session` HttpOnly        | ✅     | `src/lib/bitquest/session.ts` (Phase 1.2a)      |
-| SameSite=Lax + Secure (prod)         | ✅     | `buildSessionCookie()`                          |
-| Token rotation sur login/logout/pwd | ✅     | auth route + `/api/me/password` (1.2a + account)|
-| Mot de passe scrypt + salt 16 B      | ✅     | `/api/auth` register                            |
-| Mot de passe ≥ 10 caractères (LOT 14) | ✅     | `src/lib/validation/schemas.ts:21`              |
-| `timingSafeEqual` sur verify         | ✅     | `/api/auth` login + `/api/me/password`          |
-| Rate limit 5/min sur password change | ✅     | `src/app/api/me/password/route.ts`              |
-| Rate limit 10/min guest signup/IP    | ✅     | `/api/auth` guest branch                        |
-| **MFA / 2FA**                        | ❌     | Hors scope v1 — décision produit                |
-| **Password reset (forgot pwd)**      | ❌     | À ajouter en Phase email verification           |
+| `bq_session` HttpOnly cookie        | ready  | `src/lib/bitquest/session.ts` (Phase 1.2a)      |
+| SameSite=Lax + Secure (prod)        | ready  | `buildSessionCookie()`                          |
+| Token rotation on login/logout/pwd  | ready  | auth route + `/api/me/password` (1.2a + account)|
+| Password scrypt + salt 16 B         | ready  | `/api/auth` register                            |
+| Password ≥ 10 characters (LOT 14)   | ready  | `src/lib/validation/schemas.ts:21`              |
+| `timingSafeEqual` on verify         | ready  | `/api/auth` login + `/api/me/password`          |
+| Rate limit 5/min on password change | ready  | `src/app/api/me/password/route.ts`              |
+| Rate limit 10/min guest signup/IP   | ready  | `/api/auth` guest branch                        |
+| **MFA / 2FA**                       | no     | Out of scope v1 — product decision              |
+| **Password reset (forgot pwd)**     | no     | To add in email verification phase              |
 
 ---
 
 ## 2. CSRF
 
-| Protection                                   | Statut | Référence                               |
+| Protection                                   | Status | Reference                               |
 |----------------------------------------------|--------|-----------------------------------------|
-| Double-submit pattern (cookie + header)      | ✅     | `src/lib/auth/csrf.ts` (Phase 1.2b)     |
-| HMAC-SHA256 stateless (dérivé du session tok) | ✅     | `computeCsrfToken()`                    |
-| `timingSafeEqual` sur verify                 | ✅     | `verifyCsrfToken()`                     |
-| Enforcé sur toutes les mutations cookie-auth | ✅     | `requireCsrf()` dans guards             |
-| Exempt pour auth header legacy (immune)      | ✅     | `isCookieAuthenticated()` gate          |
-| Rotation sur logout + password change        | ✅     | Set-Cookie clear ou nouveau CSRF        |
-| Secret validation (`CSRF_SECRET` requis prod) | ✅     | `getCsrfSecret()` throw en prod         |
-| Couverture gelée par test (P1.3)             | ✅     | `src/lib/auth/csrf-coverage.test.ts` — allowlist explicite, fail si ajout d'une route POST/PUT/DELETE sans CSRF |
+| Double-submit pattern (cookie + header)      | ready  | `src/lib/auth/csrf.ts` (Phase 1.2b)     |
+| Stateless HMAC-SHA256 (derived from session tok) | ready | `computeCsrfToken()`                   |
+| `timingSafeEqual` on verify                  | ready  | `verifyCsrfToken()`                     |
+| Enforced on all cookie-auth mutations        | ready  | `requireCsrf()` in guards               |
+| Exempt for legacy auth header (immune)       | ready  | `isCookieAuthenticated()` gate          |
+| Rotation on logout + password change         | ready  | Set-Cookie clear or new CSRF            |
+| Secret validation (`CSRF_SECRET` required prod) | ready | `getCsrfSecret()` throws in prod       |
+| Coverage frozen by test (P1.3)               | ready  | `src/lib/auth/csrf-coverage.test.ts` — explicit allowlist, fails if a POST/PUT/DELETE route is added without CSRF |
 
-**Décision `SameSite=Lax` (motivation)** : `Strict` casserait la navigation
-entrante depuis des liens externes (notamment les emails de vérification qui
-pointent vers `/verify-email?token=…`). `Lax` autorise la méthode GET top-level
-depuis un domaine tiers mais bloque les requêtes POST cross-site (où le CSRF
-double-submit prend le relais). Garder `Lax`.
+**`SameSite=Lax` decision (rationale)**: `Strict` would break inbound
+navigation from external links (notably verification emails that
+point to `/verify-email?token=…`). `Lax` allows top-level GET method
+from a third-party domain but blocks cross-site POST requests (where the CSRF
+double-submit takes over). Keep `Lax`.
 
 ---
 
-## 3. Autorisation & rôles
+## 3. Authorization & Roles
 
-| Protection                                   | Statut | Référence                               |
+| Protection                                   | Status | Reference                               |
 |----------------------------------------------|--------|-----------------------------------------|
-| Roles APPRENTICE / EDITOR / ADMIN            | ✅     | `src/lib/auth/roles.ts` (Phase 1.1)     |
-| `hasAtLeastRole` lock-down par défaut        | ✅     | Valeurs inconnues → APPRENTICE          |
-| `requireRole` sur routes admin               | ✅     | `src/lib/auth/guard.ts`                 |
-| `requireRoleSsr` sur Server Components admin | ✅     | `src/lib/auth/server.ts`                |
-| Self-lockout protection (dernier admin)      | ✅     | `/api/admin/users/[id]/role`            |
-| Audit log de chaque mutation admin           | ✅     | `AdminAuditLog` + 23 actions tracées    |
+| Roles APPRENTICE / EDITOR / ADMIN            | ready  | `src/lib/auth/roles.ts` (Phase 1.1)     |
+| `hasAtLeastRole` default lock-down           | ready  | Unknown values → APPRENTICE             |
+| `requireRole` on admin routes                | ready  | `src/lib/auth/guard.ts`                 |
+| `requireRoleSsr` on admin Server Components  | ready  | `src/lib/auth/server.ts`                |
+| Self-lockout protection (last admin)         | ready  | `/api/admin/users/[id]/role`            |
+| Audit log of every admin mutation            | ready  | `AdminAuditLog` + 23 tracked actions    |
 
 ---
 
-## 4. Validation des entrées
+## 4. Input Validation
 
-| Protection                            | Statut | Référence                               |
+| Protection                            | Status | Reference                               |
 |---------------------------------------|--------|-----------------------------------------|
-| Zod à toutes les frontières API POST  | ✅     | `src/lib/validation/schemas.ts` (1.3)   |
-| Discriminated unions typées           | ✅     | auth, quest-progress, quiz questions    |
-| Bornes métier (xp/sats/level)         | ✅     | Évite les attaques via valeurs extrêmes |
-| Rejet 400 avec `issues[]`             | ✅     | `parseJsonBody()` retourne détails Zod  |
-| JSON parsing error → 400              | ✅     | Au lieu de crash                        |
+| Zod at all POST API boundaries        | ready  | `src/lib/validation/schemas.ts` (1.3)   |
+| Typed discriminated unions            | ready  | auth, quest-progress, quiz questions    |
+| Business bounds (xp/sats/level)       | ready  | Prevents attacks via extreme values     |
+| 400 rejection with `issues[]`         | ready  | `parseJsonBody()` returns Zod details   |
+| JSON parsing error → 400              | ready  | Instead of crash                        |
 
 ---
 
-## 5. Rate limiting
+## 5. Rate Limiting
 
-| Protection                            | Statut | Référence                               |
+| Protection                            | Status | Reference                               |
 |---------------------------------------|--------|-----------------------------------------|
-| Redis-backed (prod multi-instance)    | ✅     | `src/lib/cache/redis.ts` (Phase 1.4)    |
-| Fallback in-memory (dev)              | ✅     | `rateLimitInMemory()`                   |
-| Résilience : Redis down → fallback    | ✅     | Try/catch INCR / EXPIRE                 |
-| Clés : par IP (anonyme), par user (auth) | ✅  | guest:IP, progress:userId, etc.         |
+| Redis-backed (prod multi-instance)    | ready  | `src/lib/cache/redis.ts` (Phase 1.4)    |
+| In-memory fallback (dev)              | ready  | `rateLimitInMemory()`                   |
+| Resilience: Redis down → fallback     | ready  | Try/catch INCR / EXPIRE                 |
+| Keys: per IP (anonymous), per user (auth) | ready | guest:IP, progress:userId, etc.        |
 
 ---
 
-## 6. Observabilité
+## 6. Observability
 
-| Capacité                              | Statut | Référence                               |
+| Capability                            | Status | Reference                               |
 |---------------------------------------|--------|-----------------------------------------|
-| `/api/health` public (LB probes)      | ✅     | `src/app/api/health/route.ts` (5.1a)    |
-| DB + Redis checks                     | ✅     | `src/lib/health.ts` (5.1c)              |
-| Logs structurés (pino)                | ✅     | `src/lib/log.ts` (5.1b)                 |
-| Redaction (token, password, headers)  | ✅     | `REDACT_PATHS`                          |
-| Sentry wiring (no-op si pas de DSN)   | ✅     | `src/lib/obs/sentry.ts`                 |
-| `beforeSend` scrub email + IP         | ✅     | `sentry.server.config.ts`               |
-| Admin page `/admin/health` live       | ✅     | ADMIN only                              |
+| `/api/health` public (LB probes)      | ready  | `src/app/api/health/route.ts` (5.1a)    |
+| DB + Redis checks                     | ready  | `src/lib/health.ts` (5.1c)              |
+| Structured logs (pino)                | ready  | `src/lib/log.ts` (5.1b)                 |
+| Redaction (token, password, headers)  | ready  | `REDACT_PATHS`                          |
+| Sentry wiring (no-op if no DSN)       | ready  | `src/lib/obs/sentry.ts`                 |
+| `beforeSend` scrub email + IP         | ready  | `sentry.server.config.ts`               |
+| Live `/admin/health` admin page       | ready  | ADMIN only                              |
 
 ---
 
-## 7. RGPD / vie privée
+## 7. GDPR / Privacy
 
-| Protection                            | Statut | Référence                               |
+| Protection                            | Status | Reference                               |
 |---------------------------------------|--------|-----------------------------------------|
-| Soft-delete `User.deletedAt`          | ✅     | Anonymisation PII (email null, pseudo)  |
-| Confirmation password + chaîne DELETE | ✅     | `/api/me/delete`                        |
-| Hard-delete admin (purge définitive)  | ✅     | `/api/admin/users/[id]/purge`           |
-| Pas de logs user-fournis en clair     | ✅     | pino `redact` + Sentry `beforeSend`     |
-| Cookies strictement nécessaires       | ✅     | `bq_session`, `bq_csrf`, `bq_locale`    |
+| Soft-delete `User.deletedAt`          | ready  | PII anonymization (email null, pseudo)  |
+| Password confirmation + DELETE chain  | ready  | `/api/me/delete`                        |
+| Admin hard-delete (permanent purge)   | ready  | `/api/admin/users/[id]/purge`           |
+| No cleartext user-provided logs       | ready  | pino `redact` + Sentry `beforeSend`     |
+| Strictly necessary cookies            | ready  | `bq_session`, `bq_csrf`, `bq_locale`    |
 
 ---
 
-## 8. Dépendances & build
+## 8. Dependencies & Build
 
-| Vérification                          | Statut | Référence                               |
+| Check                                 | Status | Reference                               |
 |---------------------------------------|--------|-----------------------------------------|
-| CI lint + typecheck + unit + E2E      | ✅     | `.github/workflows/ci.yml`              |
-| Playwright E2E sur auth + admin gate  | ✅     | `tests/e2e/`                            |
-| Axe-core a11y audit (WCAG 2.1 AA)     | ✅     | `tests/e2e/a11y.spec.ts`                |
-| `npm audit` (à automatiser)           | ⚠️     | Manuel pour l'instant                   |
-| `depcheck` (deps orphelines)          | ⚠️     | Manuel                                  |
+| CI lint + typecheck + unit + E2E      | ready  | `.github/workflows/ci.yml`              |
+| Playwright E2E on auth + admin gate   | ready  | `tests/e2e/`                            |
+| Axe-core a11y audit (WCAG 2.1 AA)     | ready  | `tests/e2e/a11y.spec.ts`                |
+| `npm audit` (to automate)             | partial | Manual for now                         |
+| `depcheck` (orphan deps)              | partial | Manual                                  |
 
 ---
 
-## 9. Checklist pentest externe
+## 9. External Pentest Checklist
 
-Avant de missionner une équipe externe (Phase 5.5), s'assurer que :
+Before commissioning an external team (Phase 5.5), ensure that:
 
-1. **Env de test dédié** (pas la prod) avec `CSRF_SECRET` fixe fourni au pentester.
-2. **Comptes dédiés** : 1 ADMIN, 1 EDITOR, 1 APPRENTICE, 1 compte guest (voir
+1. **Dedicated test env** (not prod) with a fixed `CSRF_SECRET` provided to the pentester.
+2. **Dedicated accounts**: 1 ADMIN, 1 EDITOR, 1 APPRENTICE, 1 guest account (see
    `scripts/ci-test-users.js`).
-3. **Base de données neuve** : `prisma migrate deploy && tsx prisma/seed.ts`.
-4. **Surface exposée** à auditer :
+3. **Fresh database**: `prisma migrate deploy && tsx prisma/seed.ts`.
+4. **Exposed surface** to audit:
    - `/api/auth` (register / login / guest)
    - `/api/me/*` (password, delete, GET)
    - `/api/admin/**` (role, courses, chapters, lessons, quests/*/{theory,quiz,mission}, badges, challenges, users/[id]/purge)
    - `/api/challenges/*`
    - `/api/academy/**`
    - `/api/quests/*/progress`
-   - Routes SSR `/admin/**` (gate role)
-   - UI SPA `/`, `/academy/**`, `/dashboard`, `/profile`
-5. **Attaques attendues (benchmark réponses)** :
-   - **CSRF** : POST sans `X-CSRF-Token` cookie-auth → 403 (double-submit)
-   - **SQL injection** : Prisma avec params prépare — mais vérifier $queryRaw
-   - **XSS** : react-markdown sur contenus leçons — vérifier sanitization
-   - **IDOR** : `/api/admin/users/[id]/role` par APPRENTICE → 403
-   - **Privilege escalation** : self-demote ADMIN → 400 (dernier admin check)
-   - **Session fixation** : token roté sur login / logout / password change
-   - **Replay** : CSRF token rotés avec session, jamais deux fois valides
-   - **Rate limit bypass** : tenter header spoofing `x-forwarded-for`
-6. **Pas d'obligation Lightning réelle en v1** : les sats sont pédagogiques,
-   pas de clé privée serveur, pas de payout on-chain.
+   - SSR routes `/admin/**` (role gate)
+   - SPA UI `/`, `/academy/**`, `/dashboard`, `/profile`
+5. **Expected attacks (response benchmark)**:
+   - **CSRF**: POST without `X-CSRF-Token` cookie-auth → 403 (double-submit)
+   - **SQL injection**: Prisma with prepared params — but check $queryRaw
+   - **XSS**: react-markdown on lesson content — check sanitization
+   - **IDOR**: `/api/admin/users/[id]/role` by APPRENTICE → 403
+   - **Privilege escalation**: self-demote ADMIN → 400 (last admin check)
+   - **Session fixation**: token rotated on login / logout / password change
+   - **Replay**: CSRF tokens rotated with session, never valid twice
+   - **Rate limit bypass**: attempt `x-forwarded-for` header spoofing
+6. **No real Lightning requirement in v1**: sats are pedagogical,
+   no server-side private key, no on-chain payout.
 
 ---
 
-## 10. Limitations connues (à documenter dans le rapport pentest)
+## 10. Known Limitations (to document in the pentest report)
 
-- **Pas de 2FA** : v1 délibérément. Mitigé par rotation token + rate limit.
-- **Pas d'email verification** : les comptes s'enregistrent sans vérif. Mitigé
-  par limitation des effets (XP/sats pédagogiques, pas de payout réel).
-- **Pas de password reset self-service** : un admin peut regénérer le `token`
-  via Prisma Studio, mais pas de flow user-facing. Prévu phase post-v1.
-- **SQLite `JSON.parse` sur `theorySections` / `missionConfig`** : stockés
-  en String, parsés à chaque lecture. Postgres Json natif prévu en Phase 0.5.
-- **CSRF stateless HMAC** : si `CSRF_SECRET` fuit, tous les tokens CSRF
-  deviennent forgeables. Mitigé par rotation du secret = invalidation globale.
-- **Logout côté client ne force pas la fermeture dans tous les onglets** :
-  le cookie est clear + token roté, mais une requête déjà en vol pourrait
-  passer avant le prochain roundtrip. Risque faible.
+- **No 2FA**: v1 deliberately. Mitigated by token rotation + rate limit.
+- **No email verification**: accounts register without verification. Mitigated
+  by effect limitation (pedagogical XP/sats, no real payout).
+- **No self-service password reset**: an admin can regenerate the `token`
+  via Prisma Studio, but no user-facing flow. Planned post-v1.
+- **SQLite `JSON.parse` on `theorySections` / `missionConfig`**: stored
+  as String, parsed on each read. Native Postgres Json planned in Phase 0.5.
+- **Stateless HMAC CSRF**: if `CSRF_SECRET` leaks, all CSRF tokens
+  become forgeable. Mitigated by secret rotation = global invalidation.
+- **Client-side logout doesn't force closure across all tabs**:
+  the cookie is cleared + token rotated, but a request already in flight could
+  pass before the next roundtrip. Low risk.
 
 ---
 
-**Prochaines actions recommandées** :
+**Recommended next actions**:
 
-1. Ajouter `npm audit --production` en job CI séparé (non-bloquant au début).
-2. Automatiser les scans Snyk ou Socket.dev.
-3. Tourner Playwright E2E avec le contexte "admin promu" pour couvrir les
-   CRUDs (actuellement : création compte + tests ponctuels).
-4. Pentest externe rémunéré si projet rentre en production publique.
+1. Add `npm audit --production` as a separate CI job (non-blocking at first).
+2. Automate Snyk or Socket.dev scans.
+3. Run Playwright E2E with "promoted admin" context to cover the
+   CRUDs (currently: account creation + ad-hoc tests).
+4. Paid external pentest if the project goes into public production.

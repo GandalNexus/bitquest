@@ -1,66 +1,65 @@
-# Contribution i18n — Wolof
+# i18n contribution — Wolof
 
-BitQuest supporte trois langues : **français** (public cible principal,
-locale par défaut), **anglais** et **wolof**. Le fichier Wolof
-`src/i18n/messages/wo.json` est actuellement un **squelette** : seules
-une quinzaine de clés d'ancrage (navigation, boutons communs, titre
-d'authentification) sont traduites. Les autres clés tombent
-**automatiquement en fallback français** via la fonction
-`translate()` tant qu'elles ne sont pas remplies.
+BitQuest supports three languages: **French** (primary target
+audience, default locale), **English** and **Wolof**. The Wolof file
+`src/i18n/messages/wo.json` is currently a **skeleton**: only
+about fifteen anchor keys (navigation, common buttons, auth title)
+are translated. The other keys **automatically fall back to French**
+via the `translate()` function until they are filled in.
 
-Ce document explique comment contribuer aux traductions.
+This document explains how to contribute translations.
 
-## Qui peut contribuer
+## Who can contribute
 
-Idéalement un **locuteur natif du wolof** avec :
-- une bonne maîtrise écrite (orthographe standardisée CLAD/CNC),
-- quelques notions de culture tech (Bitcoin / Lightning utile mais pas
-  obligatoire — on peut toujours garder certains termes en français si
-  l'équivalent wolof n'est pas naturel).
+Ideally a **native Wolof speaker** with:
+- strong written proficiency (CLAD/CNC standardized orthography),
+- some notions of tech culture (Bitcoin / Lightning useful but not
+  required — some terms can stay in French if the Wolof equivalent
+  is not natural).
 
-Pas besoin d'être développeur : le fichier est un JSON simple, éditable
-avec n'importe quel éditeur texte.
+You don't need to be a developer: the file is a simple JSON, editable
+with any text editor.
 
-## Workflow proposé
+## Proposed workflow
 
-1. **Fork + clone** du dépôt.
-2. Ouvre `src/i18n/messages/wo.json`. Le fichier contient déjà une
-   partie des clés — libre à toi d'affiner ces traductions ou de les
-   compléter.
-3. Pour ajouter/affiner une traduction, consulte la clé équivalente
-   dans `src/i18n/messages/fr.json` : elle sert de référence. La
-   version EN (`en.json`) peut aussi aider à désambiguïser un terme.
-4. **Interpolations** : les clés qui contiennent `{var}` (ex.
-   `"{count} jours"`) doivent conserver exactement le même nom de
-   variable à l'intérieur des accolades, mais l'ordre et le reste du
-   texte peuvent être adaptés au wolof.
-5. **Pas besoin de tout traduire d'un coup** : chaque clé ajoutée
-   remplace instantanément le fallback français. Tu peux ouvrir une PR
-   avec 20 clés traduites, puis d'autres par la suite.
-6. Teste localement si tu peux :
+1. **Fork + clone** the repo.
+2. Open `src/i18n/messages/wo.json`. The file already contains part
+   of the keys — feel free to refine these translations or to fill
+   them out.
+3. To add/refine a translation, check the equivalent key in
+   `src/i18n/messages/fr.json`: it serves as the reference. The EN
+   version (`en.json`) can also help disambiguate a term.
+4. **Interpolations**: keys that contain `{var}` (e.g.
+   `"{count} days"`) must keep exactly the same variable name inside
+   the braces, but the order and the rest of the text can be adapted
+   to Wolof.
+5. **No need to translate everything at once**: each added key
+   instantly replaces the French fallback. You can open a PR with 20
+   translated keys, then more later.
+6. Test locally if you can:
    ```bash
    docker compose -f docker-compose.dev.yml up -d
-   # ouvre http://localhost:3000 et clique sur le bouton langue
-   # en haut à droite pour passer sur WO
+   # open http://localhost:3000 and click the language button
+   # in the top right to switch to WO
    ```
-7. Ouvre une PR avec le titre `i18n(wo): …` et un résumé des clés
-   touchées.
+7. Open a PR with the title `i18n(wo): …` and a summary of the
+   affected keys.
 
-## Convention d'écriture
+## Writing conventions
 
-- **Orthographe** : suivre la norme officielle du Sénégal (décret
-  2005-980). Exemples : `jàng` (apprendre), `jëfandikukat`
-  (utilisateur), `mandat` (mission/quête), `tërëlu` (paramètres).
-- **Néologismes tech** : garder le terme anglais/français si l'usage
-  local est déjà cristallisé (ex. « Bitcoin », « Lightning », « wallet »).
-  Pour les concepts métier (xp, sats, quêtes…), privilégier l'emprunt
-  explicite (ex. `XP yi`, `sats yi`).
-- **Diacritiques** : on garde les signes requis par la norme wolof
-  (`ñ`, `ë`, `à`, `ó`…). Le dépôt est UTF-8.
-- **Ton** : tutoiement généralisé (comme en français), pour coller à
-  l'approche « aventurier solo » de BitQuest.
+- **Orthography**: follow Senegal's official standard (decree
+  2005-980). Examples: `jàng` (to learn), `jëfandikukat`
+  (user), `mandat` (mission/quest), `tërëlu` (settings).
+- **Tech neologisms**: keep the English/French term if local usage
+  is already crystallized (e.g. "Bitcoin", "Lightning", "wallet").
+  For domain concepts (xp, sats, quests…), favor explicit borrowing
+  (e.g. `XP yi`, `sats yi`).
+- **Diacritics**: keep the signs required by the Wolof standard
+  (`ñ`, `ë`, `à`, `ó`…). The repo is UTF-8.
+- **Tone**: generalized informal address (as in French), to match
+  BitQuest's "solo adventurer" approach.
 
-## Comment le fallback fonctionne
+## How the fallback works
 
 ```ts
 // src/i18n/dictionaries.ts
@@ -72,19 +71,19 @@ export function translate(locale: Locale, key: string): string {
 }
 ```
 
-Autrement dit :
-1. Chercher dans `wo.json`.
-2. Si absent (ou chaîne vide), chercher dans `fr.json`.
-3. Sinon, retourner la clé brute (visible pour signaler le trou).
+In other words:
+1. Look up in `wo.json`.
+2. If absent (or empty string), look up in `fr.json`.
+3. Otherwise, return the raw key (visible so the gap is flagged).
 
-Résultat : tu peux pousser un `wo.json` partiel sans casser
-l'application.
+Result: you can push a partial `wo.json` without breaking the
+application.
 
-## Clés déjà traduites (référence)
+## Already-translated keys (reference)
 
-Le squelette initial couvre :
+The initial skeleton covers:
 
-| Clé | Traduction Wolof |
+| Key | Wolof translation |
 |---|---|
 | `nav.dashboard` | Tablo |
 | `nav.quests` | Mandat yi |
@@ -103,13 +102,12 @@ Le squelette initial couvre :
 | `common.retry` | Jéemaat |
 | `common.back` | Dellu |
 
-Ces traductions ont été rédigées avec prudence ; si tu es natif et
-remarques une tournure maladroite, n'hésite pas à les reprendre dans ta
-PR.
+These translations were drafted carefully; if you're a native speaker
+and notice an awkward phrasing, feel free to revise them in your PR.
 
 ## Contact
 
-Ouvre une issue avec le label `i18n/wo` ou mentionne `@alhDiallo2018`
-dans ta PR pour échanger sur une nuance de traduction.
+Open an issue with the label `i18n/wo` or mention `@alhDiallo2018`
+in your PR to discuss a translation nuance.
 
-**Jërëjëf !** 🙏
+**Jërëjëf!** 🙏

@@ -1,90 +1,90 @@
-# Rapport Phase 0 — Hygiène technique BitQuest
+# PHASE_0 Report — BitQuest Technical Hygiene
 
-**Date** : 2026-11-09
-**Branche** : `phase-0-docker-setup`
-**Environnement d'exécution** : conteneur Docker `bitquest-dev` (Node 20 bookworm-slim)
-**Base SQLite** : `db/custom.db` — **INTACTE** (SHA-256 `4e3ac78e…` identique du début à la fin)
+**Date**: 2026-11-09
+**Branch**: `phase-0-docker-setup`
+**Execution environment**: Docker container `bitquest-dev` (Node 20 bookworm-slim)
+**SQLite database**: `db/custom.db` — **INTACT** (SHA-256 `4e3ac78e…` identical start to finish)
 
 ---
 
-## 1. Synthèse
+## 1. Summary
 
-La Phase 0 d'hygiène technique est **terminée** avec les résultats suivants :
+PHASE_0 technical hygiene is **complete** with the following results:
 
-| Indicateur | Avant | Après |
+| Indicator | Before | After |
 |---|---|---|
-| Nom du package | `nextjs_tailwind_shadcn_ts` | `bitquest` |
-| Erreurs `tsc --noEmit` | masquées par `ignoreBuildErrors: true` | **0** (vérifiées) |
-| Warnings/erreurs `lint` | 1 erreur pré-existante (carousel.tsx) | **0** |
-| Tests unitaires | **0** | **25 passants** (Vitest sur `progression.ts`) |
-| Composants shadcn/ui | 48 (36 orphelins) | **12** (tous utilisés) |
-| Dépendances orphelines | `z-ai-web-dev-sdk`, config `drizzle` | retirées |
-| Workflow CI | Node 18, pas de test, DATABASE_URL incohérent | Node 20, 4 jobs (lint / typecheck / test / build) |
-| README | Annonce Drizzle + PostgreSQL (faux) | Reflète Prisma + SQLite, avertissement sats pédagogiques |
-| Environnement de dev | installation sur le host | Docker reproductible (`docker-compose.dev.yml`) |
+| Package name | `nextjs_tailwind_shadcn_ts` | `bitquest` |
+| `tsc --noEmit` errors | masked by `ignoreBuildErrors: true` | **0** (verified) |
+| `lint` warnings/errors | 1 pre-existing error (carousel.tsx) | **0** |
+| Unit tests | **0** | **25 passing** (Vitest on `progression.ts`) |
+| shadcn/ui components | 48 (36 orphan) | **12** (all used) |
+| Orphan dependencies | `z-ai-web-dev-sdk`, `drizzle` config | removed |
+| CI workflow | Node 18, no test, inconsistent DATABASE_URL | Node 20, 4 jobs (lint / typecheck / test / build) |
+| README | Advertised Drizzle + PostgreSQL (false) | Reflects Prisma + SQLite, pedagogical sats warning |
+| Dev environment | host install | reproducible Docker (`docker-compose.dev.yml`) |
 
 ---
 
-## 2. Modifications réalisées
+## 2. Changes Made
 
-### 2.1 Identité du projet
+### 2.1 Project identity
 
-- `package.json` :
-  - `name` : `nextjs_tailwind_shadcn_ts` → **`bitquest`**
-  - Ajout de `description`, `license: AGPL-3.0`, `author: GandalNexus`
-  - Retrait de la dépendance `z-ai-web-dev-sdk@^0.0.18` (0 import dans `src/`, confirmé)
-  - Ajout des scripts `typecheck`, `test`, `test:watch`
-  - Ajout des devDependencies `vitest@^3.2.0` et `happy-dom@^19.0.0`
+- `package.json`:
+  - `name`: `nextjs_tailwind_shadcn_ts` → **`bitquest`**
+  - Added `description`, `license: AGPL-3.0`, `author: GandalNexus`
+  - Removed dependency `z-ai-web-dev-sdk@^0.0.18` (0 imports in `src/`, confirmed)
+  - Added scripts `typecheck`, `test`, `test:watch`
+  - Added devDependencies `vitest@^3.2.0` and `happy-dom@^19.0.0`
 
 ### 2.2 TypeScript
 
-- `next.config.ts` : suppression de `typescript: { ignoreBuildErrors: true }` et du commentaire placeholder.
-- Script `typecheck: "tsc --noEmit"` ajouté.
-- 11 erreurs TypeScript initiales → **0** après :
-  - Suppression de `drizzle.config.ts` (fichier mort référençant `drizzle-kit` non installé).
-  - Régénération du client Prisma (`npx prisma generate`) qui restaure l'export `PrismaClient`.
-  - Installation de `vitest` qui fournit `vitest/config`.
-- Aucune utilisation de `any` injustifié, aucun `@ts-ignore` ajouté.
+- `next.config.ts`: removed `typescript: { ignoreBuildErrors: true }` and the placeholder comment.
+- Script `typecheck: "tsc --noEmit"` added.
+- 11 initial TypeScript errors → **0** after:
+  - Removing `drizzle.config.ts` (dead file referencing uninstalled `drizzle-kit`).
+  - Regenerating the Prisma client (`npx prisma generate`) which restores the `PrismaClient` export.
+  - Installing `vitest` which provides `vitest/config`.
+- No unjustified use of `any`, no `@ts-ignore` added.
 
 ### 2.3 Vitest
 
-- `vitest.config.ts` corrigé :
-  - `setupFiles` : `__tests__/setup.ts` (inexistant) → `src/test/setup.ts`
-  - `include` : nouveau glob `src/**/*.{test,spec}.{ts,tsx}`
-  - `coverage.include` : pointait sur `app/actions/**`, `db/**`, `middleware.ts` (chemins inexistants) → maintenant `src/lib/bitquest/**`, `src/app/api/**`, `middleware.ts`
-  - `alias "@"` : `path.resolve(__dirname, ".")` → `path.resolve(__dirname, "./src")` (cohérent avec `tsconfig.json`)
-- `src/test/setup.ts` créé (minimal, extensible en Phase 1).
-- `src/lib/bitquest/progression.test.ts` créé : **25 tests** couvrant les fonctions pures du moteur de progression.
-  - `LEVEL_THRESHOLDS`, `LEVEL_TITLES`, `XP_RULES`, `QUIZ_PASS_THRESHOLD`, `SATS_DAILY_CAP`, `MISSION_MAX_ATTEMPTS` (verrous sur les constantes métier)
-  - `levelFromXp` : 7 cas (XP 0, 99, 100, 10 seuils, intermédiaires, plafond)
-  - `levelInfo` : 6 cas (progression 0 %, mi-niveau, inter-niveau, niveau max avec `next=null`, bornes)
-  - `updateStreak` : 5 cas (même jour, hier, saut, nouvel utilisateur, initial à 0)
-  - `publicUser` : 5 cas (champs publics, levelInfo, pas de leak de passwordHash/token, createdAt, invité)
-- `.gitignore` corrigé : la règle trop large `test` ignorait `src/test/` ; devenue `/test` (racine seulement). Même traitement pour `prompt` → `/prompt`.
+- `vitest.config.ts` fixed:
+  - `setupFiles`: `__tests__/setup.ts` (nonexistent) → `src/test/setup.ts`
+  - `include`: new glob `src/**/*.{test,spec}.{ts,tsx}`
+  - `coverage.include`: pointed at `app/actions/**`, `db/**`, `middleware.ts` (nonexistent paths) → now `src/lib/bitquest/**`, `src/app/api/**`, `middleware.ts`
+  - `alias "@"`: `path.resolve(__dirname, ".")` → `path.resolve(__dirname, "./src")` (consistent with `tsconfig.json`)
+- `src/test/setup.ts` created (minimal, extensible in Phase 1).
+- `src/lib/bitquest/progression.test.ts` created: **25 tests** covering the pure functions of the progression engine.
+  - `LEVEL_THRESHOLDS`, `LEVEL_TITLES`, `XP_RULES`, `QUIZ_PASS_THRESHOLD`, `SATS_DAILY_CAP`, `MISSION_MAX_ATTEMPTS` (locks on business constants)
+  - `levelFromXp`: 7 cases (XP 0, 99, 100, 10 thresholds, intermediate, ceiling)
+  - `levelInfo`: 6 cases (0% progress, mid-level, inter-level, max level with `next=null`, bounds)
+  - `updateStreak`: 5 cases (same day, yesterday, gap, new user, initial 0)
+  - `publicUser`: 5 cases (public fields, levelInfo, no leak of passwordHash/token, createdAt, guest)
+- `.gitignore` fixed: the overly broad `test` rule was ignoring `src/test/`; became `/test` (root only). Same treatment for `prompt` → `/prompt`.
 
-### 2.4 Schéma Prisma
+### 2.4 Prisma schema
 
-- `prisma/schema.prisma` : suppression du champ orphelin `QuizQuestion.quest2 String?` (0 référence dans le code).
-- Client Prisma régénéré via `npx prisma generate` dans le conteneur.
-- **La base `db/custom.db` n'a PAS été modifiée** : SQLite tolère la colonne résiduelle de manière inerte. Aucun `db push`, aucun `migrate`, aucun `reset`.
+- `prisma/schema.prisma`: removed orphan field `QuizQuestion.quest2 String?` (0 references in code).
+- Prisma client regenerated via `npx prisma generate` in the container.
+- **The `db/custom.db` database was NOT modified**: SQLite tolerates the residual column inertly. No `db push`, no `migrate`, no `reset`.
 
-### 2.5 CI GitHub Actions
+### 2.5 GitHub Actions CI
 
-Workflow `.github/workflows/ci.yml` refait en gardant le même esprit :
+Workflow `.github/workflows/ci.yml` redone keeping the same spirit:
 
 - Node 18 → **Node 20**.
-- Variable globale `DATABASE_URL=file:./db/custom.db` (cohérente avec le schéma SQLite — avant : `postgresql://test:test@...` trompeur).
+- Global variable `DATABASE_URL=file:./db/custom.db` (consistent with the SQLite schema — before: misleading `postgresql://test:test@...`).
 - `NEXT_TELEMETRY_DISABLED=1`.
-- 4 jobs :
-  - `lint` (oxlint + eslint) — bloquant.
-  - `typecheck` (`npm run typecheck`) — bloquant.
-  - `test` (`npm test`) — bloquant, dépend de lint + typecheck.
-  - `build` (`npm run build`) — **non bloquant** (`continue-on-error: true`), à cause d'une issue pré-existante (voir §4).
-- Chaque job inclut désormais `npx prisma generate` avant les étapes.
+- 4 jobs:
+  - `lint` (oxlint + eslint) — blocking.
+  - `typecheck` (`npm run typecheck`) — blocking.
+  - `test` (`npm test`) — blocking, depends on lint + typecheck.
+  - `build` (`npm run build`) — **non-blocking** (`continue-on-error: true`), due to a pre-existing issue (see §4).
+- Each job now includes `npx prisma generate` before the steps.
 
-### 2.6 Nettoyage composants shadcn/ui
+### 2.6 shadcn/ui component cleanup
 
-Après analyse exhaustive des imports (statiques + transitifs) dans `src/`, 36 composants à **0 référence externe** supprimés :
+After exhaustive analysis of imports (static + transitive) in `src/`, 36 components with **0 external references** removed:
 
 ```
 accordion alert-dialog aspect-ratio avatar breadcrumb calendar carousel
@@ -94,124 +94,124 @@ scroll-area select separator sheet sidebar skeleton slider sonner switch
 table textarea toggle toggle-group tooltip
 ```
 
-**12 composants conservés** (effectivement utilisés par le code métier) :
+**12 components kept** (actually used by business code):
 `alert, badge, button, card, checkbox, input, label, progress, radio-group, tabs, toast, toaster`.
 
-Les dépendances npm associées (`@radix-ui/*` non utilisés, `cmdk`, `embla-carousel-react`, `react-day-picker`, `react-resizable-panels`, `vaul`, `input-otp`, `sonner`, etc.) **n'ont pas été retirées** du `package.json` à ce stade (approche conservatrice). À traiter en Phase 1 avec `depcheck`.
+The associated npm dependencies (unused `@radix-ui/*`, `cmdk`, `embla-carousel-react`, `react-day-picker`, `react-resizable-panels`, `vaul`, `input-otp`, `sonner`, etc.) **were not removed** from `package.json` at this stage (conservative approach). To handle in Phase 1 with `depcheck`.
 
-### 2.7 Boundary d'erreur racine
+### 2.7 Root error boundary
 
-`src/app/global-error.tsx` créé — Client Component minimal (aucun hook de contexte, aucun provider). Tentative de correctif pour l'issue de build pré-existante (voir §4). Le fichier reste utile même si le fix principal viendra en Phase 1.
+`src/app/global-error.tsx` created — minimal Client Component (no context hooks, no providers). Attempt to fix the pre-existing build issue (see §4). The file remains useful even if the main fix will come in Phase 1.
 
 ### 2.8 README
 
-Entièrement réécrit pour refléter :
-- Stack réelle : **Prisma + SQLite** (plus de Drizzle + Postgres).
-- Scripts réels (retrait de `db:start`/`db:stop` qui n'existent pas).
-- **Avertissement explicite** sur le positionnement pédagogique des sats (aucun transfert on-chain ni paiement Lightning réel à ce stade).
-- Option d'installation Docker documentée.
-- Section "Issues connues" (build prerender + 17 vulnérabilités npm).
-- Section Documentation listant les 7 fichiers `docs/`.
+Entirely rewritten to reflect:
+- Actual stack: **Prisma + SQLite** (no more Drizzle + Postgres).
+- Actual scripts (removed `db:start`/`db:stop` which don't exist).
+- **Explicit warning** on the pedagogical positioning of sats (no on-chain transfer or real Lightning payment at this stage).
+- Docker install option documented.
+- "Known issues" section (prerender build + 17 npm vulnerabilities).
+- Documentation section listing the 7 files in `docs/`.
 
-### 2.9 Docker (préalable)
+### 2.9 Docker (prerequisite)
 
-Les 4 fichiers Docker (déjà commités en `34b994b`) ont permis d'exécuter toutes les vérifications de Phase 0 dans un environnement reproductible, sans toucher au Node du Mac host :
+The 4 Docker files (already committed in `34b994b`) made it possible to run all PHASE_0 checks in a reproducible environment without touching the Mac host's Node:
 
 - `Dockerfile.dev`, `docker-compose.dev.yml`, `.dockerignore`, `docs/DOCKER_DEVELOPMENT.md`.
-- Toutes les commandes `npm`, `npx prisma`, `npx tsc`, `npx vitest` de ce rapport ont tourné dans le conteneur `bitquest-dev`.
+- All `npm`, `npx prisma`, `npx tsc`, `npx vitest` commands in this report ran in the `bitquest-dev` container.
 
 ---
 
-## 3. Fichiers modifiés et supprimés
+## 3. Files Modified and Deleted
 
-### Modifiés
+### Modified
 ```
 .github/workflows/ci.yml     — CI Node 20, 4 jobs
-.gitignore                    — règles test/prompt resserrées
-README.md                     — stack réelle, avertissement sats, Docker
-next.config.ts                — retrait ignoreBuildErrors
-package-lock.json             — régénéré (vitest+happy-dom, -z-ai)
+.gitignore                    — tightened test/prompt rules
+README.md                     — actual stack, sats warning, Docker
+next.config.ts                — removed ignoreBuildErrors
+package-lock.json             — regenerated (vitest+happy-dom, -z-ai)
 package.json                  — rename, scripts, deps
-prisma/schema.prisma          — suppression champ quest2
-vitest.config.ts              — chemins corrigés
+prisma/schema.prisma          — removed quest2 field
+vitest.config.ts              — paths fixed
 ```
 
-### Supprimés (37 fichiers)
+### Deleted (37 files)
 ```
-drizzle.config.ts                            (fichier mort)
-src/components/ui/*.tsx                      (36 composants orphelins)
+drizzle.config.ts                            (dead file)
+src/components/ui/*.tsx                      (36 orphan components)
 ```
 
-### Créés
+### Created
 ```
-src/app/global-error.tsx                     (boundary minimal)
-src/lib/bitquest/progression.test.ts         (25 tests unitaires)
-src/test/setup.ts                            (setup Vitest)
-docs/PHASE_0_REPORT.md                       (ce fichier)
+src/app/global-error.tsx                     (minimal boundary)
+src/lib/bitquest/progression.test.ts         (25 unit tests)
+src/test/setup.ts                            (Vitest setup)
+docs/PHASE_0_REPORT.md                       (this file)
 ```
 
 ---
 
-## 4. Problèmes non résolus
+## 4. Unresolved Issues
 
-### 4.1 Build Next.js — issue pré-existante
+### 4.1 Next.js build — pre-existing issue
 
 ```
 Error occurred prerendering page "/_global-error".
 TypeError: Cannot read properties of null (reading 'useContext')
 ```
 
-- **Pré-existant** : vérifié par `git stash` + `next build` sur l'état précédent le commit `34b994b`. L'erreur est antérieure à la Phase 0.
-- **Non résolu par** : ajout de `src/app/global-error.tsx` minimal.
-- **Cause probable** : interaction Next 16 + Turbopack + React 19 lors du prerender statique de la route système `/_global-error`. Les warnings `Each child in a list should have a unique "key" prop` sur `<html>`, `<body>`, `<head>`, `<meta>` suggèrent un problème dans la gestion des metadata React 19 / Next.
-- **Impact immédiat** : nul en développement (`npm run dev` fonctionne). Impact sur la mise en production.
-- **Décision Phase 0** : CI laisse le job `build` en `continue-on-error: true` avec un commentaire explicite. À traiter en Phase 1.
+- **Pre-existing**: verified via `git stash` + `next build` on the state before commit `34b994b`. The error pre-dates PHASE_0.
+- **Not resolved by**: adding a minimal `src/app/global-error.tsx`.
+- **Probable cause**: Next 16 + Turbopack + React 19 interaction during static prerender of the system route `/_global-error`. The `Each child in a list should have a unique "key" prop` warnings on `<html>`, `<body>`, `<head>`, `<meta>` suggest a problem in React 19 / Next metadata handling.
+- **Immediate impact**: zero in development (`npm run dev` works). Impact on production deployment.
+- **PHASE_0 decision**: CI keeps the `build` job in `continue-on-error: true` with an explicit comment. To address in Phase 1.
 
-### 4.2 Vulnérabilités npm — non corrigées
+### 4.2 npm vulnerabilities — not fixed
 
-17 vulnérabilités (12 moderate, 5 high, 0 critical) détectées par `npm audit`. Toutes les corrections demandent un breaking change :
+17 vulnerabilities (12 moderate, 5 high, 0 critical) detected by `npm audit`. All fixes require a breaking change:
 
-| Package | Chaîne | Sévérité | Fix nécessite |
+| Package | Chain | Severity | Fix requires |
 |---|---|---|---|
 | `js-yaml` | via `@mdxeditor/editor` | high | `@mdxeditor/editor@4.5.0` |
 | `sharp` | direct | high | `sharp@0.35.5` |
 | `minimatch` | via `eslint-config-next` | moderate | `eslint-config-next@15.5.29` |
 | `prismjs` | via `react-syntax-highlighter` | moderate | `react-syntax-highlighter@16.1.2` |
 
-Aucune correction automatique (`npm audit fix --force`) n'a été lancée. À traiter en Phase 1 après évaluation des breaking changes.
+No auto-fix (`npm audit fix --force`) has been run. To address in Phase 1 after evaluating breaking changes.
 
-### 4.3 Base de données : colonne `quest2` résiduelle
+### 4.3 Database: residual `quest2` column
 
-Le champ a été retiré du schéma Prisma mais la colonne reste dans `db/custom.db` (SQLite). Cette colonne est inerte et ignorée par le client Prisma. Elle disparaîtra lors de la migration PostgreSQL (planifiée en phase future). **Décision assumée** : pas de `prisma db push` en Phase 0 pour respecter la consigne "Ne jamais toucher la base".
+The field was removed from the Prisma schema but the column remains in `db/custom.db` (SQLite). This column is inert and ignored by the Prisma client. It will disappear with the PostgreSQL migration (planned for a future phase). **Accepted decision**: no `prisma db push` in PHASE_0 to respect the "Never touch the database" directive.
 
-### 4.4 Lockfile `bun.lock` non synchronisé
+### 4.4 Unsynchronized `bun.lock` lockfile
 
-`bun.lock` conserve `z-ai-web-dev-sdk` et l'état pré-nettoyage. Préservé intact par consigne. À réconcilier la première fois qu'un contributeur utilisera `bun install` (hors Phase 0).
+`bun.lock` still contains `z-ai-web-dev-sdk` and the pre-cleanup state. Preserved intact by directive. To reconcile the first time a contributor uses `bun install` (outside PHASE_0).
 
 ---
 
-## 5. Risques identifiés
+## 5. Identified Risks
 
-| # | Risque | Mitigation en place | À faire |
+| # | Risk | Mitigation in place | To do |
 |---|---|---|---|
-| R1 | Build de production cassé | CI non bloquant, doc README | Phase 1 : debug Next 16 / global-error |
-| R2 | Vulnérabilités `high` sur dépendances actives (`sharp`) | Document audit, pas d'exécution auto | Phase 1 : upgrade + revue breaking |
-| R3 | Base `custom.db` contient une colonne `quest2` fantôme | Prisma l'ignore ; aucune lecture code | Supprimée lors de la migration Postgres |
-| R4 | npm 10.8.2 par défaut dans l'image a un bug `--package-lock-only` | Doc + usage `npx npm@11` pour régénérer | Phase 1 : pinner npm 11 dans Dockerfile.dev |
-| R5 | `bun.lock` divergent de `package.json` | Doc dans ce rapport | Reconciler lors du passage à Bun si décidé |
-| R6 | `node_modules` Linux dans le volume Docker n'est pas compatible host Mac | Documenté dans `DOCKER_DEVELOPMENT.md` | Rien, c'est le design voulu |
+| R1 | Production build broken | Non-blocking CI, README doc | Phase 1: debug Next 16 / global-error |
+| R2 | `high` vulnerabilities on active deps (`sharp`) | Documented audit, no auto-exec | Phase 1: upgrade + breaking review |
+| R3 | `custom.db` base contains a phantom `quest2` column | Prisma ignores it; no code reads it | Removed during Postgres migration |
+| R4 | npm 10.8.2 by default in the image has a `--package-lock-only` bug | Doc + `npx npm@11` usage to regenerate | Phase 1: pin npm 11 in Dockerfile.dev |
+| R5 | `bun.lock` divergent from `package.json` | Doc in this report | Reconcile when switching to Bun if decided |
+| R6 | Linux `node_modules` in Docker volume not compatible with Mac host | Documented in `DOCKER_DEVELOPMENT.md` | Nothing, that's intended design |
 
 ---
 
-## 6. Résultats des vérifications finales
+## 6. Results of Final Checks
 
-Toutes les commandes exécutées dans le conteneur `bitquest-dev`.
+All commands executed in the `bitquest-dev` container.
 
 ### 6.1 TypeScript
 ```
 $ npm run typecheck
 > tsc --noEmit
-(aucune sortie → 0 erreur)
+(no output → 0 errors)
 ```
 
 ### 6.2 Lint
@@ -234,7 +234,7 @@ $ npm test
    Duration  1.23s
 ```
 
-### 6.4 Build (non bloquant, échec documenté)
+### 6.4 Build (non-blocking, documented failure)
 ```
 $ npm run build
 ...
@@ -243,55 +243,55 @@ TypeError: Cannot read properties of null (reading 'useContext')
 ⨯ Next.js build worker exited with code: 1
 ```
 
-### 6.5 Intégrité de la base
+### 6.5 Database integrity
 ```
 $ shasum -a 256 db/custom.db
 4e3ac78eb92eb055ba2a2704458100d20525856de93b86f98f275be5b6c34607  db/custom.db
 ```
-Identique au SHA-256 initial du début de la Phase 0.
+Identical to the initial SHA-256 at the start of PHASE_0.
 
 ---
 
-## 7. Recommandations pour la suite
+## 7. Recommendations for Next Steps
 
-### 7.1 Phase 1 — à démarrer
+### 7.1 Phase 1 — to start
 
-Par ordre de priorité :
+In priority order:
 
-1. **Résoudre le build** (`/_global-error` prerender). Options à explorer :
-   - Désactiver Turbopack pour le build (`next build --no-turbo` si disponible) et comparer.
-   - Mettre à jour Next.js vers la dernière minor (ou downgrade à 16.3 si régression).
-   - Isoler les providers de layout.tsx si nécessaire.
-2. **Durcir la session** : cookie `httpOnly; Secure; SameSite=Lax` + CSRF (priorité sécurité).
-3. **Validation Zod partout** côté serveur (schémas par route).
-4. **Rate limiting persistant** (Redis).
-5. **Rôles utilisateur** : enum `Role { APPRENTICE, EDITOR, ADMIN }` + helper `requireRole`.
-6. **Tests supplémentaires** sur `missions.ts` (8 types), routes API clés (`/api/quests/[code]/progress`).
-7. **Correctifs vulnérabilités npm** : évaluer breaking changes de `sharp@0.35.5` et `@mdxeditor/editor@4.5.0` (ce dernier n'étant pas encore utilisé par le code).
+1. **Fix the build** (`/_global-error` prerender). Options to explore:
+   - Disable Turbopack for the build (`next build --no-turbo` if available) and compare.
+   - Update Next.js to the latest minor (or downgrade to 16.3 if regression).
+   - Isolate `layout.tsx` providers if needed.
+2. **Harden the session**: `httpOnly; Secure; SameSite=Lax` cookie + CSRF (security priority).
+3. **Zod validation everywhere** server-side (schemas per route).
+4. **Persistent rate limiting** (Redis).
+5. **User roles**: enum `Role { APPRENTICE, EDITOR, ADMIN }` + helper `requireRole`.
+6. **Additional tests** on `missions.ts` (8 types), key API routes (`/api/quests/[code]/progress`).
+7. **npm vulnerability fixes**: assess breaking changes of `sharp@0.35.5` and `@mdxeditor/editor@4.5.0` (the latter not yet used by the code).
 
-### 7.2 Nettoyage de deps (différé — à faire en Phase 1)
+### 7.2 Deps cleanup (deferred — to do in Phase 1)
 
-Un passage `depcheck` aidera à retirer les deps devenues inutiles après la suppression des 36 composants shadcn :
+A `depcheck` pass will help remove deps that became useless after removing the 36 shadcn components:
 
-Candidats probables (à confirmer) : `cmdk`, `embla-carousel-react`, `input-otp`, `react-day-picker`, `react-resizable-panels`, `vaul`, `sonner` (bibliothèque différente du composant `sonner.tsx` supprimé), et plusieurs `@radix-ui/*` dont les composants consommateurs ont été retirés.
+Likely candidates (to confirm): `cmdk`, `embla-carousel-react`, `input-otp`, `react-day-picker`, `react-resizable-panels`, `vaul`, `sonner` (library different from the deleted `sonner.tsx` component), and several `@radix-ui/*` whose consumer components were removed.
 
-### 7.3 Amélioration du Dockerfile.dev
+### 7.3 Dockerfile.dev improvement
 
-- Pinner `npm@11` (au lieu de `npx -y npm@11` ponctuel) pour éviter le bug `--package-lock-only` de npm 10.
-- Réduire la taille d'image en déplaçant `openssl`, `ca-certificates`, `curl` dans une étape multi-stage si nécessaire en Phase 2.
+- Pin `npm@11` (instead of ad-hoc `npx -y npm@11`) to avoid the `--package-lock-only` bug of npm 10.
+- Reduce image size by moving `openssl`, `ca-certificates`, `curl` to a multi-stage step if needed in Phase 2.
 
-### 7.4 Documentation développeur
+### 7.4 Developer documentation
 
-- Compléter `CONTRIBUTING.md` avec le workflow Docker.
-- Ajouter une section "ADR" (Architecture Decision Records) dans `docs/` pour tracer les choix structurels (Prisma conservé, SQLite transitoire, option B pour BitLab, etc.).
-
----
-
-## 8. Prochaine étape
-
-Passer au **Lot 1 de développement** (Dashboard + Académie), documenté dans `docs/BITQUEST_FEATURE_MATRIX.md` et `docs/BITQUEST_ROADMAP.md`. Une note d'audit et plan d'attaque sera produite dans `docs/` avant toute modification de code métier (`src/components/bitquest/dashboard.tsx` et la future zone `src/app/(app)/academy/*`).
+- Complete `CONTRIBUTING.md` with the Docker workflow.
+- Add an "ADR" section (Architecture Decision Records) in `docs/` to trace structural choices (Prisma kept, transitional SQLite, option B for BitLab, etc.).
 
 ---
 
-**Rédigé le** : 2026-11-09
-**Auteur** : Claude Opus 4.7 (assisté) pour GandalNexus / BitQuest
+## 8. Next Step
+
+Move to **LOT_1 development** (Dashboard + Academy), documented in `docs/BITQUEST_FEATURE_MATRIX.md` and `docs/BITQUEST_ROADMAP.md`. An audit note and attack plan will be produced in `docs/` before any modification of business code (`src/components/bitquest/dashboard.tsx` and the future `src/app/(app)/academy/*` area).
+
+---
+
+**Written on**: 2026-11-09
+**Author**: Claude Opus 4.7 (assisted) for GandalNexus / BitQuest

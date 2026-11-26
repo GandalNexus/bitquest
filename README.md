@@ -8,142 +8,142 @@
 ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg?style=flat-square)
 
-**Plateforme éducative gamifiée pour apprendre Bitcoin et le Lightning Network.**
+**Gamified educational platform to learn Bitcoin and the Lightning Network.**
 
-BitQuest est l'un des deux volets de [GandalNexus](https://github.com/GandalNexus) (projet sénégalais récompensé au Dakar Bitcoin Hack 2025) : le module **learn → practice → earn** pour accompagner les apprenants, débutants comme avancés, dans la découverte progressive de Bitcoin. Le volet pratique est assuré par le projet frère [BitLab](https://github.com/GandalNexus/bitlab).
+BitQuest is one of the two pillars of [GandalNexus](https://github.com/GandalNexus) (a Senegalese project awarded at the Dakar Bitcoin Hack 2025): the **learn → practice → earn** module that guides learners — from beginners to advanced — through a progressive discovery of Bitcoin. The hands-on side is covered by the sibling project [BitLab](https://github.com/GandalNexus/bitlab).
 
-## Vue d'ensemble
+## Overview
 
-BitQuest propose un parcours structuré de quêtes thématiques alliant théorie, mini-quiz et missions pratiques. L'engagement est récompensé par de l'XP, des badges et des satoshis **symboliques** (voir avertissement ci-dessous).
+BitQuest offers a structured journey of themed quests combining theory, mini-quizzes, and practical missions. Engagement is rewarded with XP, badges, and **symbolic** satoshis (see warning below).
 
-### Les quêtes
+### Quests
 
-Chaque quête est composée de :
+Each quest is made up of:
 
-1. **Une introduction** avec contexte et objectifs pédagogiques.
-2. **Des sections théoriques** structurées (texte + points clés).
-3. **Un quiz** à réussir à 70 % minimum pour débloquer la suite.
-4. **Une mission pratique** (8 types disponibles : exploration de bloc, forge de clés, construction de transaction, minage d'un nonce, ouverture d'un canal Lightning, parsing BOLT11, multisig, tweak Taproot).
-5. **Une récompense** : XP et sats pédagogiques.
+1. **An introduction** with context and learning objectives.
+2. **Theoretical sections** (structured text + key takeaways).
+3. **A quiz** that must be passed at 70% minimum to unlock the next step.
+4. **A practical mission** (8 types available: block exploration, key forge, transaction building, nonce mining, Lightning channel opening, BOLT11 parsing, multisig, Taproot tweak).
+5. **A reward**: XP and educational sats.
 
-> ⚠️ **Les satoshis distribués par BitQuest sont des points pédagogiques**, pas des satoshis réels. Aucun transfert on-chain, aucun paiement Lightning réel n'est effectué dans cette version. L'intégration Lightning réelle via BitLab est prévue pour les phases ultérieures (voir `docs/BITQUEST_ROADMAP.md`).
+> ⚠️ **The satoshis distributed by BitQuest are educational points**, not real satoshis. No on-chain transfer or real Lightning payment is made in this version. Real Lightning integration via BitLab is planned for later phases (see `docs/BITQUEST_ROADMAP.md`).
 
-### Fonctionnalités actuelles (v0.3)
+### Current features (v0.3)
 
-- **Authentification** sécurisée : cookie HttpOnly `bq_session`, CSRF
-  double-submit HMAC, mot de passe (`scrypt`), vérification email (fondation),
-  soft-delete RGPD avec anonymisation PII.
-- **Rôles** `APPRENTICE` / `EDITOR` / `ADMIN` + helpers `requireRole*` côté API
-  et SSR.
-- **Dashboard** avec anneau de niveau, statistiques, timeline, onboarding
-  et teaser Académie.
-- **11 quêtes** seedées, réparties sur 4 pistes (initiation, intermédiaire,
-  avancée, spéciale). 8 types de missions.
-- **Académie** : cours → chapitres → leçons markdown avec suivi de complétion.
-- **Défi du jour** avec récompenses XP + sats.
-- **15 badges** (7 types de conditions).
-- **Classement** des 20 meilleurs apprenants.
-- **Portefeuille pédagogique** + historique.
-- **Admin console** complète : CRUD cours, quêtes (métadonnées + théorie +
-  quiz + type de mission), badges, défis du jour, utilisateurs (rôles),
-  purge RGPD, audit log (24+ actions).
-- **BitLab foundation** (Phase 3) : modèle `BitLabProof`, `MempoolClient`
-  (mempool.space + fallback blockstream), endpoint `/api/bitlab/proof`
-  (`TX` ou `INVOICE`), décodage BOLT11, JWT challenge/nonce anti-replay via
-  Redis. Quête pilote `tx-basics` câblée sur `BITLAB_PROOF`.
-- **Observabilité** : `/api/health` (DB + Redis), Sentry (client+serveur,
-  no-op si DSN absent), logs structurés pino avec redactions PII.
-- **Rate-limit** Redis par route avec fallback mémoire.
-- **i18n FR/EN** : cookie `bq_locale`, hook `useT()` avec interpolation
-  `{var}`, parité des dictionnaires.
-- **Tests** : 310 unitaires (Vitest) + 9 scénarios Playwright + audit a11y
-  WCAG 2.1 AA (@axe-core/playwright).
-- **Thème sombre** par défaut, polices Orbitron / Exo 2 / Geist Mono.
+- **Authentication** — HttpOnly `bq_session` cookie, HMAC double-submit CSRF,
+  password hashing (`scrypt`), email verification (foundation),
+  GDPR soft-delete with PII anonymisation.
+- **Roles** `APPRENTICE` / `EDITOR` / `ADMIN` + `requireRole*` helpers for API
+  and SSR.
+- **Dashboard** with level ring, statistics, timeline, onboarding
+  and Academy teaser.
+- **11 quests** seeded, spread across 4 tracks (initiation, intermediate,
+  advanced, special). 8 mission types.
+- **Academy**: courses → chapters → markdown lessons with completion tracking.
+- **Daily challenge** with XP + sats rewards.
+- **15 badges** (7 condition types).
+- **Leaderboard** of the top 20 learners.
+- **Educational wallet** + history.
+- **Full admin console**: CRUD for courses, quests (metadata + theory +
+  quiz + mission type), badges, daily challenges, users (roles),
+  GDPR purge, audit log (24+ actions).
+- **BitLab foundation** (Phase 3): `BitLabProof` model, `MempoolClient`
+  (mempool.space + blockstream fallback), `/api/bitlab/proof` endpoint
+  (`TX` or `INVOICE`), BOLT11 decoding, challenge JWT with Redis-backed
+  anti-replay nonces. Pilot quest `tx-basics` wired to `BITLAB_PROOF`.
+- **Observability**: `/api/health` (DB + Redis), Sentry (client + server,
+  no-op if DSN is absent), structured pino logs with PII redactions.
+- **Redis rate-limit** per route with in-memory fallback.
+- **i18n FR/EN**: `bq_locale` cookie, `useT()` hook with `{var}`
+  interpolation, dictionary parity.
+- **Tests**: 310 unit (Vitest) + 9 Playwright scenarios + WCAG 2.1 AA a11y
+  audit (@axe-core/playwright).
+- **Dark theme** by default, Orbitron / Exo 2 / Geist Mono fonts.
 
-### Fonctionnalités prévues (roadmap)
+### Planned features (roadmap)
 
-- SMTP réel pour la vérification email.
-- Locale WO (troisième langue).
-- Migration i18n du reste des composants (quêtes, wallet, Académie).
-- Élargissement `BITLAB_PROOF` au-delà de `tx-basics`
+- Real SMTP for email verification.
+- WO locale (third language).
+- i18n migration for the remaining components (quests, wallet, Academy).
+- `BITLAB_PROOF` broadened beyond `tx-basics`
   (invoice-decode, channel-open).
-- Récompenses Lightning Testnet sous feature flag.
+- Lightning Testnet rewards behind a feature flag.
 
-Détail complet dans `docs/BITQUEST_ROADMAP.md` et `CHANGELOG.md`.
+Full details in `docs/BITQUEST_ROADMAP.md` and `CHANGELOG.md`.
 
-## Stack technique
+## Tech stack
 
 ### Frontend
 
 - **Next.js 16** (App Router, Turbopack).
-- **React 19** avec Server Components.
-- **TypeScript** strict (vérifié par `npm run typecheck`).
-- **Tailwind CSS 4** + sélection de primitives **shadcn/ui** basée sur Radix UI.
-- **Lucide React** pour les icônes.
-- **Framer Motion** pour les animations.
-- **next-themes** pour le mode sombre.
+- **React 19** with Server Components.
+- **TypeScript** strict (checked via `npm run typecheck`).
+- **Tailwind CSS 4** + a curated subset of **shadcn/ui** primitives on Radix UI.
+- **Lucide React** for icons.
+- **Framer Motion** for animations.
+- **next-themes** for dark mode.
 
-### État client
+### Client state
 
-- **Zustand** pour la session et la navigation SPA.
-- **TanStack Query** pour le cache des appels API.
+- **Zustand** for session and SPA navigation.
+- **TanStack Query** for API call caching.
 
 ### Backend
 
-- **Route Handlers Next.js** (`src/app/api/*`) pour l'API JSON interne.
-- **Prisma 6** comme ORM, **PostgreSQL 16** comme base.
-- **Redis 7** pour sessions, rate-limit et nonces anti-replay (fallback mémoire).
-- **Zod** pour la validation à toutes les frontières API (unions discriminées).
-- **crypto natif Node.js** (`scrypt`) pour le hachage des mots de passe.
-- **jose** pour les JWT courts BitLab (HS256).
-- **@sentry/nextjs** pour l'instrumentation (no-op sans DSN).
-- **pino** pour les logs structurés avec redactions PII.
-- **ioredis** pour le client Redis.
+- **Next.js Route Handlers** (`src/app/api/*`) for the internal JSON API.
+- **Prisma 6** as ORM, **PostgreSQL 16** as database.
+- **Redis 7** for sessions, rate-limiting, and anti-replay nonces (in-memory fallback).
+- **Zod** for validation at every API boundary (discriminated unions).
+- **Node.js native crypto** (`scrypt`) for password hashing.
+- **jose** for short-lived BitLab JWTs (HS256).
+- **@sentry/nextjs** for instrumentation (no-op without DSN).
+- **pino** for structured logs with PII redactions.
+- **ioredis** as the Redis client.
 
-### Tests & qualité
+### Tests & quality
 
-- **Vitest** + **happy-dom** pour l'unitaire (310 tests / 17 fichiers).
-- **Playwright** pour les scénarios E2E (auth, admin gate, défi du jour).
-- **@axe-core/playwright** pour l'audit a11y WCAG 2.1 AA.
+- **Vitest** + **happy-dom** for unit tests (310 tests / 17 files).
+- **Playwright** for E2E scenarios (auth, admin gate, daily challenge).
+- **@axe-core/playwright** for WCAG 2.1 AA a11y audit.
 - **oxlint** + **ESLint** + **Prettier**.
-- **GitHub Actions** (`.github/workflows/ci.yml`) avec services Postgres + Redis.
+- **GitHub Actions** (`.github/workflows/ci.yml`) with Postgres + Redis services.
 
-## Démarrage rapide
+## Quick start
 
-### Option A — Avec Docker (recommandé)
+### Option A — Docker (recommended)
 
-Un environnement de développement reproductible est fourni. Voir `docs/DOCKER_DEVELOPMENT.md` pour la documentation complète.
+A reproducible development environment is provided. See `docs/DOCKER_DEVELOPMENT.md` for full documentation.
 
 ```bash
-# Construire l'image
+# Build the image
 docker compose -f docker-compose.dev.yml build
 
-# Installer les dépendances dans le volume nommé
+# Install dependencies in the named volume
 docker compose -f docker-compose.dev.yml run --rm bitquest-dev npm ci
 
-# Générer le client Prisma
+# Generate the Prisma client
 docker compose -f docker-compose.dev.yml run --rm bitquest-dev npx prisma generate
 
-# Démarrer le serveur de dev
+# Start the dev server
 docker compose -f docker-compose.dev.yml up
 ```
 
-Application disponible sur `http://localhost:3000`.
+The app is available at `http://localhost:3000`.
 
 ### Option B — Local (Node 20+)
 
-#### Prérequis
+#### Prerequisites
 
-- **Node.js 20** ou supérieur.
-- **npm 10+** (ou npm 11 recommandé — cf. note sur `--package-lock-only`).
+- **Node.js 20** or later.
+- **npm 10+** (npm 11 recommended — see note about `--package-lock-only`).
 
-#### Installation
+#### Install
 
 ```bash
 git clone https://github.com/GandalNexus/bitquest.git
 cd bitquest
 
-# Configurer l'environnement (Postgres + Redis requis)
+# Configure the environment (Postgres + Redis required)
 cat > .env <<'EOF'
 DATABASE_URL="postgresql://bitquest:bitquest@localhost:5432/bitquest"
 REDIS_URL="redis://localhost:6379"
@@ -152,37 +152,37 @@ CSRF_SECRET="change-me-in-production"
 NODE_ENV="development"
 EOF
 
-# Installer et préparer
+# Install and prepare
 npm ci
 npx prisma generate
 npx prisma db push
 npx prisma db seed
 
-# Démarrer
+# Start
 npm run dev
 ```
 
-Ouvre `http://localhost:3000`.
+Open `http://localhost:3000`.
 
-## Scripts npm
+## npm scripts
 
-| Commande | Description |
+| Command | Description |
 |---|---|
-| `npm run dev` | Serveur de développement Next.js (port 3000) |
-| `npm run build` | Build de production Next.js (⚠ voir issue connue en bas) |
-| `npm start` | Serveur de production (nécessite Bun pour `.next/standalone/server.js`) |
+| `npm run dev` | Next.js development server (port 3000) |
+| `npm run build` | Next.js production build (⚠ see known issue at the bottom) |
+| `npm start` | Production server (requires Bun for `.next/standalone/server.js`) |
 | `npm run lint` | oxlint + ESLint |
-| `npm run typecheck` | Vérification TypeScript (`tsc --noEmit`) |
-| `npm test` | Tests Vitest (une passe) |
-| `npm run test:watch` | Tests Vitest en mode watch |
-| `npm run format` | Prettier (écriture) |
-| `npm run format:check` | Prettier (vérification seule) |
-| `npm run db:generate` | Régénère le client Prisma |
-| `npm run db:push` | Synchronise le schéma avec la base (⚠ dev uniquement, `--accept-data-loss`) |
-| `npm run db:migrate` | Crée/applique une migration Prisma (dev) |
-| `npm run db:reset` | Réinitialise la base (⚠ destructif) |
+| `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
+| `npm test` | Vitest tests (single run) |
+| `npm run test:watch` | Vitest in watch mode |
+| `npm run format` | Prettier (write) |
+| `npm run format:check` | Prettier (check only) |
+| `npm run db:generate` | Regenerate the Prisma client |
+| `npm run db:push` | Sync the schema with the database (⚠ dev only, `--accept-data-loss`) |
+| `npm run db:migrate` | Create/apply a Prisma migration (dev) |
+| `npm run db:reset` | Reset the database (⚠ destructive) |
 
-## Structure du projet
+## Project structure
 
 ```
 bitquest/
@@ -191,80 +191,80 @@ bitquest/
 │   │   ├── api/                 # Route handlers (auth, me, quests, wallet, leaderboard)
 │   │   ├── layout.tsx
 │   │   ├── page.tsx             # SPA shell
-│   │   └── global-error.tsx     # Boundary d'erreur racine
+│   │   └── global-error.tsx     # Root error boundary
 │   ├── components/
-│   │   ├── bitquest/            # Composants métier (dashboard, quest-player, etc.)
-│   │   └── ui/                  # Primitives shadcn/ui utilisées (12)
-│   ├── hooks/                   # Hooks React partagés
+│   │   ├── bitquest/            # Feature components (dashboard, quest-player, etc.)
+│   │   └── ui/                  # shadcn/ui primitives used (12)
+│   ├── hooks/                   # Shared React hooks
 │   ├── lib/
 │   │   ├── bitquest/            # Domain layer (progression, missions, quests, …)
-│   │   ├── db.ts                # Instance Prisma singleton
-│   │   ├── seed-data.ts         # 11 quêtes + 15 badges + bots de leaderboard
+│   │   ├── db.ts                # Prisma singleton
+│   │   ├── seed-data.ts         # 11 quests + 15 badges + leaderboard bots
 │   │   └── utils.ts
 │   └── test/
-│       └── setup.ts             # Setup Vitest
+│       └── setup.ts             # Vitest setup
 ├── prisma/
-│   ├── schema.prisma            # 8 modèles (User, Quest, QuizQuestion, …)
+│   ├── schema.prisma            # 8 models (User, Quest, QuizQuestion, …)
 │   └── seed.ts
 ├── docs/                        # Audit, architecture, roadmap, phases, release notes
-├── public/                      # Assets statiques
-├── e2e/                         # Scénarios Playwright + audit axe-core
+├── public/                      # Static assets
+├── e2e/                         # Playwright scenarios + axe-core audit
 ├── Dockerfile.dev
-├── docker-compose.dev.yml       # Postgres 16 + Redis 7 + app dev
+├── docker-compose.dev.yml       # Postgres 16 + Redis 7 + dev app
 ├── docker-compose.yml
 └── .github/workflows/ci.yml
 ```
 
 ## Documentation
 
-Tous les documents de conception et d'audit sont dans `docs/` :
+All design and audit documents live in `docs/`:
 
-- `BITQUEST_AUDIT.md` — Audit du code existant.
-- `BITQUEST_ARCHITECTURE.md` — Architecture cible.
-- `BITQUEST_FEATURE_MATRIX.md` — Écart existant / cible.
-- `BITQUEST_INTEGRATION_BITLAB.md` — Intégration BitLab prévue.
-- `BITQUEST_ROADMAP.md` — Plan de développement par phases.
-- `DOCKER_DEVELOPMENT.md` — Environnement Docker de dev.
-- `PHASE_0_REPORT.md` — Rapport d'hygiène technique (Phase 0).
-- `PHASE_3_BITLAB.md` — Fondation BitLab (TX + INVOICE + JWT challenge).
-- `SECURITY_CHECKLIST.md` — Préparation Phase 5.5.
-- `SPRINT_1B_SCHEMA_PLAN.md` — Plan de migration de schéma Sprint 1B.
-- `LOT_1_DASHBOARD_ACADEMIE.md` — Audit Dashboard + plan Académie.
-- `RELEASE_NOTES_v0.3.md` — Notes de la release 0.3.
-- `CHANGELOG.md` (racine) — Journal versionné.
+- `BITQUEST_AUDIT.md` — Audit of the existing codebase.
+- `BITQUEST_ARCHITECTURE.md` — Target architecture.
+- `BITQUEST_FEATURE_MATRIX.md` — Gap between current and target.
+- `BITQUEST_INTEGRATION_BITLAB.md` — Planned BitLab integration.
+- `BITQUEST_ROADMAP.md` — Phase-by-phase development plan.
+- `DOCKER_DEVELOPMENT.md` — Docker dev environment.
+- `PHASE_0_REPORT.md` — Technical hygiene report (Phase 0).
+- `PHASE_3_BITLAB.md` — BitLab foundation (TX + INVOICE + JWT challenge).
+- `SECURITY_CHECKLIST.md` — Phase 5.5 preparation.
+- `SPRINT_1B_SCHEMA_PLAN.md` — Sprint 1B schema migration plan.
+- `LOT_1_DASHBOARD_ACADEMIE.md` — Dashboard audit + Academy plan.
+- `RELEASE_NOTES_v0.3.md` — Release 0.3 notes.
+- `CHANGELOG.md` (root) — Versioned log.
 
-## Variables d'environnement
+## Environment variables
 
-| Variable | Rôle | Obligatoire |
+| Variable | Role | Required |
 |---|---|---|
-| `DATABASE_URL` | URL Postgres | Oui |
-| `REDIS_URL` | URL Redis | Oui (fallback mémoire si absent) |
-| `SESSION_COOKIE_SECRET` | HMAC du cookie de session | Oui |
-| `CSRF_SECRET` | HMAC du token CSRF | Oui |
-| `BITLAB_JWT_SECRET` | Secret JWT challenge BitLab | Non (fallback `CSRF_SECRET`) |
-| `SENTRY_DSN` | Instrumentation Sentry | Non (no-op si absent) |
+| `DATABASE_URL` | Postgres URL | Yes |
+| `REDIS_URL` | Redis URL | Yes (in-memory fallback if absent) |
+| `SESSION_COOKIE_SECRET` | Session cookie HMAC | Yes |
+| `CSRF_SECRET` | CSRF token HMAC | Yes |
+| `BITLAB_JWT_SECRET` | BitLab challenge JWT secret | No (falls back to `CSRF_SECRET`) |
+| `SENTRY_DSN` | Sentry instrumentation | No (no-op if absent) |
 
-## Issues connues
+## Known issues
 
-- **Vulnérabilités npm** : quelques CVE de niveau moderate persistent sur des
-  dépendances transitives (sharp, @mdxeditor/editor,
-  react-syntax-highlighter). Toutes les corrections impliquent un breaking
-  change. À traiter dans une fenêtre dédiée.
+- **npm vulnerabilities**: a few moderate CVEs persist on transitive
+  dependencies (sharp, @mdxeditor/editor, react-syntax-highlighter).
+  All remediations involve a breaking change. To be addressed in a
+  dedicated window.
 
-## Contribuer
+## Contributing
 
-Les contributions sont bienvenues ! Voir `CONTRIBUTING.md` et `CODE_OF_CONDUCT.md`.
+Contributions are welcome! See `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
 
-Workflow :
+Workflow:
 
-1. Fork + branche de feature.
-2. Vérifier localement : `npm run lint && npm run typecheck && npm test`.
-3. Ouvrir une Pull Request contre `main`.
+1. Fork + feature branch.
+2. Check locally: `npm run lint && npm run typecheck && npm test`.
+3. Open a Pull Request against `main`.
 
-## Sécurité
+## Security
 
-Une vulnérabilité à signaler ? Merci de **ne pas** ouvrir d'issue publique. Suivre la procédure décrite dans `SECURITY.md`.
+Have a vulnerability to report? Please **do not** open a public issue. Follow the procedure described in `SECURITY.md`.
 
-## Licence
+## License
 
 [AGPL-3.0](LICENSE) © GandalNexus

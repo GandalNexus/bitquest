@@ -1,41 +1,41 @@
-# Certificates v1 — Format et vérification
+# Certificates v1 — Format and verification
 
-> Spécification du format Certificate v1 émis par les instances
-> BitQuest. Document pour intégrateurs tiers (portfolios, relays,
-> plateformes RH, autres apprenants).
+> Specification of the Certificate v1 format issued by BitQuest
+> instances. Document for third-party integrators (portfolios, relays,
+> HR platforms, other learners).
 >
-> **Version** : 1 · HMAC-SHA256. V2 passera à Schnorr-secp256k1 pour
-> permettre la vérification offline (NIP-11 Nostr).
+> **Version**: 1 · HMAC-SHA256. V2 will move to Schnorr-secp256k1 to
+> enable offline verification (NIP-11 Nostr).
 
-## 1. Qu'est-ce qu'un Certificate BitQuest ?
+## 1. What is a BitQuest Certificate?
 
-Un Certificate est la trace **exportable et signée** d'une Attestation.
-Une Attestation est elle-même la trace **immuable server-side** d'une
-quête Bitcoin complétée par un apprenant.
+A Certificate is the **exportable, signed** trace of an Attestation.
+An Attestation is itself the **immutable server-side** trace of a
+Bitcoin quest completed by a learner.
 
-- **Attestation** : row DB côté BitQuest, créée via event-bus dès que
-  `UserQuestProgress.status = COMPLETED`. Unique sur
+- **Attestation**: DB row on the BitQuest side, created via the event-bus
+  as soon as `UserQuestProgress.status = COMPLETED`. Unique on
   `(userId, kind, targetCode)`.
-- **Certificate** : blob signé par l'instance BitQuest, téléchargeable
-  par l'apprenant. Le même Certificate peut être recréé à l'identique
-  (idempotence via la clé composite `(attestationId, format)`).
+- **Certificate**: blob signed by the BitQuest instance, downloadable
+  by the learner. The same Certificate can be re-created identically
+  (idempotence via the composite key `(attestationId, format)`).
 
-## 2. Format du blob
+## 2. Blob format
 
-Un Certificate v1 est une chaîne ASCII à 3 parties séparées par des
-points, chacune en base64url (sans padding) :
+A Certificate v1 is an ASCII string with 3 parts separated by dots,
+each one in base64url (no padding):
 
 ```
 v1.<payload>.<signature>
 ```
 
-- `v1` : literal version.
-- `<payload>` : JSON canonicalisé puis base64url. Clés niveau 1
-  triées lexicographiquement avant stringify.
-- `<signature>` : HMAC-SHA256 du `<payload>` (texte base64url, pas
-  des octets du JSON), avec `CERT_SIGN_SECRET` côté serveur.
+- `v1`: literal version.
+- `<payload>`: canonicalized JSON then base64url. Top-level keys
+  sorted lexicographically before stringify.
+- `<signature>`: HMAC-SHA256 of the `<payload>` (base64url text, not
+  the JSON bytes), with `CERT_SIGN_SECRET` on the server side.
 
-## 3. Payload canonique
+## 3. Canonical payload
 
 ```json
 {
@@ -52,62 +52,62 @@ v1.<payload>.<signature>
   },
   "pseudo": "satoshi",
   "targetCode": "genesis",
-  "targetTitle": "Le Bloc Genèse",
+  "targetTitle": "The Genesis Block",
   "userId": "cm789…",
   "v": 1
 }
 ```
 
-Les clés sont **toujours triées** côté serveur avant la signature, pour
-que deux Certificates pour la même attestation produisent exactement
-le même blob (déterminisme). Un vérificateur doit donc trier aussi
-avant de re-signer s'il vérifie depuis le JSON brut.
+Keys are **always sorted** on the server side before signing, so that
+two Certificates for the same attestation produce exactly the same
+blob (determinism). A verifier must therefore sort too before
+re-signing if verifying from raw JSON.
 
-**Types** :
-- `userId`, `attestationId`, `certificateId` : cuid (string).
-- `issuedAt` : ISO 8601 string.
-- `kind` : `QUEST | COURSE | BADGE_EARNED` (v1 : seul `QUEST` est émis
-  automatiquement par le handler event-bus).
-- `metadata` : objet libre, dépend du kind. Pour `QUEST` :
+**Types**:
+- `userId`, `attestationId`, `certificateId`: cuid (string).
+- `issuedAt`: ISO 8601 string.
+- `kind`: `QUEST | COURSE | BADGE_EARNED` (v1: only `QUEST` is emitted
+  automatically by the event-bus handler).
+- `metadata`: free-form object, depends on the kind. For `QUEST`:
   `{ xpEarned, satsEarned, questCode, issuedAtEpoch }`.
-- `v` : literal `1`.
+- `v`: literal `1`.
 
-## 4. Vérification
+## 4. Verification
 
-### 4a. Via l'endpoint public
+### 4a. Via the public endpoint
 
 ```bash
 curl -s "https://bitquest.example.com/api/certificates/verify?blob=v1.XXX.YYY"
 ```
 
-Réponse :
+Response:
 ```json
 {
   "ok": true,
-  "payload": { /* comme ci-dessus */ }
+  "payload": { /* as above */ }
 }
 ```
 
-- Rate-limit IP 60/60s (LOT 29).
-- Content-Type: `application/json` avec headers
+- Rate-limit IP 60/60s (BATCH 29).
+- Content-Type: `application/json` with headers
   `X-Protocol-Version: 1` + `X-Certificate-Version: 1`.
-- Retourne `{ ok: false, error }` + status 400 si signature invalide.
+- Returns `{ ok: false, error }` + status 400 if signature invalid.
 
-### 4b. Vérification locale (impossible en v1)
+### 4b. Local verification (not possible in v1)
 
-En v1, la signature est symétrique (HMAC). Seul le serveur qui
-possède `CERT_SIGN_SECRET` peut re-signer et vérifier. C'est
-volontairement contraint pour simplifier le rollout — la v2 Schnorr
-ouvrira la vérification offline par n'importe quel client qui
-connaît la pubkey de l'instance (NIP-11 Nostr style).
+In v1, the signature is symmetric (HMAC). Only the server holding
+`CERT_SIGN_SECRET` can re-sign and verify. This is intentionally
+constrained to simplify rollout — v2 Schnorr will open offline
+verification to any client that knows the instance's pubkey (NIP-11
+Nostr style).
 
-## 5. Identifier l'instance BitQuest d'origine
+## 5. Identify the originating BitQuest instance
 
 ```bash
 curl -s https://bitquest.example.com/api/version
 ```
 
-Retourne :
+Returns:
 ```json
 {
   "protocolVersion": 1,
@@ -119,42 +119,42 @@ Retourne :
 }
 ```
 
-Le champ `issuer` **doit** matcher le champ `issuer` du payload du
-Certificate pour que la vérification ait du sens. Si un apprenant
-présente un certif émis par `bitquest-rogue.example.com`, ce n'est
-pas un Certificate BitQuest officiel.
+The `issuer` field **must** match the `issuer` field of the
+Certificate payload for verification to make sense. If a learner
+presents a cert issued by `bitquest-rogue.example.com`, it is not an
+official BitQuest Certificate.
 
-## 6. Cycle de vie
+## 6. Lifecycle
 
-1. Apprenant complète une quête → event-bus `quest.completed` →
-   `createQuestAttestation` crée une Attestation en DB.
-2. Apprenant clique « Exporter » sur `/attestations` → POST
-   `/api/me/attestations/[id]/certificate` → Certificate row créé
-   en DB (format="JSON_V1"), blob signé renvoyé au client.
-3. Apprenant télécharge le fichier `.txt` ou copie le lien
-   `?blob=...` → partage avec un tiers.
-4. Tiers ouvre le lien → page `/verify` affiche le payload décodé +
-   badge « Vérifié » emerald.
+1. Learner completes a quest → event-bus `quest.completed` →
+   `createQuestAttestation` creates an Attestation in the DB.
+2. Learner clicks "Export" on `/attestations` → POST
+   `/api/me/attestations/[id]/certificate` → Certificate row created
+   in the DB (format="JSON_V1"), signed blob returned to client.
+3. Learner downloads the `.txt` file or copies the
+   `?blob=...` link → shares with a third party.
+4. Third party opens the link → `/verify` page displays the decoded
+   payload + emerald "Verified" badge.
 
-## 7. Roadmap v2 (préparation NIP-11 Nostr)
+## 7. Roadmap v2 (NIP-11 Nostr preparation)
 
-- Signature Schnorr-secp256k1 (secp256k1 BIP-340).
-- Clé publique de l'instance publiée dans `/.well-known/nostr.json`
-  (NIP-11) + champ `pubkey` dans `/api/version`.
-- Vérification offline par n'importe quel client qui a la pubkey
-  (pas de réseau requis).
-- Blob format : `v2.<payload>.<schnorr_sig_hex>`.
-- Backward compat : le serveur accepte les deux versions au verify
-  (pattern des LOT P0.1/P0.3 côté protocole deep-link).
+- Schnorr-secp256k1 signature (secp256k1 BIP-340).
+- Instance public key published in `/.well-known/nostr.json`
+  (NIP-11) + `pubkey` field in `/api/version`.
+- Offline verification by any client that has the pubkey
+  (no network required).
+- Blob format: `v2.<payload>.<schnorr_sig_hex>`.
+- Backward compat: the server accepts both versions at verify
+  (pattern from BATCH P0.1/P0.3 on the deep-link protocol side).
 
-## 8. Références
+## 8. References
 
-- LOT 25 : handler event-bus `createQuestAttestation`
+- BATCH 25: event-bus handler `createQuestAttestation`
   (`src/lib/handlers/attestations.ts`).
-- LOT 28 : signature HMAC + route emit (`src/lib/certificates/sign.ts`,
+- BATCH 28: HMAC signature + emit route (`src/lib/certificates/sign.ts`,
   `src/app/api/me/attestations/[id]/certificate/route.ts`).
-- LOT 29 : route publique verify
+- BATCH 29: public verify route
   (`src/app/api/certificates/verify/route.ts`).
-- LOT 30 : page `/verify` UI (`src/app/verify/page.tsx`).
-- LOT 42/43 : headers `X-Protocol-Version` + `X-Certificate-Version`.
-- LOT 44 : endpoint `/api/version`.
+- BATCH 30: `/verify` page UI (`src/app/verify/page.tsx`).
+- BATCH 42/43: headers `X-Protocol-Version` + `X-Certificate-Version`.
+- BATCH 44: endpoint `/api/version`.
