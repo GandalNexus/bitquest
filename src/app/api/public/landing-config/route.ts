@@ -1,8 +1,13 @@
 import { db } from "@/lib/db";
 
+// Next 16 revalide la route toutes les 60s (aligné sur le cache CDN
+// annoncé via `cache-control`). Sans ça, le route handler serait rendu
+// statique au build et les modifications admin ne seraient jamais vues.
+export const revalidate = 60;
+
 const SINGLETON_ID = "singleton";
 
-const DEFAULTS = {
+const DEFAULT_URLS = {
   bitquestUrl: "https://bitquest.gandalnexus.com",
   bitlabUrl: "https://bitlab.gandalnexus.com",
   githubOrgUrl: "https://github.com/GandalNexus",
@@ -21,29 +26,69 @@ const PUBLIC_CORS_HEADERS = {
 
 /**
  * GET /api/public/landing-config — consommé par la landing statique (repo
- * `landing/`) pour récupérer les URL de redirection configurées côté admin.
+ * `landing/`) pour récupérer les URL de redirection + les membres d'équipe
+ * + les sponsors/partenaires configurés côté admin.
  *
- * Volontairement public, sans auth, CORS *. Zéro donnée sensible : juste
- * les URL publiques déjà exposées sur le site (BitQuest, BitLab, GitHub,
- * verify). Si la DB est down, on retourne les defaults codés en dur pour
- * ne jamais casser la landing.
+ * Volontairement public, sans auth, CORS *. Zéro donnée sensible : tout
+ * ce qui est retourné est déjà exposé publiquement sur `/gandalnexus`.
+ *
+ * Si la DB est down, on retourne un payload minimal avec juste les URL
+ * defaults — pour que la landing statique ne casse jamais, elle a elle
+ * aussi ses propres defaults en HTML (double sécurité).
  */
 export async function GET() {
   try {
-    const row = await db.landingConfig.findUnique({ where: { id: SINGLETON_ID } });
-    const config = row
-      ? {
-          bitquestUrl: row.bitquestUrl,
-          bitlabUrl: row.bitlabUrl,
-          githubOrgUrl: row.githubOrgUrl,
-          verifyUrl: row.verifyUrl,
-        }
-      : DEFAULTS;
-    return Response.json(config, { headers: PUBLIC_CORS_HEADERS });
+    const [row, teamRows, partnerRows] = await Promise.all([
+      db.landingConfig.findUnique({ where: { id: SINGLETON_ID } }),
+      db.teamMember.findMany({
+        where: { publishedAt: { not: null } },
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          role: true,
+          contribution: true,
+          initials: true,
+          avatarUrl: true,
+        },
+        take: 20,
+      }),
+      db.partner.findMany({
+        where: { publishedAt: { not: null } },
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          tier: true,
+          description: true,
+          websiteUrl: true,
+          logoUrl: true,
+          initials: true,
+        },
+        take: 30,
+      }),
+    ]);
+
+    const payload = {
+      ...(row
+        ? {
+            bitquestUrl: row.bitquestUrl,
+            bitlabUrl: row.bitlabUrl,
+            githubOrgUrl: row.githubOrgUrl,
+            verifyUrl: row.verifyUrl,
+          }
+        : DEFAULT_URLS),
+      team: teamRows,
+      partners: partnerRows,
+    };
+
+    return Response.json(payload, { headers: PUBLIC_CORS_HEADERS });
   } catch {
-    // DB injoignable → fallback silencieux. La landing a ses propres defaults
-    // en HTML, donc c'est une double sécurité.
-    return Response.json(DEFAULTS, { headers: PUBLIC_CORS_HEADERS });
+    // DB injoignable → payload minimal, la landing a ses propres defaults.
+    return Response.json(
+      { ...DEFAULT_URLS, team: [], partners: [] },
+      { headers: PUBLIC_CORS_HEADERS },
+    );
   }
 }
 
