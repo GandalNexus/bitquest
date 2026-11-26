@@ -223,7 +223,59 @@ lsof -i :3000
 #   - "3001:3000"
 ```
 
-### 8.4 Full reset (last resort)
+### 8.4 `Cannot find module '../lightningcss.linux-x64-gnu.node'`
+
+Symptom (seen on `next dev` inside the container):
+
+```
+Error: Cannot find module '../lightningcss.linux-x64-gnu.node'
+Require stack:
+- /app/node_modules/lightningcss/node/index.js
+- /app/node_modules/@tailwindcss/node/dist/index.js
+- /app/node_modules/@tailwindcss/postcss/dist/index.js
+```
+
+Cause: `lightningcss` (pulled by `@tailwindcss/postcss` under Tailwind 4)
+ships its native binary as a set of **platform-specific optional
+dependencies** (`lightningcss-darwin-x64`, `lightningcss-linux-x64-gnu`,
+etc.). npm 10 has a long-standing bug where, on `npm ci`, it sometimes
+installs **only the current platform's** optional binary and skips the
+others — even though the lockfile lists all nine of them. When macOS
+runs `npm ci` and the resulting `node_modules` ends up inside the Linux
+container's named volume, the Linux binary is missing and PostCSS
+cannot load Tailwind.
+
+**Fast fix** (keeps the volume, just adds the missing binary):
+
+```bash
+docker compose -f docker-compose.dev.yml run --rm bitquest-dev \
+  npm install lightningcss-linux-x64-gnu@1.33.0 --no-save --force
+docker compose -f docker-compose.dev.yml restart bitquest-dev
+```
+
+**Clean fix** (resets the volume, reinstalls from scratch inside the
+container with all optional deps included):
+
+```bash
+docker compose -f docker-compose.dev.yml down
+docker volume rm bitquest_node_modules
+docker compose -f docker-compose.dev.yml run --rm bitquest-dev \
+  npm ci --include=optional
+docker compose -f docker-compose.dev.yml run --rm bitquest-dev \
+  npx prisma generate
+docker compose -f docker-compose.dev.yml up
+```
+
+**Permanent prevention**: the repo ships an `.npmrc` with
+`include=optional` so every `npm ci`/`npm install` keeps the
+cross-platform binaries. If that file disappears, re-add:
+
+```
+# .npmrc
+include=optional
+```
+
+### 8.5 Full reset (last resort)
 
 ```bash
 docker compose -f docker-compose.dev.yml down -v
