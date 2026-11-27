@@ -165,7 +165,9 @@ export default async function VerifyPage({
         </Card>
       )}
 
-      {state === "ok" && payload && <CertificateDownload payload={payload} />}
+      {state === "ok" && payload && (
+        <CertificateDownload payload={payload} blob={rawBlob} />
+      )}
 
       {state === "ko" && (
         <Card className="border-destructive/40 bg-destructive/5">
