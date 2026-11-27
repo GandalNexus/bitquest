@@ -31,7 +31,7 @@ the current application.
 |---|---|
 | `npm run db:generate` | Generates the Prisma client (after modifying `schema.prisma`) |
 | `npm run db:migrate` | `prisma migrate dev` — creates/applies a migration in dev |
-| `npm run db:migrate:deploy` | `prisma migrate deploy` — applies existing migrations without creating new ones (prod) |
+| `npm run db:migrate:deploy` | `prisma migrate deploy && prisma generate` — applies pending migrations **and** regenerates the Prisma client so new fields are visible to the runtime (prod). |
 | `npm run db:push` | `prisma db push --accept-data-loss` — to avoid in prod |
 | `npm run db:reset` | Full reset (dev only, destructive) |
 | `npm run db:seed` | Initial seed (`prisma/seed.ts`) |
