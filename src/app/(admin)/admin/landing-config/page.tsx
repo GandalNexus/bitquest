@@ -60,6 +60,10 @@ export default async function AdminLandingConfigPage() {
               bitlabUrl: config.bitlabUrl,
               githubOrgUrl: config.githubOrgUrl,
               verifyUrl: config.verifyUrl,
+              contactEmail: config.contactEmail ?? "",
+              twitterUrl: config.twitterUrl ?? "",
+              nostrPubkey: config.nostrPubkey ?? "",
+              docsUrl: config.docsUrl ?? "",
             }}
             updatedAt={config.updatedAt.toISOString()}
           />

@@ -37,7 +37,21 @@ export async function PATCH(req: Request) {
 
   const parsed = await parseJsonBody(req, adminLandingConfigUpdateSchema);
   if (!parsed.ok) return parsed.response;
-  const data = parsed.data;
+  const raw = parsed.data;
+
+  // Les champs optionnels validés comme chaîne (y compris "") sont convertis
+  // en `null` avant persistance. La landing masque le slot UI quand c'est
+  // null — pas de lien mort, pas de bouton vide.
+  const data = {
+    bitquestUrl: raw.bitquestUrl,
+    bitlabUrl: raw.bitlabUrl,
+    githubOrgUrl: raw.githubOrgUrl,
+    verifyUrl: raw.verifyUrl,
+    contactEmail: raw.contactEmail.length > 0 ? raw.contactEmail : null,
+    twitterUrl: raw.twitterUrl.length > 0 ? raw.twitterUrl : null,
+    nostrPubkey: raw.nostrPubkey.length > 0 ? raw.nostrPubkey : null,
+    docsUrl: raw.docsUrl.length > 0 ? raw.docsUrl : null,
+  };
 
   const config = await db.landingConfig.upsert({
     where: { id: SINGLETON_ID },
@@ -54,6 +68,10 @@ export async function PATCH(req: Request) {
       bitlabUrl: config.bitlabUrl,
       githubOrgUrl: config.githubOrgUrl,
       verifyUrl: config.verifyUrl,
+      contactEmail: config.contactEmail,
+      twitterUrl: config.twitterUrl,
+      nostrPubkey: config.nostrPubkey,
+      docsUrl: config.docsUrl,
     },
   );
 

@@ -10,6 +10,10 @@ interface LandingConfigInitial {
   bitlabUrl: string;
   githubOrgUrl: string;
   verifyUrl: string;
+  contactEmail: string;
+  twitterUrl: string;
+  nostrPubkey: string;
+  docsUrl: string;
 }
 
 const FIELDS: Array<{
@@ -17,30 +21,68 @@ const FIELDS: Array<{
   label: string;
   hint: string;
   placeholder: string;
+  type: "url" | "email" | "text";
+  optional?: boolean;
 }> = [
   {
     key: "bitquestUrl",
     label: "BitQuest",
     hint: "URL publique de l'app BitQuest (CTA « Learn »).",
     placeholder: "https://bitquest.gandalnexus.com",
+    type: "url",
   },
   {
     key: "bitlabUrl",
     label: "BitLab",
     hint: "URL publique de l'app BitLab (CTA « Practice »).",
     placeholder: "https://bitlab.gandalnexus.com",
+    type: "url",
   },
   {
     key: "githubOrgUrl",
     label: "GitHub",
     hint: "URL de l'organisation GitHub (header + footer).",
     placeholder: "https://github.com/GandalNexus",
+    type: "url",
   },
   {
     key: "verifyUrl",
     label: "Vérifier certificat",
     hint: "URL de vérification d'attestation (footer).",
     placeholder: "https://bitquest.gandalnexus.com/verify",
+    type: "url",
+  },
+  {
+    key: "contactEmail",
+    label: "Email contact",
+    hint: "mailto: affiché dans le footer. Laisser vide pour masquer.",
+    placeholder: "hello@gandalnexus.com",
+    type: "email",
+    optional: true,
+  },
+  {
+    key: "twitterUrl",
+    label: "X / Twitter",
+    hint: "Compte officiel. Laisser vide pour masquer l'icône du footer.",
+    placeholder: "https://x.com/gandalnexus",
+    type: "url",
+    optional: true,
+  },
+  {
+    key: "nostrPubkey",
+    label: "Nostr pubkey",
+    hint: "hex 64 chars ou npub1… bech32. Laisser vide pour masquer.",
+    placeholder: "npub1… ou 64 chars hex",
+    type: "text",
+    optional: true,
+  },
+  {
+    key: "docsUrl",
+    label: "Documentation publique",
+    hint: "Lien vers les docs (GitBook, readthedocs…). Vide = masqué.",
+    placeholder: "https://docs.gandalnexus.com",
+    type: "url",
+    optional: true,
   },
 ];
 
@@ -84,6 +126,10 @@ export function LandingConfigForm({
         bitlabUrl: data.config.bitlabUrl,
         githubOrgUrl: data.config.githubOrgUrl,
         verifyUrl: data.config.verifyUrl,
+        contactEmail: data.config.contactEmail,
+        twitterUrl: data.config.twitterUrl,
+        nostrPubkey: data.config.nostrPubkey,
+        docsUrl: data.config.docsUrl,
       });
       setSaved(data.config.updatedAt);
       startTransition(() => router.refresh());
@@ -100,7 +146,14 @@ export function LandingConfigForm({
             htmlFor={`landing-${f.key}`}
             className="flex items-baseline justify-between gap-3 text-sm font-medium"
           >
-            <span>{f.label}</span>
+            <span className="flex items-center gap-1.5">
+              {f.label}
+              {f.optional && (
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground">
+                  optionnel
+                </span>
+              )}
+            </span>
             <span className="text-xs font-normal text-muted-foreground">
               {f.hint}
             </span>
@@ -108,9 +161,9 @@ export function LandingConfigForm({
           <input
             id={`landing-${f.key}`}
             name={f.key}
-            type="url"
-            inputMode="url"
-            required
+            type={f.type === "text" ? "text" : f.type}
+            inputMode={f.type === "email" ? "email" : f.type === "text" ? "text" : "url"}
+            required={!f.optional}
             autoComplete="off"
             spellCheck={false}
             value={state[f.key]}

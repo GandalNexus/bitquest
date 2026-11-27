@@ -76,8 +76,18 @@ export async function GET() {
             bitlabUrl: row.bitlabUrl,
             githubOrgUrl: row.githubOrgUrl,
             verifyUrl: row.verifyUrl,
+            contactEmail: row.contactEmail,
+            twitterUrl: row.twitterUrl,
+            nostrPubkey: row.nostrPubkey,
+            docsUrl: row.docsUrl,
           }
-        : DEFAULT_URLS),
+        : {
+            ...DEFAULT_URLS,
+            contactEmail: null,
+            twitterUrl: null,
+            nostrPubkey: null,
+            docsUrl: null,
+          }),
       team: teamRows,
       partners: partnerRows,
     };
@@ -86,7 +96,15 @@ export async function GET() {
   } catch {
     // DB injoignable → payload minimal, la landing a ses propres defaults.
     return Response.json(
-      { ...DEFAULT_URLS, team: [], partners: [] },
+      {
+        ...DEFAULT_URLS,
+        contactEmail: null,
+        twitterUrl: null,
+        nostrPubkey: null,
+        docsUrl: null,
+        team: [],
+        partners: [],
+      },
       { headers: PUBLIC_CORS_HEADERS },
     );
   }

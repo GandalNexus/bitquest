@@ -441,11 +441,61 @@ const landingUrlSchema = z
     { message: "URL invalide : http(s) requis." },
   );
 
+// Optionnels : accepte "" (vide = effacer la valeur) ou une URL valide.
+// Transformés en `null` côté API avant persistance pour que le landing
+// masque le slot UI correspondant.
+const optionalLandingUrlSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .refine(
+    (v) => {
+      if (v.length === 0) return true;
+      try {
+        const u = new URL(v);
+        return u.protocol === "https:" || u.protocol === "http:";
+      } catch {
+        return false;
+      }
+    },
+    { message: "URL invalide : http(s) requis ou champ vide pour effacer." },
+  );
+
+const optionalEmailSchema = z
+  .string()
+  .trim()
+  .max(320)
+  .refine(
+    (v) => v.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+    { message: "Email invalide ou champ vide pour effacer." },
+  );
+
+// Nostr pubkey : hex 64 chars OU npub1... (bech32, 63 chars typiquement).
+// Format strict mais permissif pour les deux encodages canoniques.
+const optionalNostrSchema = z
+  .string()
+  .trim()
+  .max(128)
+  .refine(
+    (v) =>
+      v.length === 0 ||
+      /^[0-9a-f]{64}$/i.test(v) ||
+      /^npub1[a-z0-9]{50,70}$/.test(v),
+    {
+      message:
+        "Nostr pubkey : hex (64 chars) ou npub1… bech32, ou champ vide.",
+    },
+  );
+
 export const adminLandingConfigUpdateSchema = z.object({
   bitquestUrl: landingUrlSchema,
   bitlabUrl: landingUrlSchema,
   githubOrgUrl: landingUrlSchema,
   verifyUrl: landingUrlSchema,
+  contactEmail: optionalEmailSchema,
+  twitterUrl: optionalLandingUrlSchema,
+  nostrPubkey: optionalNostrSchema,
+  docsUrl: optionalLandingUrlSchema,
 });
 
 export type AdminLandingConfigUpdateBody = z.infer<typeof adminLandingConfigUpdateSchema>;

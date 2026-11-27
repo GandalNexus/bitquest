@@ -497,6 +497,13 @@ model LandingConfig {
   bitlabUrl     String // URL publique de BitLab
   githubOrgUrl  String   @default("https://github.com/GandalNexus")
   verifyUrl     String // URL de vérification d'un certificat BitQuest
+  // Liens contextuels optionnels : affichés par la landing s'ils sont
+  // renseignés, masqués sinon. Évite les liens « morts » si l'équipe
+  // n'a pas encore Twitter/Nostr/doc.
+  contactEmail  String? // mailto: cliquable dans le footer
+  twitterUrl    String? // compte X / Twitter officiel
+  nostrPubkey   String? // npub… ou hex — scannable via nostr clients
+  docsUrl       String? // lien vers les docs publiques (readthedocs, GitBook…)
   updatedAt     DateTime @updatedAt
   updatedBy     String? // userId de l'admin ayant modifié en dernier (traçabilité)
 }
