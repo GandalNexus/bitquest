@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Map,
   Moon,
+  Sparkles,
   Sun,
   type LucideIcon,
 } from "lucide-react";
@@ -41,6 +42,10 @@ export function PublicNav() {
   useEffect(() => setMounted(true), []);
 
   const bitlabUrl = process.env.NEXT_PUBLIC_BITLAB_URL ?? "http://localhost:3001";
+  // URL de la landing (hub public). Admin-configurable via env var ;
+  // par défaut on pointe sur gandalnexus.com qui héberge le repo
+  // `GandalNexus/landing`.
+  const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL ?? "https://gandalnexus.com";
 
   // `theme` est `undefined` au SSR (next-themes lit le localStorage côté
   // client uniquement). Sans guard `mounted`, le aria-label calculé
@@ -64,6 +69,22 @@ export function PublicNav() {
           <OrbiteMark className="h-8 w-8 shrink-0 text-foreground" />
           <QuestBubble className="hidden min-[400px]:inline-block" />
         </Link>
+
+        {/* Retour à la landing publique GandalNexus (hub) — distinct du
+            lien "Accueil BitQuest" qui pointe sur /. Utile quand l'user
+            arrive depuis gandalnexus.com et veut revenir en arrière. */}
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-muted-foreground hover:text-foreground"
+          title="Retour à la landing GandalNexus"
+        >
+          <a href={landingUrl} rel="noopener">
+            <Sparkles className="h-4 w-4 text-primary" aria-hidden />
+            <span className="hidden min-[520px]:inline">Nexus</span>
+          </a>
+        </Button>
 
         <nav
           aria-label="Navigation BitQuest"

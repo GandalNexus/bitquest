@@ -24,6 +24,7 @@ import {
   Compass,
   PenSquare,
   ShieldCheck,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <OrbiteMark className="h-8 w-8 shrink-0 text-foreground" />
             <QuestBubble className="hidden min-[400px]:inline-block" />
           </Link>
+
+          {/* Retour à la landing publique GandalNexus. Pour les utilisateurs
+              arrivés depuis gandalnexus.com qui veulent revenir au hub,
+              distinct du lien "Accueil BitQuest" qui route sur /dashboard. */}
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground hover:text-foreground"
+            title={t("nav.backToLanding")}
+            aria-label={t("nav.backToLanding")}
+          >
+            <a
+              href={
+                process.env.NEXT_PUBLIC_LANDING_URL ?? "https://gandalnexus.com"
+              }
+              rel="noopener"
+            >
+              <Sparkles className="h-4 w-4 text-primary" aria-hidden />
+              <span className="hidden min-[520px]:inline">Nexus</span>
+            </a>
+          </Button>
 
           {/* Stats */}
           {me && (
