@@ -16,8 +16,8 @@ CREATE TABLE "LandingConfig" (
 INSERT INTO "LandingConfig" ("id", "bitquestUrl", "bitlabUrl", "verifyUrl", "updatedAt")
 VALUES (
   'singleton',
-  'https://bitquest.gandalnexus.com',
-  'https://bitlab.gandalnexus.com',
-  'https://bitquest.gandalnexus.com/verify',
+  'https://www.bitquest.gandalnexus.xyz',
+  'https://www.bitlab.gandalnexus.xyz',
+  'https://www.bitquest.gandalnexus.xyz/verify',
   CURRENT_TIMESTAMP
 );

@@ -8,11 +8,11 @@ export const revalidate = 60;
 const SINGLETON_ID = "singleton";
 
 const DEFAULT_URLS = {
-  bitquestUrl: "https://bitquest.gandalnexus.com",
-  bitlabUrl: "https://bitlab.gandalnexus.com",
-  landingUrl: "https://gandalnexus.com",
+  bitquestUrl: "https://www.bitquest.gandalnexus.xyz",
+  bitlabUrl: "https://www.bitlab.gandalnexus.xyz",
+  landingUrl: "https://www.gandalnexus.xyz",
   githubOrgUrl: "https://github.com/GandalNexus",
-  verifyUrl: "https://bitquest.gandalnexus.com/verify",
+  verifyUrl: "https://www.bitquest.gandalnexus.xyz/verify",
 };
 
 const PUBLIC_CORS_HEADERS = {

@@ -2,4 +2,4 @@
 -- par le bouton « Nexus » dans les deux apps. Ajout additif avec default
 -- pour que les rows existantes continuent à fonctionner.
 ALTER TABLE "LandingConfig"
-  ADD COLUMN "landingUrl" TEXT NOT NULL DEFAULT 'https://gandalnexus.com';
+  ADD COLUMN "landingUrl" TEXT NOT NULL DEFAULT 'https://www.gandalnexus.xyz';

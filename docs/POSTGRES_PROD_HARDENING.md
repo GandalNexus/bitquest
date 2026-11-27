@@ -87,7 +87,7 @@ The app binds on `127.0.0.1:3000`. Put Caddy / Nginx / Traefik in front
 with TLS termination and HSTS. Minimal Caddyfile example :
 
 ```
-bitquest.gandalnexus.com {
+www.bitquest.gandalnexus.xyz {
   reverse_proxy 127.0.0.1:3000
   encode zstd gzip
   header {
@@ -351,7 +351,7 @@ echo "[7] CORS strict (BITLAB_ALLOWED_ORIGINS is set, no wildcard)"
 grep -E "^BITLAB_ALLOWED_ORIGINS=" .env.prod | grep -qvE "(\*|localhost)"
 
 echo "[8] TLS terminated at the reverse proxy"
-curl -sI https://bitquest.gandalnexus.com/ | grep -q "HTTP/2 200"
+curl -sI https://www.bitquest.gandalnexus.xyz/ | grep -q "HTTP/2 200"
 
 echo "✅ all checks passed"
 ```

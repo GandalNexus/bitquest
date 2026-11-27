@@ -73,7 +73,7 @@ export function PublicNav() {
 
         {/* Retour à la landing publique GandalNexus (hub) — distinct du
             lien "Accueil BitQuest" qui pointe sur /. Utile quand l'user
-            arrive depuis gandalnexus.com et veut revenir en arrière. */}
+            arrive depuis www.gandalnexus.xyz et veut revenir en arrière. */}
         <Button
           asChild
           variant="ghost"

@@ -108,7 +108,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
 
           {/* Retour à la landing publique GandalNexus. Pour les utilisateurs
-              arrivés depuis gandalnexus.com qui veulent revenir au hub,
+              arrivés depuis www.gandalnexus.xyz qui veulent revenir au hub,
               distinct du lien "Accueil BitQuest" qui route sur /dashboard. */}
           <Button
             asChild

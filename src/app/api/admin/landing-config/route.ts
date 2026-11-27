@@ -10,11 +10,11 @@ import {
 const SINGLETON_ID = "singleton";
 
 const DEFAULTS = {
-  bitquestUrl: "https://bitquest.gandalnexus.com",
-  bitlabUrl: "https://bitlab.gandalnexus.com",
-  landingUrl: "https://gandalnexus.com",
+  bitquestUrl: "https://www.bitquest.gandalnexus.xyz",
+  bitlabUrl: "https://www.bitlab.gandalnexus.xyz",
+  landingUrl: "https://www.gandalnexus.xyz",
   githubOrgUrl: "https://github.com/GandalNexus",
-  verifyUrl: "https://bitquest.gandalnexus.com/verify",
+  verifyUrl: "https://www.bitquest.gandalnexus.xyz/verify",
 };
 
 /** GET /api/admin/landing-config — lit la config landing (ADMIN). */

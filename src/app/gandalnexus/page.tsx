@@ -32,7 +32,7 @@ export const metadata = {
 };
 
 const LANDING_CONFIG_DEFAULTS = {
-  bitlabUrl: "https://bitlab.gandalnexus.com",
+  bitlabUrl: "https://www.bitlab.gandalnexus.xyz",
 } as const;
 
 /**
