@@ -42,6 +42,18 @@ export function PublicNav() {
 
   const bitlabUrl = process.env.NEXT_PUBLIC_BITLAB_URL ?? "http://localhost:3001";
 
+  // `theme` est `undefined` au SSR (next-themes lit le localStorage côté
+  // client uniquement). Sans guard `mounted`, le aria-label calculé
+  // côté serveur ne matche pas celui du premier render client → warning
+  // d'hydratation React. On attend que `mounted` soit true pour afficher
+  // la valeur réelle ; au SSR / premier render client on se contente de
+  // « Changer de thème » qui est valide dans les deux cas.
+  const themeLabel = !mounted
+    ? "Changer de thème"
+    : theme === "dark"
+      ? "Thème clair"
+      : "Thème sombre";
+
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
 
@@ -91,7 +103,7 @@ export function PublicNav() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label={theme === "dark" ? "Thème clair" : "Thème sombre"}
+            aria-label={themeLabel}
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
             {mounted && theme === "dark" ? (
@@ -118,7 +130,7 @@ export function PublicNav() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label={theme === "dark" ? "Thème clair" : "Thème sombre"}
+            aria-label={themeLabel}
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
             {mounted && theme === "dark" ? (
