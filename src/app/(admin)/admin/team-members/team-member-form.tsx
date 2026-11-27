@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
 import { useContentBasePath } from "@/lib/admin/base-path";
 import { PendingButton } from "@/components/ui/pending-button";
+import { ImageField } from "@/components/admin/image-field";
 
 interface TeamMemberInitial {
   id?: string;
@@ -157,19 +158,13 @@ export function TeamMemberForm({
         />
       </label>
 
-      <label className="block text-sm">
-        <span className="block font-medium">URL avatar (optionnelle)</span>
-        <input
-          type="url"
-          value={state.avatarUrl}
-          onChange={(e) => setState({ ...state, avatarUrl: e.target.value })}
-          placeholder="https://…"
-          className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
-        />
-        <span className="mt-1 block text-[11px] text-muted-foreground">
-          Laisse vide pour utiliser les initiales en avatar fallback.
-        </span>
-      </label>
+      <ImageField
+        label="Avatar (optionnel)"
+        hint="URL ou fichier. Vide = initiales en fallback."
+        value={state.avatarUrl}
+        onChange={(next) => setState({ ...state, avatarUrl: next })}
+        initialsFallback={state.initials}
+      />
 
       <label className="inline-flex items-center gap-2 text-sm">
         <input

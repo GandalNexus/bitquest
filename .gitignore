@@ -76,3 +76,9 @@ server.log
 /backups/
 *.dump.gz
 .vitest/
+
+# Admin image uploads — servis depuis public/uploads/ en runtime, à monter
+# sur volume dédié en prod. Seul .gitkeep est versionné (dir doit exister
+# pour que l'endpoint POST /api/admin/uploads/image ait où écrire).
+public/uploads/*
+!public/uploads/.gitkeep

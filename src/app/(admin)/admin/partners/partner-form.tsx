@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { readCookie } from "@/lib/bitquest/client";
 import { useContentBasePath } from "@/lib/admin/base-path";
 import { PendingButton } from "@/components/ui/pending-button";
+import { ImageField } from "@/components/admin/image-field";
 import { PARTNER_TIERS, type PartnerTier } from "@/lib/validation/schemas";
 
 interface PartnerInitial {
@@ -170,31 +171,24 @@ export function PartnerForm({
         />
       </label>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-sm">
-          <span className="block font-medium">URL du site (optionnelle)</span>
-          <input
-            type="url"
-            value={state.websiteUrl}
-            onChange={(e) => setState({ ...state, websiteUrl: e.target.value })}
-            placeholder="https://example.org"
-            className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="block font-medium">URL logo (optionnelle)</span>
-          <input
-            type="url"
-            value={state.logoUrl}
-            onChange={(e) => setState({ ...state, logoUrl: e.target.value })}
-            placeholder="https://example.org/logo.png"
-            className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
-          />
-          <span className="mt-1 block text-[11px] text-muted-foreground">
-            Laisse vide pour utiliser les initiales en fallback.
-          </span>
-        </label>
-      </div>
+      <label className="block text-sm">
+        <span className="block font-medium">URL du site (optionnelle)</span>
+        <input
+          type="url"
+          value={state.websiteUrl}
+          onChange={(e) => setState({ ...state, websiteUrl: e.target.value })}
+          placeholder="https://example.org"
+          className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+        />
+      </label>
+
+      <ImageField
+        label="Logo (optionnel)"
+        hint="URL ou fichier. Vide = initiales en fallback."
+        value={state.logoUrl}
+        onChange={(next) => setState({ ...state, logoUrl: next })}
+        initialsFallback={state.initials}
+      />
 
       <label className="inline-flex items-center gap-2 text-sm">
         <input

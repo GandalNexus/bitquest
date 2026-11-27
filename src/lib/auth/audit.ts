@@ -51,7 +51,8 @@ export type AuditAction =
   | "AI_DRAFT_GENERATE"
   | "AI_DRAFT_APPROVE"
   | "AI_DRAFT_REJECT"
-  | "AI_CONFIG_UPDATE";
+  | "AI_CONFIG_UPDATE"
+  | "UPLOAD_IMAGE";
 
 export async function logAdminAction(
   actorId: string,
