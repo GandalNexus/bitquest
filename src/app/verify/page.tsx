@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { verifyCertificate } from "@/lib/certificates/sign";
 import { PublicNav } from "@/components/bitquest/public-nav";
+import { CertificateDownload } from "./certificate-download";
 
 export const dynamic = "force-dynamic";
 
@@ -163,6 +164,8 @@ export default async function VerifyPage({
           </CardContent>
         </Card>
       )}
+
+      {state === "ok" && payload && <CertificateDownload payload={payload} />}
 
       {state === "ko" && (
         <Card className="border-destructive/40 bg-destructive/5">
