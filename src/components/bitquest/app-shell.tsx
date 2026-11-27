@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useBitQuest, type View } from "@/lib/bitquest/store";
 import { useMe, useIsAdmin, useIsEditor, useRole } from "@/lib/bitquest/hooks";
 import { api, clearStoredSession } from "@/lib/bitquest/client";
-import { useLandingUrl } from "@/lib/bitquest/use-landing-url";
+import { useLandingUrl } from "@/lib/bitquest/use-landing-config";
 import { XpBar } from "./ui-bits";
 import { OrbiteMark, QuestBubble } from "./brand";
 import { formatSats } from "@/lib/bitquest/client";

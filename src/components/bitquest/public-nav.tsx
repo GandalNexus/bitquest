@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useLandingUrl } from "@/lib/bitquest/use-landing-url";
+import { useBitlabUrl, useLandingUrl } from "@/lib/bitquest/use-landing-config";
 import { OrbiteMark, QuestBubble } from "./brand";
 
 /**
@@ -42,10 +42,10 @@ export function PublicNav() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const bitlabUrl = process.env.NEXT_PUBLIC_BITLAB_URL ?? "http://localhost:3001";
-  // URL du hub public GandalNexus — admin-configurable via
-  // `LandingConfig.landingUrl` consommé par le hook ; fallback
-  // `https://gandalnexus.com` jusqu'à réception du fetch.
+  // URLs admin-configurables via `LandingConfig` côté BitQuest. Les 2
+  // hooks partagent un seul fetch sous le capot (useLandingConfig) +
+  // cache sessionStorage 10 min pour zéro flicker entre pages.
+  const bitlabUrl = useBitlabUrl();
   const landingUrl = useLandingUrl();
 
   // `theme` est `undefined` au SSR (next-themes lit le localStorage côté

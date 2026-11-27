@@ -31,7 +31,23 @@ export const metadata = {
     "GandalNexus est un écosystème open-source Bitcoin : un parcours gamifié (BitQuest) et un laboratoire non-custodial (BitLab) pour apprendre, pratiquer et posséder vraiment. De l'Afrique vers le monde.",
 };
 
-const BITLAB_URL = process.env.NEXT_PUBLIC_BITLAB_URL ?? "http://localhost:3001";
+const LANDING_CONFIG_DEFAULTS = {
+  bitlabUrl: "https://bitlab.gandalnexus.com",
+} as const;
+
+/**
+ * Lit `bitlabUrl` depuis `LandingConfig` (singleton, admin-mutable à
+ * chaud). Fallback silencieux sur la constante si la table n'existe
+ * pas encore (ex. environnement fraîchement migré).
+ */
+async function getBitlabUrlFromDb(): Promise<string> {
+  try {
+    const row = await db.landingConfig.findUnique({ where: { id: "singleton" } });
+    return row?.bitlabUrl ?? LANDING_CONFIG_DEFAULTS.bitlabUrl;
+  } catch {
+    return LANDING_CONFIG_DEFAULTS.bitlabUrl;
+  }
+}
 
 const OBJECTIVES: Array<{ icon: LucideIcon; title: string; body: string }> = [
   {
@@ -56,7 +72,7 @@ const OBJECTIVES: Array<{ icon: LucideIcon; title: string; body: string }> = [
   },
 ];
 
-const PROJECTS: Array<{
+type Project = {
   icon: LucideIcon;
   name: string;
   tagline: string;
@@ -65,7 +81,10 @@ const PROJECTS: Array<{
   cta: { label: string; href: string };
   license: string;
   accent: string;
-}> = [
+};
+
+function buildProjects(bitlabUrl: string): Project[] {
+  return [
   {
     icon: BookOpen,
     name: "BitQuest",
@@ -94,11 +113,12 @@ const PROJECTS: Array<{
       "Transactions brutes avec signature client",
       "Mode regtest pour tester sans Internet",
     ],
-    cta: { label: "Ouvrir BitLab", href: BITLAB_URL },
+    cta: { label: "Ouvrir BitLab", href: bitlabUrl },
     license: "MIT",
     accent: "text-emerald-500",
   },
-];
+  ];
+}
 
 /**
  * Fallback utilisé si la table TeamMember est vide (ex. post-déploiement
@@ -192,8 +212,12 @@ const PRINCIPLES = [
 ];
 
 export default async function GandalNexusLandingPage() {
-  const members = await getPublishedMembers();
-  const partners = await getPublishedPartners();
+  const [members, partners, bitlabUrl] = await Promise.all([
+    getPublishedMembers(),
+    getPublishedPartners(),
+    getBitlabUrlFromDb(),
+  ]);
+  const projects = buildProjects(bitlabUrl);
   const partnersByTier = TIER_ORDER.map((tier) => ({
     tier,
     label: TIER_META[tier].label,
@@ -218,7 +242,7 @@ export default async function GandalNexusLandingPage() {
               <Link href="/">BitQuest</Link>
             </Button>
             <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
-              <a href={BITLAB_URL} rel="noopener">
+              <a href={bitlabUrl} rel="noopener">
                 BitLab
               </a>
             </Button>
@@ -255,7 +279,7 @@ export default async function GandalNexusLandingPage() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <a href={BITLAB_URL} rel="noopener">
+              <a href={bitlabUrl} rel="noopener">
                 <FlaskConical className="h-5 w-5" aria-hidden />
                 Explorer BitLab
               </a>
@@ -287,7 +311,7 @@ export default async function GandalNexusLandingPage() {
           </p>
         </div>
         <div className="grid gap-6 md:grid-cols-2">
-          {PROJECTS.map((p) => {
+          {projects.map((p) => {
             const Icon = p.icon;
             return (
               <Card key={p.name} className="h-full">
@@ -558,7 +582,7 @@ export default async function GandalNexusLandingPage() {
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <a href={BITLAB_URL} rel="noopener">
+            <a href={bitlabUrl} rel="noopener">
               <FlaskConical className="h-5 w-5" aria-hidden />
               Lancer BitLab
             </a>
@@ -587,7 +611,7 @@ export default async function GandalNexusLandingPage() {
             <Link href="/" className="hover:text-foreground">
               BitQuest
             </Link>
-            <a href={BITLAB_URL} rel="noopener" className="hover:text-foreground">
+            <a href={bitlabUrl} rel="noopener" className="hover:text-foreground">
               BitLab
             </a>
             <Link href="/verify" className="hover:text-foreground">
