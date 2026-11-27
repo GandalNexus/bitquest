@@ -495,6 +495,7 @@ model LandingConfig {
   id            String   @id @default("singleton") // forcé à "singleton" : 1 seule ligne par environnement
   bitquestUrl   String // URL publique de BitQuest
   bitlabUrl     String // URL publique de BitLab
+  landingUrl    String   @default("https://gandalnexus.com") // URL du hub public (repo GandalNexus/landing). Consommée par le bouton « Nexus » dans BitQuest + BitLab.
   githubOrgUrl  String   @default("https://github.com/GandalNexus")
   verifyUrl     String // URL de vérification d'un certificat BitQuest
   // Liens contextuels optionnels : affichés par la landing s'ils sont

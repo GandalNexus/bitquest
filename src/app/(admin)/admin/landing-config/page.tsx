@@ -11,6 +11,7 @@ const SINGLETON_ID = "singleton";
 const DEFAULTS = {
   bitquestUrl: "https://bitquest.gandalnexus.com",
   bitlabUrl: "https://bitlab.gandalnexus.com",
+  landingUrl: "https://gandalnexus.com",
   githubOrgUrl: "https://github.com/GandalNexus",
   verifyUrl: "https://bitquest.gandalnexus.com/verify",
 };
@@ -58,6 +59,7 @@ export default async function AdminLandingConfigPage() {
             initial={{
               bitquestUrl: config.bitquestUrl,
               bitlabUrl: config.bitlabUrl,
+              landingUrl: config.landingUrl,
               githubOrgUrl: config.githubOrgUrl,
               verifyUrl: config.verifyUrl,
               contactEmail: config.contactEmail ?? "",

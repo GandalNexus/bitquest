@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useBitQuest, type View } from "@/lib/bitquest/store";
 import { useMe, useIsAdmin, useIsEditor, useRole } from "@/lib/bitquest/hooks";
 import { api, clearStoredSession } from "@/lib/bitquest/client";
+import { useLandingUrl } from "@/lib/bitquest/use-landing-url";
 import { XpBar } from "./ui-bits";
 import { OrbiteMark, QuestBubble } from "./brand";
 import { formatSats } from "@/lib/bitquest/client";
@@ -60,6 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
   const t = useT();
   const [mounted, setMounted] = useState(false);
+  const landingUrl = useLandingUrl();
 
   /** Détermine l'onglet actif : URL si on est sur une route /dashboard|/quests|…, sinon store.view (mode SPA /) */
   const isRouteMode = pathname !== null && pathname !== "/" && !pathname.startsWith("/academy");
@@ -116,12 +118,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             title={t("nav.backToLanding")}
             aria-label={t("nav.backToLanding")}
           >
-            <a
-              href={
-                process.env.NEXT_PUBLIC_LANDING_URL ?? "https://gandalnexus.com"
-              }
-              rel="noopener"
-            >
+            <a href={landingUrl} rel="noopener">
               <Sparkles className="h-4 w-4 text-primary" aria-hidden />
               <span className="hidden min-[520px]:inline">Nexus</span>
             </a>

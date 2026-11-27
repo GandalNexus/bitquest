@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLandingUrl } from "@/lib/bitquest/use-landing-url";
 import { OrbiteMark, QuestBubble } from "./brand";
 
 /**
@@ -42,10 +43,10 @@ export function PublicNav() {
   useEffect(() => setMounted(true), []);
 
   const bitlabUrl = process.env.NEXT_PUBLIC_BITLAB_URL ?? "http://localhost:3001";
-  // URL de la landing (hub public). Admin-configurable via env var ;
-  // par défaut on pointe sur gandalnexus.com qui héberge le repo
-  // `GandalNexus/landing`.
-  const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL ?? "https://gandalnexus.com";
+  // URL du hub public GandalNexus — admin-configurable via
+  // `LandingConfig.landingUrl` consommé par le hook ; fallback
+  // `https://gandalnexus.com` jusqu'à réception du fetch.
+  const landingUrl = useLandingUrl();
 
   // `theme` est `undefined` au SSR (next-themes lit le localStorage côté
   // client uniquement). Sans guard `mounted`, le aria-label calculé

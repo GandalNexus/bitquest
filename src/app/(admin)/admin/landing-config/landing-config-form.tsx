@@ -8,6 +8,7 @@ import { PendingButton } from "@/components/ui/pending-button";
 interface LandingConfigInitial {
   bitquestUrl: string;
   bitlabUrl: string;
+  landingUrl: string;
   githubOrgUrl: string;
   verifyUrl: string;
   contactEmail: string;
@@ -36,6 +37,13 @@ const FIELDS: Array<{
     label: "BitLab",
     hint: "URL publique de l'app BitLab (CTA « Practice »).",
     placeholder: "https://bitlab.gandalnexus.com",
+    type: "url",
+  },
+  {
+    key: "landingUrl",
+    label: "Landing (hub public)",
+    hint: "URL de la landing GandalNexus — bouton « Nexus » dans BitQuest + BitLab.",
+    placeholder: "https://gandalnexus.com",
     type: "url",
   },
   {
@@ -124,6 +132,7 @@ export function LandingConfigForm({
       setState({
         bitquestUrl: data.config.bitquestUrl,
         bitlabUrl: data.config.bitlabUrl,
+        landingUrl: data.config.landingUrl,
         githubOrgUrl: data.config.githubOrgUrl,
         verifyUrl: data.config.verifyUrl,
         contactEmail: data.config.contactEmail,

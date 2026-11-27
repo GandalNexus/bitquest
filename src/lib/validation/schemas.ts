@@ -490,6 +490,7 @@ const optionalNostrSchema = z
 export const adminLandingConfigUpdateSchema = z.object({
   bitquestUrl: landingUrlSchema,
   bitlabUrl: landingUrlSchema,
+  landingUrl: landingUrlSchema,
   githubOrgUrl: landingUrlSchema,
   verifyUrl: landingUrlSchema,
   contactEmail: optionalEmailSchema,

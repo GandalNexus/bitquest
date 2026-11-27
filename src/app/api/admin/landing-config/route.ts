@@ -12,6 +12,7 @@ const SINGLETON_ID = "singleton";
 const DEFAULTS = {
   bitquestUrl: "https://bitquest.gandalnexus.com",
   bitlabUrl: "https://bitlab.gandalnexus.com",
+  landingUrl: "https://gandalnexus.com",
   githubOrgUrl: "https://github.com/GandalNexus",
   verifyUrl: "https://bitquest.gandalnexus.com/verify",
 };
@@ -45,6 +46,7 @@ export async function PATCH(req: Request) {
   const data = {
     bitquestUrl: raw.bitquestUrl,
     bitlabUrl: raw.bitlabUrl,
+    landingUrl: raw.landingUrl,
     githubOrgUrl: raw.githubOrgUrl,
     verifyUrl: raw.verifyUrl,
     contactEmail: raw.contactEmail.length > 0 ? raw.contactEmail : null,
@@ -66,6 +68,7 @@ export async function PATCH(req: Request) {
     {
       bitquestUrl: config.bitquestUrl,
       bitlabUrl: config.bitlabUrl,
+      landingUrl: config.landingUrl,
       githubOrgUrl: config.githubOrgUrl,
       verifyUrl: config.verifyUrl,
       contactEmail: config.contactEmail,

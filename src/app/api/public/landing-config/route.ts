@@ -10,6 +10,7 @@ const SINGLETON_ID = "singleton";
 const DEFAULT_URLS = {
   bitquestUrl: "https://bitquest.gandalnexus.com",
   bitlabUrl: "https://bitlab.gandalnexus.com",
+  landingUrl: "https://gandalnexus.com",
   githubOrgUrl: "https://github.com/GandalNexus",
   verifyUrl: "https://bitquest.gandalnexus.com/verify",
 };
@@ -74,6 +75,7 @@ export async function GET() {
         ? {
             bitquestUrl: row.bitquestUrl,
             bitlabUrl: row.bitlabUrl,
+            landingUrl: row.landingUrl,
             githubOrgUrl: row.githubOrgUrl,
             verifyUrl: row.verifyUrl,
             contactEmail: row.contactEmail,
